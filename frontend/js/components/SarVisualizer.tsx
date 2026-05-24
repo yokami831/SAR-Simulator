@@ -24,6 +24,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createSarScene, SarSceneHandle, SarParams, computeDerived } from './SarSceneManager.js';
+import { schedulePulses, bandFillCss, TimingInput } from './sarTiming.js';
 
 // Parameter definition shape (subset of the block JSON parameter entries).
 export interface SarParamDef {
@@ -130,64 +131,127 @@ function SarEnumRow({ def, value, onChange }: {
   );
 }
 
-// ---- timing diagram (canvas 2D) -------------------------------------------
-// Phase A: a simple PRF/pulse-width strip. Phase C ports the full TX/RX
-// sub-band diagram from sar-visualizer's TimingDiagram.tsx.
-function TimingStrip({ prfHz, pulseUs, derived }: {
-  prfHz: number; pulseUs: number; derived: { roundTripMs: number };
-}) {
+// ---- shared sim clock ------------------------------------------------------
+// A tiny mutable clock advanced by the timing diagram's rAF loop and read by
+// both the diagram and the 3D pulse animation. slowMo factor 10^slowMoExp maps
+// wall-clock dt to sim seconds (default 1e-3 = 1/1000x, matches sar-visualizer).
+export interface SimClock { t: number; running: boolean; slowMoExp: number; }
+
+// ---- timing diagram (canvas 2D, faithful port of TimingDiagram.tsx) --------
+const NOW_FRACTION = 0.75;
+const WINDOW_S = 0.005;     // 5 ms visible window (default zoom)
+const EVENT_WINDOW_S = 0.01;
+const MIN_BAND_PX = 2;
+
+function TimingDiagram({ timing, clock }: { timing: TimingInput; clock: React.MutableRefObject<SimClock> }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const timingRef = useRef(timing);
+  timingRef.current = timing;
+
   useEffect(() => {
     const cv = ref.current;
     if (!cv) return;
     const ctx = cv.getContext('2d');
     if (!ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = cv.clientWidth, h = cv.clientHeight;
-    cv.width = Math.max(w * dpr, 1); cv.height = Math.max(h * dpr, 1);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = '#0d1424';
-    ctx.fillRect(0, 0, w, h);
+    let raf = 0;
+    let last = performance.now();
 
-    const pri_ms = 1000 / prfHz;           // pulse repetition interval [ms]
-    const windowMs = pri_ms * 3.2;         // show ~3 PRIs
-    const t0pad = 8, tEnd = w - 8;
-    const xOf = (ms: number) => t0pad + (ms / windowMs) * (tEnd - t0pad);
+    const draw = (now: number) => {
+      const dt = (now - last) / 1000; last = now;
+      const ck = clock.current;
+      const factor = Math.pow(10, ck.slowMoExp);
+      if (ck.running) ck.t += dt * factor;
+      const t = ck.t;
 
-    // ms grid
-    ctx.strokeStyle = '#1d2940';
-    ctx.fillStyle = '#5a6783';
-    ctx.font = '9px ui-monospace, monospace';
-    for (let ms = 0; ms <= windowMs; ms += pri_ms) {
-      const x = xOf(ms);
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-    }
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = cv.clientWidth, h = cv.clientHeight;
+      cv.width = Math.max(w * dpr, 1); cv.height = Math.max(h * dpr, 1);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = '#0d1424'; ctx.fillRect(0, 0, w, h);
 
-    const txY = 14, rxY = h - 22, trackH = 12;
-    ctx.fillStyle = '#8a9bb4';
-    ctx.fillText('TX', 4, txY - 3);
-    ctx.fillText('RX', 4, rxY - 3);
+      const t0 = t - WINDOW_S * NOW_FRACTION;
+      const tEnd = t0 + WINDOW_S;
+      const labelW = 24;
+      const xOf = (s: number) => labelW + ((s - t0) / WINDOW_S) * (w - labelW);
 
-    // Draw pulses across the window.
-    const pwMs = pulseUs / 1000;
-    const rttMs = derived.roundTripMs;
-    const echoMs = pwMs; // Phase A: echo as a single block (sub-band ramp in Phase C)
-    for (let k = 0; k * pri_ms <= windowMs; k++) {
-      const tTx = k * pri_ms;
-      // TX block
-      const xTx = xOf(tTx), wTx = Math.max(xOf(tTx + pwMs) - xTx, 1.5);
-      ctx.fillStyle = '#5dd5ff';
-      ctx.fillRect(xTx, txY, wTx, trackH);
-      // RX block (delayed by round-trip)
-      const tRx = tTx + rttMs;
-      if (tRx <= windowMs) {
-        const xRx = xOf(tRx), wRx = Math.max(xOf(tRx + echoMs) - xRx, 1.5);
-        ctx.fillStyle = '#ff8c42';
-        ctx.fillRect(xRx, rxY, wRx, trackH);
+      // grid: 1 ms major, 0.2 ms minor
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(58,77,118,0.35)';
+      const minorStep = 0.0002;
+      for (let s = Math.ceil(t0 / minorStep) * minorStep; s <= tEnd; s += minorStep) {
+        const x = xOf(s);
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
       }
-    }
-  });
+      ctx.strokeStyle = '#3a4d76';
+      ctx.fillStyle = '#5a6783';
+      ctx.font = '9px ui-monospace, monospace';
+      ctx.textAlign = 'start';
+      for (let ms = Math.ceil(t0 * 1000); ms <= Math.floor(tEnd * 1000); ms++) {
+        const x = xOf(ms / 1000);
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+        ctx.fillText(`${ms}ms`, x + 2, h - 2);
+      }
+
+      // tracks: each occupies half the available band height (bars are half
+      // as tall as the slot, leaving breathing room above/below).
+      const trackTopY = 12;
+      const trackH = (h - trackTopY - 14) / 2;
+      const txTop = trackTopY;
+      const rxTop = trackTopY + trackH + 2;
+      const trackInnerH = (trackH - 4) * 0.5;     // half-height bars
+      const rxInnerOffset = trackH - 4 - trackInnerH; // push RX bars to the bottom of their slot
+      const N = Math.max(1, Math.floor(timingRef.current.nSub));
+      const visualRow = (k: number) => N - 1 - k;
+      const rowYTop = (top: number, k: number) => top + (visualRow(k) * trackInnerH) / N;
+      const rowH = trackInnerH / N;
+
+      ctx.fillStyle = '#5dd5ff'; ctx.fillText('TX', 2, txTop + 8);
+      ctx.fillStyle = '#ff8c42'; ctx.fillText('RX', 2, rxTop + rxInnerOffset + 8);
+
+      const pulses = schedulePulses(timingRef.current, t - EVENT_WINDOW_S, t + EVENT_WINDOW_S);
+      const drawRect = (s0: number, s1: number, yTop: number, fill: string) => {
+        const x0 = Math.max(labelW, xOf(s0));
+        const x1 = Math.min(w, xOf(s1));
+        if (x1 <= x0) return;
+        ctx.fillStyle = fill;
+        ctx.fillRect(x0, yTop, Math.max(MIN_BAND_PX, x1 - x0), Math.max(MIN_BAND_PX, rowH));
+      };
+      for (const p of pulses) {
+        for (let k = 0; k < p.subBands.length; k++) {
+          const sb = p.subBands[k];
+          const col = bandFillCss(k, N);
+          drawRect(sb.txStart, sb.txStart + sb.pw, rowYTop(txTop, k), col);
+          drawRect(sb.nearArrive, sb.farArrive + sb.pw, rowYTop(rxTop + rxInnerOffset, k), col);
+        }
+      }
+
+      // overlap (blind range): pink blink where TX and RX coincide
+      const blink = 0.35 + 0.4 * (0.5 + 0.5 * Math.sin((now / 400) * 2 * Math.PI));
+      ctx.fillStyle = `rgba(255,47,107,${blink.toFixed(3)})`;
+      for (const pTx of pulses) for (const sbTx of pTx.subBands) {
+        for (const pRx of pulses) for (const sbRx of pRx.subBands) {
+          const o0 = Math.max(sbTx.txStart, sbRx.nearArrive);
+          const o1 = Math.min(sbTx.txStart + sbTx.pw, sbRx.farArrive + sbRx.pw);
+          if (o0 < o1) {
+            const x0 = Math.max(labelW, xOf(o0)), x1 = Math.min(w, xOf(o1));
+            if (x1 > x0) ctx.fillRect(x0, txTop, x1 - x0, rxTop + trackInnerH - txTop);
+          }
+        }
+      }
+
+      // NOW (ANT) cursor
+      const xn = xOf(t);
+      ctx.strokeStyle = '#ffc344'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(xn, 8); ctx.lineTo(xn, h); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#ffc344';
+      ctx.beginPath(); ctx.moveTo(xn - 4, 1); ctx.lineTo(xn + 4, 1); ctx.lineTo(xn, 8); ctx.closePath(); ctx.fill();
+
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, [clock]);
+
   return <canvas ref={ref} className="sarviz-timing-canvas" />;
 }
 
@@ -196,6 +260,14 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
   const sceneHostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SarSceneHandle | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Shared sim clock + latest timing params (refs so the once-only mount effect
+  // can read current values without re-subscribing).
+  const clockRef = useRef<SimClock>({ t: 0, running: true, slowMoExp: -3 });
+  const timingRef = useRef<TimingInput>({
+    altitudeM: 514e3, lookRad: 25 * DEG, beamRgRad: 2 * DEG,
+    prfHz: 4000, pulseWidthS: 10e-6, nSub: 8, chirpDir: 'up',
+  });
 
   const sliderDefs = useMemo(() => paramDefs.filter((d) => d.dtype !== 'enum'), [paramDefs]);
   const enumDefs = useMemo(() => paramDefs.filter((d) => d.dtype === 'enum'), [paramDefs]);
@@ -213,6 +285,7 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
         if (cancelled) { handle.dispose(); return; }
         sceneRef.current = handle;
         handle.update(toSarParams(params, paramDefs));
+        handle.setTiming(timingRef.current, clockRef.current);
       })
       .catch((e) => setError(String(e)));
     return () => {
@@ -234,6 +307,29 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
 
   const prfHz = parseFloat(params.prf_hz ?? paramDefs.find((d) => d.id === 'prf_hz')?.default ?? '4000');
   const pulseUs = parseFloat(params.pulse_width_us ?? paramDefs.find((d) => d.id === 'pulse_width_us')?.default ?? '10');
+
+  const [running, setRunning] = useState(true);
+  const [slowMoExp, setSlowMoExp] = useState(-3);
+  useEffect(() => { clockRef.current.running = running; }, [running]);
+  useEffect(() => { clockRef.current.slowMoExp = slowMoExp; }, [slowMoExp]);
+
+  // Timing parameters (shared by 2D + 3D). Sub-band count kept modest (8) to
+  // stay light inside a node vs the original's 64.
+  const timing: TimingInput = useMemo(() => ({
+    altitudeM: sarParams.altitudeM,
+    lookRad: sarParams.lookRad,
+    beamRgRad: sarParams.beamRgRad,
+    prfHz,
+    pulseWidthS: pulseUs * 1e-6,
+    nSub: 8,
+    chirpDir: (params.chirp_dir as 'up' | 'down' | 'updown') ?? 'up',
+  }), [sarParams.altitudeM, sarParams.lookRad, sarParams.beamRgRad, prfHz, pulseUs, params.chirp_dir]);
+
+  // Keep the ref current and hand timing + clock to the 3D scene.
+  useEffect(() => {
+    timingRef.current = timing;
+    sceneRef.current?.setTiming(timing, clockRef.current);
+  }, [timing]);
 
   return (
     <div className="sarviz-body nodrag nopan nowheel"
@@ -271,10 +367,20 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
         </div>
       </div>
 
-      {/* Bottom: timing diagram */}
+      {/* Bottom: timing diagram + playback controls */}
       <div className="sarviz-timing">
-        <div className="sarviz-section-title sarviz-timing-title">TIMING (TX / RX)</div>
-        <TimingStrip prfHz={prfHz} pulseUs={pulseUs} derived={derived} />
+        <div className="sarviz-timing-header">
+          <span className="sarviz-section-title sarviz-timing-title">TIMING (TX / RX)</span>
+          <button className="sarviz-play-btn nodrag nopan"
+            onClick={(e) => { e.stopPropagation(); setRunning((r) => !r); }}
+            title={running ? 'Pause' : 'Play'}>{running ? '❚❚' : '▶'}</button>
+          <span className="sarviz-slowmo-label">slow-mo 1/{Math.round(1 / Math.pow(10, slowMoExp)).toLocaleString()}x</span>
+          <input type="range" className="sarviz-slowmo nodrag nopan" min={-5} max={-2} step={0.1}
+            value={slowMoExp}
+            onChange={(e) => setSlowMoExp(parseFloat(e.target.value))}
+            onMouseDown={(e) => e.stopPropagation()} />
+        </div>
+        <TimingDiagram timing={timing} clock={clockRef} />
       </div>
     </div>
   );

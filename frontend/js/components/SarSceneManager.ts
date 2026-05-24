@@ -22,6 +22,10 @@
 
 import type * as THREE_NS from 'three';
 import type { OrbitControls as OrbitControlsType } from 'three/examples/jsm/controls/OrbitControls.js';
+import { schedulePulses, chirpRampColor, TimingInput, SPEED_OF_LIGHT } from './sarTiming.js';
+
+/** Mutable sim clock shared with SarVisualizer's 2D timing diagram. */
+export interface SimClock { t: number; running: boolean; slowMoExp: number; }
 
 // Lazy three import (same approach as SurfaceRendererManager).
 let THREE: typeof THREE_NS | null = null;
@@ -63,6 +67,8 @@ export interface SarSceneHandle {
   dispose(): void;
   /** Derived read-outs for the telemetry panel. */
   derived(params: SarParams): SarDerived;
+  /** Provide the timing parameters + shared sim clock for the 3D pulse animation. */
+  setTiming(timing: TimingInput, clock: SimClock): void;
 }
 
 export interface SarDerived {
@@ -323,8 +329,75 @@ export async function createSarScene(host: HTMLDivElement): Promise<SarSceneHand
   swath.rotation.x = -Math.PI / 2;
   scene.add(swath);
 
-  // ---- update logic --------------------------------------------------------
+  // ---- TX/RX pulse animation -----------------------------------------------
+  // A small pool of spheres represents the leading edge of each in-flight pulse:
+  // TX travels satellite -> beam centre along the slant line; RX travels beam
+  // centre -> satellite. Colour follows the chirp ramp. Kept to a small pool so
+  // a node stays light (the original uses InstancedMesh with 128/256 capacity).
+  const PULSE_POOL = 24;
+  const pulseGeo = new T.SphereGeometry(0.045, 10, 8);
+  const pulseGroup = new T.Group();
+  const pulseMeshes: THREE_NS.Mesh[] = [];
+  for (let i = 0; i < PULSE_POOL; i++) {
+    const mesh = new T.Mesh(pulseGeo, new T.MeshBasicMaterial({ color: 0xffffff }));
+    mesh.visible = false;
+    pulseGroup.add(mesh);
+    pulseMeshes.push(mesh);
+  }
+  scene.add(pulseGroup);
+
   let current: SarParams | null = null;
+  let timingInput: TimingInput | null = null;
+  let simClock: SimClock | null = null;
+
+  function setTiming(t: TimingInput, clock: SimClock) {
+    timingInput = t;
+    simClock = clock;
+  }
+
+  // Advance the pulse pool to sim time `t`. Each in-flight pulse is shown as a
+  // moving leading-edge marker on the slant path (TX outbound, RX inbound).
+  function updatePulses() {
+    if (!timingInput || !simClock || !current) {
+      for (const mm of pulseMeshes) mm.visible = false;
+      return;
+    }
+    const t = simClock.t;
+    const p = current;
+    const satX = m(p.satAzimuthM), satY = m(p.altitudeM);
+    const fp = footprint(p);
+    const bcZ = m(fp.centerZ);
+    const slant = p.altitudeM / Math.cos(p.lookRad);   // metres
+    const oneWay = slant / SPEED_OF_LIGHT;             // seconds to beam centre
+    const sat = new T.Vector3(satX, satY, 0);
+    const bc = new T.Vector3(satX, 0, bcZ);
+
+    const pulses = schedulePulses(timingInput, t - 0.02, t + 0.02);
+    let mi = 0;
+    for (const pulse of pulses) {
+      // TX leading edge: fraction of one-way travel since txStart.
+      const fTx = (t - pulse.txStart) / oneWay;
+      if (fTx >= 0 && fTx <= 1 && mi < PULSE_POOL) {
+        const mesh = pulseMeshes[mi++];
+        mesh.visible = true;
+        mesh.position.lerpVectors(sat, bc, fTx);
+        const col = chirpRampColor(0.85); // TX shown near high-f end
+        (mesh.material as THREE_NS.MeshBasicMaterial).color.setRGB(col[0] / 255, col[1] / 255, col[2] / 255);
+      }
+      // RX leading edge: returning after reflection (txStart + oneWay .. +2*oneWay).
+      const fRx = (t - (pulse.txStart + oneWay)) / oneWay;
+      if (fRx >= 0 && fRx <= 1 && mi < PULSE_POOL) {
+        const mesh = pulseMeshes[mi++];
+        mesh.visible = true;
+        mesh.position.lerpVectors(bc, sat, fRx);
+        const col = chirpRampColor(0.15); // RX shown near low-f end
+        (mesh.material as THREE_NS.MeshBasicMaterial).color.setRGB(col[0] / 255, col[1] / 255, col[2] / 255);
+      }
+    }
+    for (; mi < PULSE_POOL; mi++) pulseMeshes[mi].visible = false;
+  }
+
+  // ---- update logic --------------------------------------------------------
 
   function setLine(geo: THREE_NS.BufferGeometry, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) {
     const pos = geo.attributes.position.array as Float32Array;
@@ -416,6 +489,7 @@ export async function createSarScene(host: HTMLDivElement): Promise<SarSceneHand
         camera.updateProjectionMatrix();
       }
     }
+    updatePulses();
     renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
   }
@@ -424,6 +498,7 @@ export async function createSarScene(host: HTMLDivElement): Promise<SarSceneHand
   return {
     update,
     derived: computeDerived,
+    setTiming,
     dispose() {
       disposed = true;
       cancelAnimationFrame(raf);

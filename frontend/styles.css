@@ -2425,7 +2425,34 @@ select.grc-param-input { cursor: pointer; }
   display: flex;
   flex-direction: column;
 }
-.sarviz-timing-title { margin-bottom: 3px; }
+.sarviz-timing-title { margin-bottom: 0; }
+.sarviz-timing-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.sarviz-play-btn {
+  background: #1c3a5e;
+  border: 1px solid #2a4a6a;
+  color: #e6ecf5;
+  font-size: 9px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.sarviz-play-btn:hover { background: #245078; }
+.sarviz-slowmo-label {
+  color: #7f8aa3;
+  font-size: 9px;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+}
+.sarviz-slowmo {
+  flex: 0 0 90px;
+  accent-color: #ffc344;
+  cursor: pointer;
+}
 .sarviz-timing-canvas {
   flex: 1 1 auto;
   width: 100%;
