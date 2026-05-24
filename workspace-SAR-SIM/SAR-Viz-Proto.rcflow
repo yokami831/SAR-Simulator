@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "type": "flow",
+  "title": "SAR-Viz-Proto",
+  "description": "",
+  "created": "2026-05-24T14:30:51.164208+00:00",
+  "modified": "2026-05-24T15:11:01.808803+00:00",
+  "canvas": {
+    "name": "flowgraph",
+    "savedAt": "2026-05-24T15:11:01.807Z",
+    "nodes": [
+      {
+        "id": "n1",
+        "type": "canvasNode",
+        "position": {
+          "x": 791.9354838709678,
+          "y": 409.19354838709677
+        },
+        "width": 760,
+        "data": {
+          "label": "SAR Visualizer",
+          "category": "processing",
+          "blockType": "sar_visualizer",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "float"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "float"
+            }
+          ],
+          "defaultParameters": {
+            "altitude_km": "514",
+            "look_deg": "25",
+            "beam_az_deg": "0.5",
+            "beam_rg_deg": "2.0",
+            "prf_hz": "4000",
+            "pulse_width_us": "10",
+            "bandwidth_mhz": "300",
+            "fc_ghz": "9.65",
+            "velocity_ms": "7600",
+            "antenna_la_m": "4.8",
+            "antenna_lr_m": "0.8",
+            "chirp_dir": "up",
+            "obs_mode": "stripmap",
+            "label": "SAR Observation Geometry"
+          }
+        }
+      }
+    ],
+    "edges": []
+  }
+}

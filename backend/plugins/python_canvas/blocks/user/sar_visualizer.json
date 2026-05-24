@@ -89,6 +89,30 @@
       "scale": "1e6"
     },
     {
+      "id": "sampling_mhz",
+      "label": "Sampling Fs",
+      "dtype": "number",
+      "default": "360",
+      "min": "12",
+      "max": "1500",
+      "step": "10",
+      "unit": "MHz",
+      "var": "Fs",
+      "scale": "1e6"
+    },
+    {
+      "id": "range_swath_half_m",
+      "label": "Range swath half-width",
+      "dtype": "number",
+      "default": "3000",
+      "min": "100",
+      "max": "12000",
+      "step": "100",
+      "unit": "m",
+      "var": "R_half",
+      "scale": "1"
+    },
+    {
       "id": "fc_ghz",
       "label": "Carrier fc",
       "dtype": "number",
@@ -141,7 +165,11 @@
       "label": "Chirp Direction",
       "dtype": "enum",
       "default": "up",
-      "options": ["up", "down", "updown"],
+      "options": [
+        "up",
+        "down",
+        "updown"
+      ],
       "var": "chirp_dir",
       "scale": "str"
     },
@@ -150,18 +178,30 @@
       "label": "Observation Mode",
       "dtype": "enum",
       "default": "stripmap",
-      "options": ["stripmap", "sliding", "spotlight"],
+      "options": [
+        "stripmap",
+        "sliding",
+        "spotlight"
+      ],
       "var": "obs_mode",
       "scale": "str"
     }
   ],
   "inputs": [
-    { "id": "in_0", "label": "in_0", "portType": "any" }
+    {
+      "id": "in_0",
+      "label": "in_0",
+      "portType": "any"
+    }
   ],
   "outputs": [
-    { "id": "out_0", "label": "out_0", "portType": "any" }
+    {
+      "id": "out_0",
+      "label": "out_0",
+      "portType": "any"
+    }
   ],
-  "code_template": "",
+  "code_template": "# --- Library helpers (formerly Common Parameters node). Provided here so\n# this sar_visualizer node can replace it: disable the Common Parameters node\n# and these + the parameter assignments above fully set up the kernel. ---\ndef make_rand(seed):\n    \"\"\"mulberry32 PRNG (exact port). float in [0,1).\"\"\"\n    box = {'a': int(seed) & 0xFFFFFFFF}\n    M = 0xFFFFFFFF\n    def _rand():\n        box['a'] = (box['a'] + 0x6d2b79f5) & M\n        t = box['a']\n        t = (((t ^ (t >> 15)) & M) * ((1 | t) & M)) & M           # Math.imul(t^(t>>>15), 1|t)\n        t = ((t + ((((t ^ (t >> 7)) & M) * ((61 | t) & M)) & M)) & M) ^ t  # +Math.imul(t^(t>>>7),61|t), ^t\n        t &= M\n        return ((t ^ (t >> 14)) & M) / 4294967296.0\n    return _rand\n\ndef make_point_targets(count, half_az_m, half_range_m, seed, R0):\n    \"\"\"Point targets, sar-visualizer parity. T1 is always the centre\n    reference (az 0, slant R0); extras are seeded-random inside +/-0.85*half\n    so they sit clearly within the display window.\"\"\"\n    out = [('T1', 0.0, R0)]\n    rnd = make_rand(seed)\n    az_span = half_az_m * 0.85\n    r_span = half_range_m * 0.85\n    for i in range(1, int(count)):\n        az_m = (rnd() * 2 - 1) * az_span\n        sr_m = R0 + (rnd() * 2 - 1) * r_span\n        out.append(('T%d' % (i + 1), az_m, sr_m))\n    return out\n# Plot helpers (surface3d_gl, surface3d_pair_gl, upsample_complex, upsample_complex_range, ...) are\n# defined in the \"Plot Library\" node (unconnected, runs first) and shared via\n# the kernel namespace. They are workspace-local, NOT HiyoCanvas core. See that\n# node's SPEC and CLAUDE.md (\"common helpers go in a visible Library node\").\n",
   "default_width": 780,
   "default_height": 480,
   "gui_widget": {

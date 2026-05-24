@@ -51,8 +51,19 @@ def make_sar_params_code(block_def: dict, params: dict) -> str:
     Variables whose def lacks "var" are skipped. Unparseable numbers surface as
     a clear comment rather than silently defaulting (CLAUDE.md: no silent
     fallbacks).
+
+    After the assignments, the block's ``code_template`` is appended verbatim.
+    For sar_visualizer this carries the imports (numpy / scipy.constants) and the
+    library helpers (make_rand / make_point_targets) so the node fully replaces
+    the workspace's Common Parameters node when that one is disabled.
     """
-    lines = ["import math  # sar_visualizer parameter assignments"]
+    # numpy + scipy.constants.c so downstream SAR nodes (and the appended
+    # helpers) have the same environment the Common Parameters node provided.
+    lines = [
+        "import math  # sar_visualizer parameter assignments",
+        "import numpy as np",
+        "from scipy.constants import c",
+    ]
     for pdef in block_def.get("parameters", []):
         var = pdef.get("var")
         if not var or not str(var).isidentifier():
@@ -79,8 +90,25 @@ def make_sar_params_code(block_def: dict, params: dict) -> str:
             if factor == 1.0:
                 lines.append(f"{var} = {num}")
             else:
-                lines.append(f"{var} = {num} * {factor}")
-    return "\n".join(lines)
+                # Emit a single exponent literal (e.g. "10e-6", "514e3") rather
+                # than "10.0 * 1e-06". The literal form is parsed as one float
+                # and so reproduces values like Tp=10e-6 (=1e-05) bit-for-bit,
+                # matching the original Common Parameters node. "10.0 * 1e-06"
+                # rounds to 9.999...e-06 and perturbs downstream results.
+                import math as _math
+                exp = _math.log10(factor)
+                if abs(exp - round(exp)) < 1e-9:
+                    e = int(round(exp))
+                    # render value without a trailing ".0" when integral
+                    vs = f"{num:.0f}" if num == int(num) else repr(num)
+                    lines.append(f"{var} = {vs}e{e}")
+                else:
+                    lines.append(f"{var} = {num} * {factor}")
+    code = "\n".join(lines)
+    template = block_def.get("code_template", "")
+    if template:
+        code = code + "\n\n" + template
+    return code
 
 
 def make_gui_assignment_code(var_name: str, value, dtype: str) -> str:
