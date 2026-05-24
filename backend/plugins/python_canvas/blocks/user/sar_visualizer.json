@@ -1,0 +1,171 @@
+{
+  "id": "sar_visualizer",
+  "label": "SAR Visualizer",
+  "category": "Visualization",
+  "description": "Interactive 3D SAR observation-geometry visualizer (ported from sar-visualizer). Left pane: parameter sliders. Right pane: 3D satellite/ground/beam scene. Bottom: TX/RX timing diagram. Sliders update the 3D scene live and write the same parameters into the kernel (H, look, La, Lr, PRF, Tp, B, fc, V) at flow run time.",
+  "parameters": [
+    {
+      "id": "altitude_km",
+      "label": "Orbit Altitude",
+      "dtype": "number",
+      "default": "514",
+      "min": "200",
+      "max": "1500",
+      "step": "1",
+      "unit": "km",
+      "var": "H",
+      "scale": "1000"
+    },
+    {
+      "id": "look_deg",
+      "label": "Off-Nadir (look angle)",
+      "dtype": "number",
+      "default": "25",
+      "min": "15",
+      "max": "60",
+      "step": "0.5",
+      "unit": "deg",
+      "var": "look",
+      "scale": "deg2rad"
+    },
+    {
+      "id": "beam_az_deg",
+      "label": "Beam Width (Az)",
+      "dtype": "number",
+      "default": "0.5",
+      "min": "0.05",
+      "max": "5",
+      "step": "0.05",
+      "unit": "deg",
+      "var": "beam_az",
+      "scale": "deg2rad"
+    },
+    {
+      "id": "beam_rg_deg",
+      "label": "Beam Width (Rg)",
+      "dtype": "number",
+      "default": "2.0",
+      "min": "0.5",
+      "max": "10",
+      "step": "0.1",
+      "unit": "deg",
+      "var": "beam_rg",
+      "scale": "deg2rad"
+    },
+    {
+      "id": "prf_hz",
+      "label": "PRF",
+      "dtype": "number",
+      "default": "4000",
+      "min": "1000",
+      "max": "8000",
+      "step": "10",
+      "unit": "Hz",
+      "var": "PRF",
+      "scale": "1"
+    },
+    {
+      "id": "pulse_width_us",
+      "label": "Pulse Width",
+      "dtype": "number",
+      "default": "10",
+      "min": "1",
+      "max": "250",
+      "step": "1",
+      "unit": "us",
+      "var": "Tp",
+      "scale": "1e-6"
+    },
+    {
+      "id": "bandwidth_mhz",
+      "label": "Bandwidth B",
+      "dtype": "number",
+      "default": "300",
+      "min": "10",
+      "max": "1200",
+      "step": "10",
+      "unit": "MHz",
+      "var": "B",
+      "scale": "1e6"
+    },
+    {
+      "id": "fc_ghz",
+      "label": "Carrier fc",
+      "dtype": "number",
+      "default": "9.65",
+      "min": "1",
+      "max": "40",
+      "step": "0.05",
+      "unit": "GHz",
+      "var": "fc",
+      "scale": "1e9"
+    },
+    {
+      "id": "velocity_ms",
+      "label": "Platform Velocity",
+      "dtype": "number",
+      "default": "7600",
+      "min": "6000",
+      "max": "8000",
+      "step": "10",
+      "unit": "m/s",
+      "var": "V",
+      "scale": "1"
+    },
+    {
+      "id": "antenna_la_m",
+      "label": "Antenna La (azimuth)",
+      "dtype": "number",
+      "default": "4.8",
+      "min": "1",
+      "max": "15",
+      "step": "0.1",
+      "unit": "m",
+      "var": "La",
+      "scale": "1"
+    },
+    {
+      "id": "antenna_lr_m",
+      "label": "Antenna Lr (range)",
+      "dtype": "number",
+      "default": "0.8",
+      "min": "0.2",
+      "max": "5",
+      "step": "0.1",
+      "unit": "m",
+      "var": "Lr",
+      "scale": "1"
+    },
+    {
+      "id": "chirp_dir",
+      "label": "Chirp Direction",
+      "dtype": "enum",
+      "default": "up",
+      "options": ["up", "down", "updown"],
+      "var": "chirp_dir",
+      "scale": "str"
+    },
+    {
+      "id": "obs_mode",
+      "label": "Observation Mode",
+      "dtype": "enum",
+      "default": "stripmap",
+      "options": ["stripmap", "sliding", "spotlight"],
+      "var": "obs_mode",
+      "scale": "str"
+    }
+  ],
+  "inputs": [
+    { "id": "in_0", "label": "in_0", "portType": "any" }
+  ],
+  "outputs": [
+    { "id": "out_0", "label": "out_0", "portType": "any" }
+  ],
+  "code_template": "",
+  "default_width": 780,
+  "default_height": 480,
+  "gui_widget": {
+    "type": "sar_visualizer",
+    "dtype": "sar_params"
+  }
+}

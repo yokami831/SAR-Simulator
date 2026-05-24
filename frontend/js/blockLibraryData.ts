@@ -172,11 +172,22 @@ export function buildDefaultParams(paramDefs: BlockParam[]): Record<string, stri
  * Other blocks adjust based on tab count.
  */
 export function getInitialWidth(blockType: string): number {
-  // Code blocks get wider for the textarea
   const def = getBlockDef(blockType);
+  // Explicit default size from the block definition wins (e.g. sar_visualizer
+  // needs a wide body for its 3D scene + slider pane + timing diagram).
+  const dw = (def as { default_width?: number } | null)?.default_width;
+  if (typeof dw === 'number' && dw > 0) return dw;
+  // Code blocks get wider for the textarea
   if (def?.parameters?.some(p => p.dtype === 'code')) return NODE_CODE_WIDTH;
 
   return NODE_DEFAULT_WIDTH;
+}
+
+/** Initial node height from the block definition, or undefined for auto. */
+export function getInitialHeight(blockType: string): number | undefined {
+  const def = getBlockDef(blockType);
+  const dh = (def as { default_height?: number } | null)?.default_height;
+  return typeof dh === 'number' && dh > 0 ? dh : undefined;
 }
 
 // ===== Node Creation =====
@@ -206,15 +217,18 @@ export function createNode({ id, position, blockDef, paramOverrides, width, heig
     ? { ...(blockDef.defaultParameters || {}), ...paramOverrides }
     : (blockDef.defaultParameters || {});
 
+  // Height: explicit (from saved file) wins; otherwise the block's default.
+  const effectiveHeight = height ?? getInitialHeight(blockDef.type);
+
   return {
     id,
     type: 'canvasNode',
     position,
     style: {
       width: width || getInitialWidth(blockDef.type),
-      ...(height ? { minHeight: height } : {}),
+      ...(effectiveHeight ? { minHeight: effectiveHeight } : {}),
     },
-    ...(height ? { height } : {}),
+    ...(effectiveHeight ? { height: effectiveHeight } : {}),
     data: {
       label: blockDef.label,
       category: blockDef.category,

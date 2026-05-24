@@ -2304,3 +2304,131 @@ select.grc-param-input { cursor: pointer; }
   font-size: 13px;
 }
 
+/* ============================================================ */
+/* SAR Visualizer node widget (sar_visualizer block)            */
+/* Layout: left = parameter sliders, right = 3D scene,          */
+/*         bottom = TX/RX timing strip.                          */
+/* ============================================================ */
+.sarviz-body {
+  display: flex;
+  flex-direction: column;
+  width: 760px;
+  max-width: 90vw;
+  background: #070b14;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.sarviz-main {
+  display: flex;
+  flex-direction: row;
+  height: 360px;
+}
+.sarviz-controls {
+  flex: 0 0 230px;
+  padding: 8px 10px;
+  overflow-y: auto;
+  background: #0d1424;
+  border-right: 1px solid #1d2940;
+}
+.sarviz-controls::-webkit-scrollbar { width: 6px; }
+.sarviz-controls::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+.sarviz-section-title {
+  color: #8a9bb4;
+  font-size: 10px;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.sarviz-row { margin-bottom: 10px; }
+.sarviz-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+.sarviz-row-label {
+  color: #c4cde0;
+  font-size: 11px;
+}
+.sarviz-row-value {
+  color: #5dd5ff;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+}
+.sarviz-slider {
+  width: 100%;
+  accent-color: #5dd5ff;
+  cursor: pointer;
+}
+.sarviz-segmented {
+  display: flex;
+  gap: 2px;
+}
+.sarviz-seg-btn {
+  flex: 1;
+  background: #11203a;
+  border: 1px solid #1d2940;
+  color: #8a9bb4;
+  font-size: 10px;
+  padding: 3px 2px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.sarviz-seg-btn.active {
+  background: #1c3a5e;
+  border-color: #5dd5ff;
+  color: #e6ecf5;
+}
+.sarviz-scene-wrap {
+  flex: 1 1 auto;
+  position: relative;
+  min-width: 0;
+}
+.sarviz-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.sarviz-telemetry {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: rgba(13, 20, 36, 0.7);
+  border: 1px solid #1d2940;
+  border-radius: 4px;
+  padding: 5px 8px;
+  pointer-events: none;
+}
+.sarviz-telemetry div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+}
+.sarviz-telemetry span { color: #7f8aa3; }
+.sarviz-telemetry b { color: #cfd6e6; font-weight: 600; }
+.sarviz-error {
+  padding: 12px;
+  color: #ff6b6b;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+}
+.sarviz-timing {
+  flex: 0 0 70px;
+  border-top: 1px solid #1d2940;
+  padding: 4px 8px 6px;
+  background: #0d1424;
+  display: flex;
+  flex-direction: column;
+}
+.sarviz-timing-title { margin-bottom: 3px; }
+.sarviz-timing-canvas {
+  flex: 1 1 auto;
+  width: 100%;
+  display: block;
+}
+

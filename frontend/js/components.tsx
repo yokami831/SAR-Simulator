@@ -23,6 +23,7 @@ fetch('/api/config').then(r => r.json()).then(cfg => {
 import { rcPrompt } from './modal.js';
 import { PythonEditor } from './components/PythonEditor.js';
 import { Surface3D } from './components/Surface3D.js';
+import SarVisualizer, { SarParamDef } from './components/SarVisualizer.js';
 // DOMPurify removed — text/html now rendered in sandboxed iframe
 
 /** Wrap raw HTML in a full document with dark-theme CSS and auto-resize via postMessage. */
@@ -371,9 +372,10 @@ function GuiFilePicker({ params, onParamChange }: {
 }
 
 /** Render the appropriate GUI widget based on gui_widget.type */
-function GuiWidgetBody({ guiWidget, params, onParamChange }: {
+function GuiWidgetBody({ guiWidget, params, onParamChange, paramDefs }: {
   guiWidget: GuiWidgetDef; params: Record<string, string>;
   onParamChange: (id: string, val: string) => void;
+  paramDefs?: SarParamDef[];
 }) {
   switch (guiWidget.type) {
     case 'text_input': return <GuiTextInput params={params} onParamChange={onParamChange} />;
@@ -381,6 +383,8 @@ function GuiWidgetBody({ guiWidget, params, onParamChange }: {
     case 'dropdown': return <GuiDropdown params={params} onParamChange={onParamChange} />;
     case 'toggle': return <GuiToggle params={params} onParamChange={onParamChange} />;
     case 'file_picker': return <GuiFilePicker params={params} onParamChange={onParamChange} />;
+    case 'sar_visualizer':
+      return <SarVisualizer params={params} paramDefs={paramDefs ?? []} onParamChange={onParamChange} />;
     default: return <div>Unknown widget: {guiWidget.type}</div>;
   }
 }
@@ -756,7 +760,8 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
           saved data: gui_widget is a static block attribute, so deriving it
           here means it survives save/load without being stored per-node. */}
       {guiWidget && !showSettings ? (
-        <GuiWidgetBody guiWidget={guiWidget} params={currentParams} onParamChange={onParamChange} />
+        <GuiWidgetBody guiWidget={guiWidget} params={currentParams} onParamChange={onParamChange}
+          paramDefs={(blockDef?.parameters as SarParamDef[] | undefined)} />
       ) : (
       <>
       {/* Non-code parameters */}
