@@ -192,21 +192,23 @@ function TimingDiagram({ timing, clock }: { timing: TimingInput; clock: React.Mu
         ctx.fillText(`${ms}ms`, x + 2, h - 2);
       }
 
-      // tracks: each occupies half the available band height (bars are half
-      // as tall as the slot, leaving breathing room above/below).
+      // tracks: TX (top) and RX (bottom). The band area is split into two equal
+      // slots; bars fill HALF of each slot's height (centred) so TX == RX and
+      // both are compact, with breathing room above/below.
       const trackTopY = 12;
-      const trackH = (h - trackTopY - 14) / 2;
-      const txTop = trackTopY;
-      const rxTop = trackTopY + trackH + 2;
-      const trackInnerH = (trackH - 4) * 0.5;     // half-height bars
-      const rxInnerOffset = trackH - 4 - trackInnerH; // push RX bars to the bottom of their slot
+      const gap = 10;                               // space between TX and RX slots
+      const slotH = (h - trackTopY - 14 - gap) / 2;
+      const trackInnerH = slotH * 0.5;             // half-height bars, TX == RX
+      const slotPad = (slotH - trackInnerH) / 2;   // centre bars in their slot
+      const txTop = trackTopY + slotPad;
+      const rxTop = trackTopY + slotH + gap + slotPad;
       const N = Math.max(1, Math.floor(timingRef.current.nSub));
       const visualRow = (k: number) => N - 1 - k;
       const rowYTop = (top: number, k: number) => top + (visualRow(k) * trackInnerH) / N;
       const rowH = trackInnerH / N;
 
-      ctx.fillStyle = '#5dd5ff'; ctx.fillText('TX', 2, txTop + 8);
-      ctx.fillStyle = '#ff8c42'; ctx.fillText('RX', 2, rxTop + rxInnerOffset + 8);
+      ctx.fillStyle = '#5dd5ff'; ctx.fillText('TX', 2, txTop - slotPad + 8);
+      ctx.fillStyle = '#ff8c42'; ctx.fillText('RX', 2, rxTop - slotPad + 8);
 
       const pulses = schedulePulses(timingRef.current, t - EVENT_WINDOW_S, t + EVENT_WINDOW_S);
       const drawRect = (s0: number, s1: number, yTop: number, fill: string) => {
@@ -221,7 +223,7 @@ function TimingDiagram({ timing, clock }: { timing: TimingInput; clock: React.Mu
           const sb = p.subBands[k];
           const col = bandFillCss(k, N);
           drawRect(sb.txStart, sb.txStart + sb.pw, rowYTop(txTop, k), col);
-          drawRect(sb.nearArrive, sb.farArrive + sb.pw, rowYTop(rxTop + rxInnerOffset, k), col);
+          drawRect(sb.nearArrive, sb.farArrive + sb.pw, rowYTop(rxTop, k), col);
         }
       }
 
@@ -335,21 +337,21 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
     <div className="sarviz-body nodrag nopan nowheel"
       onWheel={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}>
-      <div className="sarviz-main">
-        {/* Left: parameter controls */}
-        <div className="sarviz-controls">
-          <div className="sarviz-section-title">PARAMETERS</div>
-          {sliderDefs.map((def) => (
-            <SarSliderRow key={def.id} def={def}
-              value={params[def.id] ?? def.default ?? ''} onChange={handleChange} />
-          ))}
-          {enumDefs.map((def) => (
-            <SarEnumRow key={def.id} def={def}
-              value={params[def.id] ?? def.default ?? ''} onChange={handleChange} />
-          ))}
-        </div>
+      {/* Left: parameter controls, full node height */}
+      <div className="sarviz-controls">
+        <div className="sarviz-section-title">PARAMETERS</div>
+        {sliderDefs.map((def) => (
+          <SarSliderRow key={def.id} def={def}
+            value={params[def.id] ?? def.default ?? ''} onChange={handleChange} />
+        ))}
+        {enumDefs.map((def) => (
+          <SarEnumRow key={def.id} def={def}
+            value={params[def.id] ?? def.default ?? ''} onChange={handleChange} />
+        ))}
+      </div>
 
-        {/* Right: 3D scene + derived telemetry overlay */}
+      {/* Right column: 3D scene (top) over timing diagram (bottom) */}
+      <div className="sarviz-right">
         <div className="sarviz-scene-wrap">
           {error ? (
             <div className="sarviz-error">SAR scene failed: {error}</div>
@@ -365,22 +367,21 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
             </>
           )}
         </div>
-      </div>
 
-      {/* Bottom: timing diagram + playback controls */}
-      <div className="sarviz-timing">
-        <div className="sarviz-timing-header">
-          <span className="sarviz-section-title sarviz-timing-title">TIMING (TX / RX)</span>
-          <button className="sarviz-play-btn nodrag nopan"
-            onClick={(e) => { e.stopPropagation(); setRunning((r) => !r); }}
-            title={running ? 'Pause' : 'Play'}>{running ? '❚❚' : '▶'}</button>
-          <span className="sarviz-slowmo-label">slow-mo 1/{Math.round(1 / Math.pow(10, slowMoExp)).toLocaleString()}x</span>
-          <input type="range" className="sarviz-slowmo nodrag nopan" min={-5} max={-2} step={0.1}
-            value={slowMoExp}
-            onChange={(e) => setSlowMoExp(parseFloat(e.target.value))}
-            onMouseDown={(e) => e.stopPropagation()} />
+        <div className="sarviz-timing">
+          <div className="sarviz-timing-header">
+            <span className="sarviz-section-title sarviz-timing-title">TIMING (TX / RX)</span>
+            <button className="sarviz-play-btn nodrag nopan"
+              onClick={(e) => { e.stopPropagation(); setRunning((r) => !r); }}
+              title={running ? 'Pause' : 'Play'}>{running ? '❚❚' : '▶'}</button>
+            <span className="sarviz-slowmo-label">slow-mo 1/{Math.round(1 / Math.pow(10, slowMoExp)).toLocaleString()}x</span>
+            <input type="range" className="sarviz-slowmo nodrag nopan" min={-5} max={-2} step={0.1}
+              value={slowMoExp}
+              onChange={(e) => setSlowMoExp(parseFloat(e.target.value))}
+              onMouseDown={(e) => e.stopPropagation()} />
+          </div>
+          <TimingDiagram timing={timing} clock={clockRef} />
         </div>
-        <TimingDiagram timing={timing} clock={clockRef} />
       </div>
     </div>
   );

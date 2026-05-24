@@ -2306,22 +2306,24 @@ select.grc-param-input { cursor: pointer; }
 
 /* ============================================================ */
 /* SAR Visualizer node widget (sar_visualizer block)            */
-/* Layout: left = parameter sliders, right = 3D scene,          */
-/*         bottom = TX/RX timing strip.                          */
+/* Layout: left = parameter sliders (full height),              */
+/*         right column = 3D scene (top) over TX/RX timing.      */
 /* ============================================================ */
 .sarviz-body {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   width: 760px;
+  height: 440px;
   max-width: 90vw;
   background: #070b14;
   border-radius: 4px;
   overflow: hidden;
 }
-.sarviz-main {
+.sarviz-right {
+  flex: 1 1 auto;
   display: flex;
-  flex-direction: row;
-  height: 360px;
+  flex-direction: column;
+  min-width: 0;
 }
 .sarviz-controls {
   flex: 0 0 230px;
@@ -2418,7 +2420,7 @@ select.grc-param-input { cursor: pointer; }
   font-family: 'JetBrains Mono', 'Consolas', monospace;
 }
 .sarviz-timing {
-  flex: 0 0 70px;
+  flex: 0 0 150px;
   border-top: 1px solid #1d2940;
   padding: 4px 8px 6px;
   background: #0d1424;
