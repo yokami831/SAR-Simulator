@@ -185,6 +185,20 @@
       ],
       "var": "obs_mode",
       "scale": "str"
+    },
+    {
+      "id": "controls_width",
+      "label": "Controls pane width (px)",
+      "dtype": "number",
+      "default": "230",
+      "hidden": true
+    },
+    {
+      "id": "timing_height",
+      "label": "Timing pane height (px)",
+      "dtype": "number",
+      "default": "60",
+      "hidden": true
     }
   ],
   "inputs": [

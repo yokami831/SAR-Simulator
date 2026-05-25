@@ -4,17 +4,17 @@
   "title": "SAR-Viz-Proto",
   "description": "",
   "created": "2026-05-24T14:30:51.164208+00:00",
-  "modified": "2026-05-24T15:11:01.808803+00:00",
+  "modified": "2026-05-25T13:51:57.244689+00:00",
   "canvas": {
     "name": "flowgraph",
-    "savedAt": "2026-05-24T15:11:01.807Z",
+    "savedAt": "2026-05-25T13:51:57.244Z",
     "nodes": [
       {
         "id": "n1",
         "type": "canvasNode",
         "position": {
-          "x": 791.9354838709678,
-          "y": 409.19354838709677
+          "x": 345.9051080475165,
+          "y": 14.379149898131061
         },
         "width": 760,
         "data": {
@@ -40,7 +40,7 @@
             "look_deg": "25",
             "beam_az_deg": "0.5",
             "beam_rg_deg": "2.0",
-            "prf_hz": "4000",
+            "prf_hz": "3810",
             "pulse_width_us": "10",
             "bandwidth_mhz": "300",
             "fc_ghz": "9.65",
@@ -49,7 +49,9 @@
             "antenna_lr_m": "0.8",
             "chirp_dir": "up",
             "obs_mode": "stripmap",
-            "label": "SAR Observation Geometry"
+            "label": "SAR Observation Geometry",
+            "timing_height": "60",
+            "controls_width": "230"
           }
         }
       }

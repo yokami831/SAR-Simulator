@@ -2311,9 +2311,14 @@ select.grc-param-input { cursor: pointer; }
 /* ============================================================ */
 .sarviz-body {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: row;
-  width: 760px;
-  height: 440px;
+  width: 100%;
+  /* min-height:0 lets this flex child shrink below content so the inner
+     column-flex panes can be resized (standard flexbox split-pane fix).
+     Height comes from flex (parent .grc-block is a column flex, height:100%);
+     do NOT also set height:100% — that double-constraint breaks shrinking. */
+  min-height: 0;
   max-width: 90vw;
   background: #070b14;
   border-radius: 4px;
@@ -2324,13 +2329,32 @@ select.grc-param-input { cursor: pointer; }
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
+/* Drag-to-resize splitters between panes */
+.sarviz-splitter-v {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: #1d2940;
+  transition: background 0.12s;
+}
+.sarviz-splitter-v:hover { background: #5dd5ff; }
+.sarviz-splitter-h {
+  flex: 0 0 5px;
+  cursor: row-resize;
+  background: #1d2940;
+  transition: background 0.12s;
+}
+.sarviz-splitter-h:hover { background: #5dd5ff; }
 .sarviz-controls {
-  flex: 0 0 230px;
+  flex-grow: 0;
+  flex-shrink: 0;
+  /* width is set inline (resizable) */
   padding: 8px 10px;
   overflow-y: auto;
   background: #0d1424;
   border-right: 1px solid #1d2940;
+  box-sizing: border-box;
 }
 .sarviz-controls::-webkit-scrollbar { width: 6px; }
 .sarviz-controls::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
@@ -2384,6 +2408,7 @@ select.grc-param-input { cursor: pointer; }
   flex: 1 1 auto;
   position: relative;
   min-width: 0;
+  min-height: 0;
 }
 .sarviz-scene {
   position: absolute;
@@ -2420,12 +2445,16 @@ select.grc-param-input { cursor: pointer; }
   font-family: 'JetBrains Mono', 'Consolas', monospace;
 }
 .sarviz-timing {
-  flex: 0 0 150px;
+  flex-grow: 0;
+  flex-shrink: 0;
+  /* height is set inline (resizable); flex-basis stays auto so height wins */
   border-top: 1px solid #1d2940;
   padding: 4px 8px 6px;
   background: #0d1424;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 .sarviz-timing-title { margin-bottom: 0; }
 .sarviz-timing-header {
@@ -2433,6 +2462,7 @@ select.grc-param-input { cursor: pointer; }
   align-items: center;
   gap: 8px;
   margin-bottom: 3px;
+  flex: 0 0 auto;   /* header keeps its height; canvas shrinks instead */
 }
 .sarviz-play-btn {
   background: #1c3a5e;
@@ -2456,7 +2486,8 @@ select.grc-param-input { cursor: pointer; }
   cursor: pointer;
 }
 .sarviz-timing-canvas {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-height: 0;   /* allow the canvas to shrink with the pane */
   width: 100%;
   display: block;
 }

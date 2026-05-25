@@ -39,6 +39,7 @@ export interface SarParamDef {
   var?: string;
   scale?: string;
   options?: string[];
+  hidden?: boolean;
 }
 
 interface SarVisualizerProps {
@@ -192,23 +193,25 @@ function TimingDiagram({ timing, clock }: { timing: TimingInput; clock: React.Mu
         ctx.fillText(`${ms}ms`, x + 2, h - 2);
       }
 
-      // tracks: TX (top) and RX (bottom). The band area is split into two equal
-      // slots; bars fill HALF of each slot's height (centred) so TX == RX and
-      // both are compact, with breathing room above/below.
-      const trackTopY = 12;
-      const gap = 10;                               // space between TX and RX slots
-      const slotH = (h - trackTopY - 14 - gap) / 2;
-      const trackInnerH = slotH * 0.5;             // half-height bars, TX == RX
-      const slotPad = (slotH - trackInnerH) / 2;   // centre bars in their slot
-      const txTop = trackTopY + slotPad;
-      const rxTop = trackTopY + slotH + gap + slotPad;
+      // tracks: TX (top) and RX (bottom), packed tightly. The fixed margins
+      // (label space, axis-label space, inter-track gap) scale DOWN when the
+      // pane is short so the whole diagram always fits — dragging the splitter
+      // smaller shrinks everything rather than clipping the RX track.
+      const fit = Math.min(1, h / 96);            // 1 at >=96px, smaller below
+      const trackTopY = 10 * fit;                 // room for the TX label
+      const bottomPad = 12 * fit;                 // room for the ms axis labels
+      const gap = 6 * fit;                        // small space between TX and RX bars
+      const slotH = Math.max(1, (h - trackTopY - bottomPad - gap) / 2);
+      const trackInnerH = slotH;                 // bars fill the slot, TX == RX
+      const txTop = trackTopY;
+      const rxTop = trackTopY + slotH + gap;
       const N = Math.max(1, Math.floor(timingRef.current.nSub));
       const visualRow = (k: number) => N - 1 - k;
       const rowYTop = (top: number, k: number) => top + (visualRow(k) * trackInnerH) / N;
       const rowH = trackInnerH / N;
 
-      ctx.fillStyle = '#5dd5ff'; ctx.fillText('TX', 2, txTop - slotPad + 8);
-      ctx.fillStyle = '#ff8c42'; ctx.fillText('RX', 2, rxTop - slotPad + 8);
+      ctx.fillStyle = '#5dd5ff'; ctx.fillText('TX', 2, txTop + 8);
+      ctx.fillStyle = '#ff8c42'; ctx.fillText('RX', 2, rxTop + 8);
 
       const pulses = schedulePulses(timingRef.current, t - EVENT_WINDOW_S, t + EVENT_WINDOW_S);
       const drawRect = (s0: number, s1: number, yTop: number, fill: string) => {
@@ -257,11 +260,62 @@ function TimingDiagram({ timing, clock }: { timing: TimingInput; clock: React.Mu
   return <canvas ref={ref} className="sarviz-timing-canvas" />;
 }
 
+// ---- drag-to-resize splitter ----------------------------------------------
+// Generic pointer-drag handler returning an onPointerDown for a splitter bar.
+// `axis` 'x' resizes width, 'y' resizes height. `sign` flips the direction so
+// dragging the bar feels natural for the pane it borders. The current size is
+// read from a ref (not via a setState updater, whose timing is unreliable for
+// capturing the start value). Stops propagation so React Flow does not pan.
+function useSplitter(
+  sizeRef: React.MutableRefObject<number>,
+  setSize: (v: number) => void,
+  axis: 'x' | 'y',
+  sign = 1,
+  min = 120,
+  max = 1200,
+  onCommit?: (v: number) => void,
+) {
+  return useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const start = axis === 'x' ? e.clientX : e.clientY;
+    const startSize = sizeRef.current;
+    const onMove = (ev: PointerEvent) => {
+      const cur = axis === 'x' ? ev.clientX : ev.clientY;
+      const next = Math.max(min, Math.min(max, startSize + (cur - start) * sign));
+      sizeRef.current = next;
+      setSize(next);
+    };
+    const onUp = () => {
+      onCommit?.(Math.round(sizeRef.current));   // persist final size to the node
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, [sizeRef, setSize, axis, sign, min, max, onCommit]);
+}
+
 // ---- main widget body ------------------------------------------------------
 export default function SarVisualizer({ params, paramDefs, onParamChange }: SarVisualizerProps) {
   const sceneHostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SarSceneHandle | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Resizable pane sizes (px). Left controls width, and timing-diagram height.
+  // Initialised from the node's saved params so a chosen layout persists across
+  // save/reload; refs mirror the state for synchronous reads during a drag.
+  const initialControlsW = parseFloat(params.controls_width ?? '') || 230;
+  const initialTimingH = parseFloat(params.timing_height ?? '') || 60;
+  const [controlsW, setControlsW] = useState(initialControlsW);
+  const [timingH, setTimingH] = useState(initialTimingH);
+  const controlsWRef = useRef(initialControlsW);
+  const timingHRef = useRef(initialTimingH);
+  // Persist the final size to the node (written to defaultParameters -> .rcflow).
+  const commitControlsW = useCallback((v: number) => onParamChange('controls_width', String(v)), [onParamChange]);
+  const commitTimingH = useCallback((v: number) => onParamChange('timing_height', String(v)), [onParamChange]);
+  const dragControls = useSplitter(controlsWRef, setControlsW, 'x', 1, 140, 480, commitControlsW);
+  const dragTiming = useSplitter(timingHRef, setTimingH, 'y', -1, 40, 400, commitTimingH);
 
   // Shared sim clock + latest timing params (refs so the once-only mount effect
   // can read current values without re-subscribing).
@@ -271,8 +325,10 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
     prfHz: 4000, pulseWidthS: 10e-6, nSub: 8, chirpDir: 'up',
   });
 
-  const sliderDefs = useMemo(() => paramDefs.filter((d) => d.dtype !== 'enum'), [paramDefs]);
-  const enumDefs = useMemo(() => paramDefs.filter((d) => d.dtype === 'enum'), [paramDefs]);
+  // Hidden params (e.g. saved pane sizes) are not rendered as controls.
+  const visibleDefs = useMemo(() => paramDefs.filter((d) => !d.hidden), [paramDefs]);
+  const sliderDefs = useMemo(() => visibleDefs.filter((d) => d.dtype !== 'enum'), [visibleDefs]);
+  const enumDefs = useMemo(() => visibleDefs.filter((d) => d.dtype === 'enum'), [visibleDefs]);
 
   const sarParams = useMemo(() => toSarParams(params, paramDefs), [params, paramDefs]);
   const derived = useMemo(() => computeDerived(sarParams), [sarParams]);
@@ -337,8 +393,8 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
     <div className="sarviz-body nodrag nopan nowheel"
       onWheel={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}>
-      {/* Left: parameter controls, full node height */}
-      <div className="sarviz-controls">
+      {/* Left: parameter controls, full node height (drag-resizable width) */}
+      <div className="sarviz-controls" style={{ width: `${controlsW}px` }}>
         <div className="sarviz-section-title">PARAMETERS</div>
         {sliderDefs.map((def) => (
           <SarSliderRow key={def.id} def={def}
@@ -349,6 +405,9 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
             value={params[def.id] ?? def.default ?? ''} onChange={handleChange} />
         ))}
       </div>
+
+      {/* Vertical splitter between controls and the right column */}
+      <div className="sarviz-splitter-v nodrag nopan" onPointerDown={dragControls} title="Drag to resize" />
 
       {/* Right column: 3D scene (top) over timing diagram (bottom) */}
       <div className="sarviz-right">
@@ -368,7 +427,10 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
           )}
         </div>
 
-        <div className="sarviz-timing">
+        {/* Horizontal splitter between 3D scene and timing diagram */}
+        <div className="sarviz-splitter-h nodrag nopan" onPointerDown={dragTiming} title="Drag to resize" />
+
+        <div className="sarviz-timing" style={{ height: `${timingH}px` }}>
           <div className="sarviz-timing-header">
             <span className="sarviz-section-title sarviz-timing-title">TIMING (TX / RX)</span>
             <button className="sarviz-play-btn nodrag nopan"
