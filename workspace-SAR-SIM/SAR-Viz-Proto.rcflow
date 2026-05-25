@@ -4,17 +4,17 @@
   "title": "SAR-Viz-Proto",
   "description": "",
   "created": "2026-05-24T14:30:51.164208+00:00",
-  "modified": "2026-05-25T13:51:57.244689+00:00",
+  "modified": "2026-05-25T14:03:50.142674+00:00",
   "canvas": {
     "name": "flowgraph",
-    "savedAt": "2026-05-25T13:51:57.244Z",
+    "savedAt": "2026-05-25T14:03:50.142Z",
     "nodes": [
       {
         "id": "n1",
         "type": "canvasNode",
         "position": {
-          "x": 345.9051080475165,
-          "y": 14.379149898131061
+          "x": 250.49600750061438,
+          "y": 2.109348317443752
         },
         "width": 760,
         "data": {
@@ -40,7 +40,7 @@
             "look_deg": "25",
             "beam_az_deg": "0.5",
             "beam_rg_deg": "2.0",
-            "prf_hz": "3810",
+            "prf_hz": "2740",
             "pulse_width_us": "10",
             "bandwidth_mhz": "300",
             "fc_ghz": "9.65",

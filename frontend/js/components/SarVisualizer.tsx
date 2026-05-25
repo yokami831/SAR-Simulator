@@ -24,7 +24,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createSarScene, SarSceneHandle, SarParams, computeDerived } from './SarSceneManager.js';
-import { schedulePulses, bandFillCss, TimingInput } from './sarTiming.js';
+import { schedulePulses, chirpRampColor, TimingInput } from './sarTiming.js';
 
 // Parameter definition shape (subset of the block JSON parameter entries).
 export interface SarParamDef {
@@ -140,8 +140,7 @@ export interface SimClock { t: number; running: boolean; slowMoExp: number; }
 
 // ---- timing diagram (canvas 2D, faithful port of TimingDiagram.tsx) --------
 const NOW_FRACTION = 0.75;
-const WINDOW_S = 0.005;     // 5 ms visible window (default zoom)
-const EVENT_WINDOW_S = 0.01;
+const WINDOW_PRIS = 4;     // show ~4 pulse-repetition intervals (zoom level)
 const MIN_BAND_PX = 2;
 
 function TimingDiagram({ timing, clock }: { timing: TimingInput; clock: React.MutableRefObject<SimClock> }) {
@@ -170,27 +169,40 @@ function TimingDiagram({ timing, clock }: { timing: TimingInput; clock: React.Mu
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = '#0d1424'; ctx.fillRect(0, 0, w, h);
 
+      // Visible window scales with PRF so a few PRIs are always shown (the time
+      // axis zooms automatically; pulses stay wide enough to see the chirp slant).
+      const pri = 1 / Math.max(1, timingRef.current.prfHz);
+      const WINDOW_S = pri * WINDOW_PRIS;
+      const EVENT_WINDOW_S = WINDOW_S * 1.5;
+
       const t0 = t - WINDOW_S * NOW_FRACTION;
       const tEnd = t0 + WINDOW_S;
       const labelW = 24;
       const xOf = (s: number) => labelW + ((s - t0) / WINDOW_S) * (w - labelW);
 
-      // grid: 1 ms major, 0.2 ms minor
+      // grid: a faint line at each PRI boundary (one per transmitted pulse),
+      // plus ms tick labels at a step chosen so labels never crowd.
       ctx.lineWidth = 1;
       ctx.strokeStyle = 'rgba(58,77,118,0.35)';
-      const minorStep = 0.0002;
-      for (let s = Math.ceil(t0 / minorStep) * minorStep; s <= tEnd; s += minorStep) {
+      for (let s = Math.ceil(t0 / pri) * pri; s <= tEnd; s += pri) {
         const x = xOf(s);
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
       }
+      // ms labels: pick a step (0.1/0.2/0.5/1/2/5 ms) giving ~5 labels.
+      const targetLabels = 5;
+      const rawStepMs = (WINDOW_S * 1000) / targetLabels;
+      const niceSteps = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
+      const stepMs = niceSteps.find((s) => s >= rawStepMs) ?? 10;
       ctx.strokeStyle = '#3a4d76';
       ctx.fillStyle = '#5a6783';
       ctx.font = '9px ui-monospace, monospace';
       ctx.textAlign = 'start';
-      for (let ms = Math.ceil(t0 * 1000); ms <= Math.floor(tEnd * 1000); ms++) {
+      const firstMs = Math.ceil((t0 * 1000) / stepMs) * stepMs;
+      for (let ms = firstMs; ms <= tEnd * 1000 + 1e-9; ms += stepMs) {
         const x = xOf(ms / 1000);
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-        ctx.fillText(`${ms}ms`, x + 2, h - 2);
+        const label = stepMs < 1 ? `${ms.toFixed(1)}` : `${Math.round(ms)}`;
+        ctx.fillText(`${label}ms`, x + 2, h - 2);
       }
 
       // tracks: TX (top) and RX (bottom), packed tightly. The fixed margins
@@ -214,20 +226,50 @@ function TimingDiagram({ timing, clock }: { timing: TimingInput; clock: React.Mu
       ctx.fillStyle = '#ff8c42'; ctx.fillText('RX', 2, rxTop + 8);
 
       const pulses = schedulePulses(timingRef.current, t - EVENT_WINDOW_S, t + EVENT_WINDOW_S);
-      const drawRect = (s0: number, s1: number, yTop: number, fill: string) => {
-        const x0 = Math.max(labelW, xOf(s0));
-        const x1 = Math.min(w, xOf(s1));
-        if (x1 <= x0) return;
-        ctx.fillStyle = fill;
-        ctx.fillRect(x0, yTop, Math.max(MIN_BAND_PX, x1 - x0), Math.max(MIN_BAND_PX, rowH));
+      const chirpDir = timingRef.current.chirpDir;
+
+      // Draw one pulse (TX or RX) as a smooth-gradient slanted chirp band.
+      // The band spans [tStart, tStart+dur] in time (x) and the full track
+      // height in frequency (y). The slant: each frequency row is emitted at a
+      // slightly later time, so the high-f edge is shifted by `slantT` relative
+      // to the low-f edge — an 'up' chirp leans right going up. The fill is a
+      // vertical inferno-style ramp (blue low-f -> red high-f), continuous.
+      const drawChirp = (tStart: number, dur: number, slantT: number, top: number, h2: number, reversed: boolean) => {
+        const xa = xOf(tStart);
+        const xb = xOf(tStart + dur);
+        if (Math.min(xa, xb) > w || Math.max(xa, xb) < labelW) return;
+        const slantPx = ((slantT) / WINDOW_S) * (w - labelW) * (reversed ? -1 : 1);
+        const yBot = top + h2, yTop = top;
+        // Parallelogram: bottom edge at [xa, xb], top edge shifted by slantPx.
+        // For reversed (down chirp) the shift flips so the band leans the other way.
+        const bl = xa, br = xb;                 // bottom-left/right (low f)
+        const tl = xa + slantPx, tr = xb + slantPx; // top-left/right (high f)
+        // Vertical gradient over the band's y-extent: blue -> yellow-green -> red.
+        const grad = ctx.createLinearGradient(0, yBot, 0, yTop);
+        const c0 = chirpRampColor(0), c1 = chirpRampColor(0.5), c2 = chirpRampColor(1);
+        const rgb = (c: [number, number, number]) => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
+        grad.addColorStop(0, rgb(c0));
+        grad.addColorStop(0.5, rgb(c1));
+        grad.addColorStop(1, rgb(c2));
+        ctx.fillStyle = grad;
+        // Clip to the visible band area first, THEN fill the parallelogram.
+        // (Order matters: clip() consumes the current path, so the fill path
+        //  must be built after clipping — otherwise the clip rect gets filled.)
+        ctx.save();
+        ctx.beginPath(); ctx.rect(labelW, yTop, w - labelW, yBot - yTop); ctx.clip();
+        ctx.beginPath();
+        ctx.moveTo(bl, yBot); ctx.lineTo(br, yBot); ctx.lineTo(tr, yTop); ctx.lineTo(tl, yTop);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
       };
+
       for (const p of pulses) {
-        for (let k = 0; k < p.subBands.length; k++) {
-          const sb = p.subBands[k];
-          const col = bandFillCss(k, N);
-          drawRect(sb.txStart, sb.txStart + sb.pw, rowYTop(txTop, k), col);
-          drawRect(sb.nearArrive, sb.farArrive + sb.pw, rowYTop(rxTop, k), col);
-        }
+        const reversed = chirpDir === 'down' || (chirpDir === 'updown' && p.id % 2 === 1);
+        // TX: time-of-flight 0; band = pulse width, slanted over pw.
+        drawChirp(p.txStart, p.pw, p.pw, txTop, trackInnerH, reversed);
+        // RX: arrives over [nearArrive, farArrive+pw]; slant over pw as well.
+        drawChirp(p.nearArrive, (p.farArrive + p.pw) - p.nearArrive, p.pw, rxTop, trackInnerH, reversed);
       }
 
       // overlap (blind range): pink blink where TX and RX coincide
