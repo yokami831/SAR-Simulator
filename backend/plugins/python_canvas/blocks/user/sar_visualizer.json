@@ -14,11 +14,12 @@
       "step": "1",
       "unit": "km",
       "var": "H",
-      "scale": "1000"
+      "scale": "1000",
+      "section": "PARAMETERS"
     },
     {
       "id": "look_deg",
-      "label": "Off-Nadir (look angle)",
+      "label": "Off-Nadir",
       "dtype": "number",
       "default": "25",
       "min": "15",
@@ -26,7 +27,9 @@
       "step": "0.5",
       "unit": "deg",
       "var": "look",
-      "scale": "deg2rad"
+      "scale": "deg2rad",
+      "section": "PARAMETERS",
+      "sub": "(look angle)"
     },
     {
       "id": "beam_az_deg",
@@ -38,7 +41,10 @@
       "step": "0.05",
       "unit": "deg",
       "var": "beam_az",
-      "scale": "deg2rad"
+      "scale": "deg2rad",
+      "section": "PARAMETERS",
+      "group": "Beam Width",
+      "groupLabel": "Az"
     },
     {
       "id": "beam_rg_deg",
@@ -50,95 +56,14 @@
       "step": "0.1",
       "unit": "deg",
       "var": "beam_rg",
-      "scale": "deg2rad"
-    },
-    {
-      "id": "prf_hz",
-      "label": "PRF",
-      "dtype": "number",
-      "default": "4000",
-      "min": "1000",
-      "max": "8000",
-      "step": "10",
-      "unit": "Hz",
-      "var": "PRF",
-      "scale": "1"
-    },
-    {
-      "id": "pulse_width_us",
-      "label": "Pulse Width",
-      "dtype": "number",
-      "default": "10",
-      "min": "1",
-      "max": "250",
-      "step": "1",
-      "unit": "us",
-      "var": "Tp",
-      "scale": "1e-6"
-    },
-    {
-      "id": "bandwidth_mhz",
-      "label": "Bandwidth B",
-      "dtype": "number",
-      "default": "300",
-      "min": "10",
-      "max": "1200",
-      "step": "10",
-      "unit": "MHz",
-      "var": "B",
-      "scale": "1e6"
-    },
-    {
-      "id": "sampling_mhz",
-      "label": "Sampling Fs",
-      "dtype": "number",
-      "default": "360",
-      "min": "12",
-      "max": "1500",
-      "step": "10",
-      "unit": "MHz",
-      "var": "Fs",
-      "scale": "1e6"
-    },
-    {
-      "id": "range_swath_half_m",
-      "label": "Range swath half-width",
-      "dtype": "number",
-      "default": "3000",
-      "min": "100",
-      "max": "12000",
-      "step": "100",
-      "unit": "m",
-      "var": "R_half",
-      "scale": "1"
-    },
-    {
-      "id": "fc_ghz",
-      "label": "Carrier fc",
-      "dtype": "number",
-      "default": "9.65",
-      "min": "1",
-      "max": "40",
-      "step": "0.05",
-      "unit": "GHz",
-      "var": "fc",
-      "scale": "1e9"
-    },
-    {
-      "id": "velocity_ms",
-      "label": "Platform Velocity",
-      "dtype": "number",
-      "default": "7600",
-      "min": "6000",
-      "max": "8000",
-      "step": "10",
-      "unit": "m/s",
-      "var": "V",
-      "scale": "1"
+      "scale": "deg2rad",
+      "section": "PARAMETERS",
+      "group": "Beam Width",
+      "groupLabel": "Rg"
     },
     {
       "id": "antenna_la_m",
-      "label": "Antenna La (azimuth)",
+      "label": "Antenna La",
       "dtype": "number",
       "default": "4.8",
       "min": "1",
@@ -146,11 +71,13 @@
       "step": "0.1",
       "unit": "m",
       "var": "La",
-      "scale": "1"
+      "scale": "1",
+      "section": "PARAMETERS",
+      "sub": "(azimuth)"
     },
     {
       "id": "antenna_lr_m",
-      "label": "Antenna Lr (range)",
+      "label": "Antenna Lr",
       "dtype": "number",
       "default": "0.8",
       "min": "0.2",
@@ -158,20 +85,9 @@
       "step": "0.1",
       "unit": "m",
       "var": "Lr",
-      "scale": "1"
-    },
-    {
-      "id": "chirp_dir",
-      "label": "Chirp Direction",
-      "dtype": "enum",
-      "default": "up",
-      "options": [
-        "up",
-        "down",
-        "updown"
-      ],
-      "var": "chirp_dir",
-      "scale": "str"
+      "scale": "1",
+      "section": "PARAMETERS",
+      "sub": "(range)"
     },
     {
       "id": "obs_mode",
@@ -184,7 +100,113 @@
         "spotlight"
       ],
       "var": "obs_mode",
-      "scale": "str"
+      "scale": "str",
+      "section": "PARAMETERS"
+    },
+    {
+      "id": "prf_hz",
+      "label": "PRF",
+      "dtype": "number",
+      "default": "4000",
+      "min": "1000",
+      "max": "8000",
+      "step": "10",
+      "unit": "Hz",
+      "var": "PRF",
+      "scale": "1",
+      "section": "SIGNAL"
+    },
+    {
+      "id": "pulse_width_us",
+      "label": "Pulse Width",
+      "dtype": "number",
+      "default": "10",
+      "min": "1",
+      "max": "250",
+      "step": "1",
+      "unit": "us",
+      "var": "Tp",
+      "scale": "1e-6",
+      "section": "SIGNAL"
+    },
+    {
+      "id": "bandwidth_mhz",
+      "label": "Bandwidth B",
+      "dtype": "number",
+      "default": "300",
+      "min": "10",
+      "max": "1200",
+      "step": "10",
+      "unit": "MHz",
+      "var": "B",
+      "scale": "1e6",
+      "section": "SIGNAL"
+    },
+    {
+      "id": "sampling_mhz",
+      "label": "Sampling Fs",
+      "dtype": "number",
+      "default": "360",
+      "min": "12",
+      "max": "1500",
+      "step": "10",
+      "unit": "MHz",
+      "var": "Fs",
+      "scale": "1e6",
+      "section": "SIGNAL"
+    },
+    {
+      "id": "range_swath_half_m",
+      "label": "Range swath half-width",
+      "dtype": "number",
+      "default": "3000",
+      "min": "100",
+      "max": "12000",
+      "step": "100",
+      "unit": "m",
+      "var": "R_half",
+      "scale": "1",
+      "section": "SIGNAL"
+    },
+    {
+      "id": "fc_ghz",
+      "label": "Carrier fc",
+      "dtype": "number",
+      "default": "9.65",
+      "min": "1",
+      "max": "40",
+      "step": "0.05",
+      "unit": "GHz",
+      "var": "fc",
+      "scale": "1e9",
+      "section": "SIGNAL"
+    },
+    {
+      "id": "velocity_ms",
+      "label": "Platform Velocity",
+      "dtype": "number",
+      "default": "7600",
+      "min": "6000",
+      "max": "8000",
+      "step": "10",
+      "unit": "m/s",
+      "var": "V",
+      "scale": "1",
+      "section": "SIGNAL"
+    },
+    {
+      "id": "chirp_dir",
+      "label": "Chirp Direction",
+      "dtype": "enum",
+      "default": "up",
+      "options": [
+        "up",
+        "down",
+        "updown"
+      ],
+      "var": "chirp_dir",
+      "scale": "str",
+      "section": "SIGNAL"
     },
     {
       "id": "controls_width",

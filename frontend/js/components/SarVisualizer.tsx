@@ -40,6 +40,10 @@ export interface SarParamDef {
   scale?: string;
   options?: string[];
   hidden?: boolean;
+  section?: string;     // "PARAMETERS" / "SIGNAL" — section header before the row
+  sub?: string;         // dim secondary label, e.g. "(look angle)"
+  group?: string;       // shared sub-group heading, e.g. "Beam Width"
+  groupLabel?: string;  // per-row label within a group, e.g. "Az" / "Rg"
 }
 
 interface SarVisualizerProps {
@@ -79,20 +83,36 @@ function fmt(n: number, digits = 1): string {
 }
 
 // ---- one slider row --------------------------------------------------------
-function SarSliderRow({ def, value, onChange }: {
+// `compact` renders the inline "Az [====] 0.50°" form used inside a group.
+function SarSliderRow({ def, value, onChange, compact }: {
   def: SarParamDef;
   value: string;
   onChange: (id: string, val: string) => void;
+  compact?: boolean;
 }) {
   const min = parseFloat(def.min ?? '0');
   const max = parseFloat(def.max ?? '100');
   const step = parseFloat(def.step ?? '1');
   const num = value === '' || value == null ? parseFloat(def.default ?? '0') : parseFloat(value);
+  const valStr = `${fmt(num, step < 1 ? 2 : 0)}${def.unit ? ` ${def.unit}` : ''}`;
+  if (compact) {
+    return (
+      <div className="sarviz-row-compact">
+        <span className="sarviz-group-axis">{def.groupLabel ?? def.label}</span>
+        <input type="range" className="sarviz-slider nodrag nopan"
+          min={min} max={max} step={step} value={isNaN(num) ? min : num}
+          onChange={(e) => onChange(def.id, e.target.value)}
+          onMouseDown={(e) => e.stopPropagation()} />
+        <span className="sarviz-row-value">{valStr}</span>
+      </div>
+    );
+  }
   return (
     <div className="sarviz-row">
       <div className="sarviz-row-head">
-        <span className="sarviz-row-label">{def.label ?? def.id}</span>
-        <span className="sarviz-row-value">{fmt(num, step < 1 ? 2 : 0)}{def.unit ? ` ${def.unit}` : ''}</span>
+        <span className="sarviz-row-label">{def.label ?? def.id}
+          {def.sub && <span className="sarviz-row-sub"> {def.sub}</span>}</span>
+        <span className="sarviz-row-value">{valStr}</span>
       </div>
       <input
         type="range"
@@ -357,8 +377,6 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
 
   // Hidden params (e.g. saved pane sizes) are not rendered as controls.
   const visibleDefs = useMemo(() => paramDefs.filter((d) => !d.hidden), [paramDefs]);
-  const sliderDefs = useMemo(() => visibleDefs.filter((d) => d.dtype !== 'enum'), [visibleDefs]);
-  const enumDefs = useMemo(() => visibleDefs.filter((d) => d.dtype === 'enum'), [visibleDefs]);
 
   const sarParams = useMemo(() => toSarParams(params, paramDefs), [params, paramDefs]);
   const derived = useMemo(() => computeDerived(sarParams), [sarParams]);
@@ -437,17 +455,49 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
     <div className="sarviz-body nodrag nopan nowheel"
       onWheel={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}>
-      {/* Left: parameter controls, full node height (drag-resizable width) */}
+      {/* Left: parameter controls, full node height (drag-resizable width).
+          Rendered in JSON order with section headers, sub-labels and the
+          Beam Width sub-group, matching the standalone sar-visualizer sidebar. */}
       <div className="sarviz-controls" style={{ width: `${controlsW}px` }}>
-        <div className="sarviz-section-title">PARAMETERS</div>
-        {sliderDefs.map((def) => (
-          <SarSliderRow key={def.id} def={def}
-            value={params[def.id] ?? def.default ?? ''} onChange={handleChange} />
-        ))}
-        {enumDefs.map((def) => (
-          <SarEnumRow key={def.id} def={def}
-            value={params[def.id] ?? def.default ?? ''} onChange={handleChange} />
-        ))}
+        {(() => {
+          const out: React.ReactNode[] = [];
+          let curSection: string | undefined;
+          let i = 0;
+          while (i < visibleDefs.length) {
+            const def = visibleDefs[i];
+            // Section header when the section changes.
+            if (def.section && def.section !== curSection) {
+              curSection = def.section;
+              out.push(<div key={`sec-${curSection}`} className="sarviz-section-title">{curSection}</div>);
+            }
+            // Grouped rows (e.g. Beam Width: Az / Rg) — gather consecutive same-group defs.
+            if (def.group) {
+              const g = def.group;
+              const members: SarParamDef[] = [];
+              while (i < visibleDefs.length && visibleDefs[i].group === g) { members.push(visibleDefs[i]); i++; }
+              out.push(
+                <div key={`grp-${g}`} className="sarviz-group">
+                  <div className="sarviz-group-title">{g}</div>
+                  {members.map((mdef) => (
+                    <SarSliderRow key={mdef.id} def={mdef} compact
+                      value={params[mdef.id] ?? mdef.default ?? ''} onChange={handleChange} />
+                  ))}
+                </div>,
+              );
+              continue;
+            }
+            // Enum vs slider.
+            if (def.dtype === 'enum') {
+              out.push(<SarEnumRow key={def.id} def={def}
+                value={params[def.id] ?? def.default ?? ''} onChange={handleChange} />);
+            } else {
+              out.push(<SarSliderRow key={def.id} def={def}
+                value={params[def.id] ?? def.default ?? ''} onChange={handleChange} />);
+            }
+            i++;
+          }
+          return out;
+        })()}
       </div>
 
       {/* Vertical splitter between controls and the right column */}

@@ -4,10 +4,10 @@
   "title": "SAR-Viz-Proto",
   "description": "",
   "created": "2026-05-24T14:30:51.164208+00:00",
-  "modified": "2026-05-25T14:17:26.612382+00:00",
+  "modified": "2026-05-25T14:23:31.589929+00:00",
   "canvas": {
     "name": "flowgraph",
-    "savedAt": "2026-05-25T14:17:26.601Z",
+    "savedAt": "2026-05-25T14:23:31.587Z",
     "nodes": [
       {
         "id": "n1",

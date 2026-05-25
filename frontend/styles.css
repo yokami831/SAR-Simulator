@@ -2358,32 +2358,93 @@ select.grc-param-input { cursor: pointer; }
 }
 .sarviz-controls::-webkit-scrollbar { width: 6px; }
 .sarviz-controls::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+/* Section header (amber dot + caps), like the standalone app's PARAMETERS / SIGNAL */
 .sarviz-section-title {
-  color: #8a9bb4;
-  font-size: 10px;
-  letter-spacing: 1px;
-  margin-bottom: 8px;
+  color: #ffc344;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 3px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #1d2940;
 }
-.sarviz-row { margin-bottom: 10px; }
+.sarviz-section-title::before {
+  content: '';
+  width: 6px; height: 6px;
+  background: #ffc344;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #ffc344;
+}
+.sarviz-section-title + .sarviz-section-title,
+.sarviz-row + .sarviz-section-title,
+.sarviz-group + .sarviz-section-title,
+.sarviz-segmented + .sarviz-section-title { margin-top: 8px; }
+
+.sarviz-row { margin-bottom: 7px; }
 .sarviz-row-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 .sarviz-row-label {
-  color: #c4cde0;
-  font-size: 11px;
+  color: #e6ecf5;
+  font-size: 12px;
 }
+.sarviz-row-sub { color: #8a9bb4; opacity: 0.7; }
 .sarviz-row-value {
   color: #5dd5ff;
-  font-size: 11px;
+  font-size: 12px;
   font-family: 'JetBrains Mono', 'Consolas', monospace;
+  font-variant-numeric: tabular-nums;
 }
+/* Sub-group (e.g. Beam Width with Az / Rg rows) */
+.sarviz-group { margin-bottom: 7px; }
+.sarviz-group-title { color: #e6ecf5; font-size: 12px; margin-bottom: 1px; }
+.sarviz-row-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.sarviz-group-axis {
+  color: #8a9bb4;
+  font-size: 11px;
+  width: 18px;
+  flex: 0 0 18px;
+}
+.sarviz-row-compact .sarviz-slider { flex: 1 1 auto; }
+.sarviz-row-compact .sarviz-row-value { flex: 0 0 auto; min-width: 46px; text-align: right; }
+/* Slider: thin track + glowing cyan thumb (matches the standalone app) */
 .sarviz-slider {
   width: 100%;
-  accent-color: #5dd5ff;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 3px;
+  background: #1d2940;
+  border-radius: 2px;
+  outline: none;
   cursor: pointer;
+  margin: 1px 0;
+}
+.sarviz-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  background: #5dd5ff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(93, 213, 255, 0.7);
+}
+.sarviz-slider::-moz-range-thumb {
+  width: 14px; height: 14px;
+  background: #5dd5ff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(93, 213, 255, 0.7);
 }
 .sarviz-segmented {
   display: flex;
