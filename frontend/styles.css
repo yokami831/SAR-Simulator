@@ -2480,6 +2480,25 @@ select.grc-param-input { cursor: pointer; }
   font-size: 9px;
   font-family: 'JetBrains Mono', 'Consolas', monospace;
 }
+.sarviz-zoom {
+  margin-left: auto;       /* push the zoom buttons to the right edge */
+  display: flex;
+  gap: 3px;
+}
+.sarviz-zoom-btn {
+  width: 20px;
+  height: 18px;
+  background: #11203a;
+  border: 1px solid #2a4a6a;
+  color: #cdd6f4;
+  font-size: 13px;
+  line-height: 1;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+}
+.sarviz-zoom-btn:hover:not(:disabled) { background: #245078; }
+.sarviz-zoom-btn:disabled { opacity: 0.35; cursor: default; }
 .sarviz-slowmo {
   flex: 0 0 90px;
   accent-color: #ffc344;

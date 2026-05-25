@@ -24,7 +24,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createSarScene, SarSceneHandle, SarParams, computeDerived } from './SarSceneManager.js';
-import { schedulePulses, chirpRampColor, TimingInput } from './sarTiming.js';
+import { schedulePulses, bandFillCss, TimingInput } from './sarTiming.js';
 
 // Parameter definition shape (subset of the block JSON parameter entries).
 export interface SarParamDef {
@@ -140,12 +140,18 @@ export interface SimClock { t: number; running: boolean; slowMoExp: number; }
 
 // ---- timing diagram (canvas 2D, faithful port of TimingDiagram.tsx) --------
 const NOW_FRACTION = 0.75;
-const WINDOW_PRIS = 4;     // show ~4 pulse-repetition intervals (zoom level)
 const MIN_BAND_PX = 2;
+// Zoom levels = how many pulse-repetition intervals are visible. The time axis
+// scales with PRF (so pulses stay legible at any PRF) and the −/+ buttons step
+// through these (smaller = zoomed in). Mirrors sar-visualizer's zoom control.
+const ZOOM_PRIS = [2, 4, 8, 16, 32] as const;
+const DEFAULT_ZOOM_INDEX = 1; // 4 PRIs
 
-function TimingDiagram({ timing, clock }: { timing: TimingInput; clock: React.MutableRefObject<SimClock> }) {
+function TimingDiagram({ timing, clock, windowPris }: { timing: TimingInput; clock: React.MutableRefObject<SimClock>; windowPris: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const timingRef = useRef(timing);
+  const windowPrisRef = useRef(windowPris);
+  windowPrisRef.current = windowPris;
   timingRef.current = timing;
 
   useEffect(() => {
@@ -171,8 +177,9 @@ function TimingDiagram({ timing, clock }: { timing: TimingInput; clock: React.Mu
 
       // Visible window scales with PRF so a few PRIs are always shown (the time
       // axis zooms automatically; pulses stay wide enough to see the chirp slant).
+      // windowPris is the −/+ zoom level (PRIs visible).
       const pri = 1 / Math.max(1, timingRef.current.prfHz);
-      const WINDOW_S = pri * WINDOW_PRIS;
+      const WINDOW_S = pri * windowPrisRef.current;
       const EVENT_WINDOW_S = WINDOW_S * 1.5;
 
       const t0 = t - WINDOW_S * NOW_FRACTION;
@@ -226,50 +233,31 @@ function TimingDiagram({ timing, clock }: { timing: TimingInput; clock: React.Mu
       ctx.fillStyle = '#ff8c42'; ctx.fillText('RX', 2, rxTop + 8);
 
       const pulses = schedulePulses(timingRef.current, t - EVENT_WINDOW_S, t + EVENT_WINDOW_S);
-      const chirpDir = timingRef.current.chirpDir;
 
-      // Draw one pulse (TX or RX) as a smooth-gradient slanted chirp band.
-      // The band spans [tStart, tStart+dur] in time (x) and the full track
-      // height in frequency (y). The slant: each frequency row is emitted at a
-      // slightly later time, so the high-f edge is shifted by `slantT` relative
-      // to the low-f edge — an 'up' chirp leans right going up. The fill is a
-      // vertical inferno-style ramp (blue low-f -> red high-f), continuous.
-      const drawChirp = (tStart: number, dur: number, slantT: number, top: number, h2: number, reversed: boolean) => {
-        const xa = xOf(tStart);
-        const xb = xOf(tStart + dur);
-        if (Math.min(xa, xb) > w || Math.max(xa, xb) < labelW) return;
-        const slantPx = ((slantT) / WINDOW_S) * (w - labelW) * (reversed ? -1 : 1);
-        const yBot = top + h2, yTop = top;
-        // Parallelogram: bottom edge at [xa, xb], top edge shifted by slantPx.
-        // For reversed (down chirp) the shift flips so the band leans the other way.
-        const bl = xa, br = xb;                 // bottom-left/right (low f)
-        const tl = xa + slantPx, tr = xb + slantPx; // top-left/right (high f)
-        // Vertical gradient over the band's y-extent: blue -> yellow-green -> red.
-        const grad = ctx.createLinearGradient(0, yBot, 0, yTop);
-        const c0 = chirpRampColor(0), c1 = chirpRampColor(0.5), c2 = chirpRampColor(1);
-        const rgb = (c: [number, number, number]) => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
-        grad.addColorStop(0, rgb(c0));
-        grad.addColorStop(0.5, rgb(c1));
-        grad.addColorStop(1, rgb(c2));
-        ctx.fillStyle = grad;
-        // Clip to the visible band area first, THEN fill the parallelogram.
-        // (Order matters: clip() consumes the current path, so the fill path
-        //  must be built after clipping — otherwise the clip rect gets filled.)
-        ctx.save();
-        ctx.beginPath(); ctx.rect(labelW, yTop, w - labelW, yBot - yTop); ctx.clip();
-        ctx.beginPath();
-        ctx.moveTo(bl, yBot); ctx.lineTo(br, yBot); ctx.lineTo(tr, yTop); ctx.lineTo(tl, yTop);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
+      // Per-sub-band rectangles, exactly as sar-visualizer's TimingDiagram.tsx:
+      // each pulse is N sub-bands; sub-band k owns a frequency row (k=0 blue/low
+      // at the bottom, k=N-1 red/high at the top). TX rect = [txStart_k,
+      // txStart_k+pw_k] (pw_k = pw/N, narrow — the chirp marches in time across
+      // rows, giving a thin slanted line). RX rect = [nearArrive_k,
+      // farArrive_k+pw_k] (widened by the swath bracket — a parallelogram). The
+      // colour index k feeds bandFillCss unchanged (direction is already in
+      // txStart). N=64 makes the colour read as a smooth gradient.
+      const rowYTop2 = (top: number, k: number) => top + ((N - 1 - k) * trackInnerH) / N;
+      const rowYBot2 = (top: number, k: number) => top + ((N - 1 - k + 1) * trackInnerH) / N;
+      const drawBandRect = (tStart: number, tEnd: number, yTop: number, yBot: number, fill: string) => {
+        const x0 = Math.max(labelW, xOf(tStart));
+        const x1 = Math.min(w, xOf(tEnd));
+        if (x1 <= x0) return;
+        ctx.fillStyle = fill;
+        ctx.fillRect(x0, yTop, Math.max(MIN_BAND_PX, x1 - x0), Math.max(MIN_BAND_PX, yBot - yTop));
       };
-
       for (const p of pulses) {
-        const reversed = chirpDir === 'down' || (chirpDir === 'updown' && p.id % 2 === 1);
-        // TX: time-of-flight 0; band = pulse width, slanted over pw.
-        drawChirp(p.txStart, p.pw, p.pw, txTop, trackInnerH, reversed);
-        // RX: arrives over [nearArrive, farArrive+pw]; slant over pw as well.
-        drawChirp(p.nearArrive, (p.farArrive + p.pw) - p.nearArrive, p.pw, rxTop, trackInnerH, reversed);
+        for (let k = 0; k < p.subBands.length; k++) {
+          const sb = p.subBands[k];
+          const fill = bandFillCss(k, N);
+          drawBandRect(sb.txStart, sb.txStart + sb.pw, rowYTop2(txTop, k), rowYBot2(txTop, k), fill);
+          drawBandRect(sb.nearArrive, sb.farArrive + sb.pw, rowYTop2(rxTop, k), rowYBot2(rxTop, k), fill);
+        }
       }
 
       // overlap (blind range): pink blink where TX and RX coincide
@@ -413,6 +401,20 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
   useEffect(() => { clockRef.current.running = running; }, [running]);
   useEffect(() => { clockRef.current.slowMoExp = slowMoExp; }, [slowMoExp]);
 
+  // Time-axis zoom index (persisted to the node like the pane sizes).
+  const initialZoom = (() => {
+    const v = parseInt(params.timing_zoom ?? '', 10);
+    return Number.isInteger(v) && v >= 0 && v < ZOOM_PRIS.length ? v : DEFAULT_ZOOM_INDEX;
+  })();
+  const [zoomIdx, setZoomIdxState] = useState(initialZoom);
+  const setZoomIdx = useCallback((updater: (i: number) => number) => {
+    setZoomIdxState((prev) => {
+      const next = updater(prev);
+      onParamChange('timing_zoom', String(next));   // persist to .rcflow
+      return next;
+    });
+  }, [onParamChange]);
+
   // Timing parameters (shared by 2D + 3D). Sub-band count kept modest (8) to
   // stay light inside a node vs the original's 64.
   const timing: TimingInput = useMemo(() => ({
@@ -421,7 +423,7 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
     beamRgRad: sarParams.beamRgRad,
     prfHz,
     pulseWidthS: pulseUs * 1e-6,
-    nSub: 8,
+    nSub: 64,   // matches sar-visualizer default; smooth chirp gradient
     chirpDir: (params.chirp_dir as 'up' | 'down' | 'updown') ?? 'up',
   }), [sarParams.altitudeM, sarParams.lookRad, sarParams.beamRgRad, prfHz, pulseUs, params.chirp_dir]);
 
@@ -483,8 +485,17 @@ export default function SarVisualizer({ params, paramDefs, onParamChange }: SarV
               value={slowMoExp}
               onChange={(e) => setSlowMoExp(parseFloat(e.target.value))}
               onMouseDown={(e) => e.stopPropagation()} />
+            {/* Time-axis zoom: − widens the window (zoom out), + narrows it (zoom in) */}
+            <div className="sarviz-zoom nodrag nopan">
+              <button className="sarviz-zoom-btn" title="Zoom out (more time)"
+                disabled={zoomIdx >= ZOOM_PRIS.length - 1}
+                onClick={(e) => { e.stopPropagation(); setZoomIdx((i) => Math.min(ZOOM_PRIS.length - 1, i + 1)); }}>−</button>
+              <button className="sarviz-zoom-btn" title="Zoom in (less time)"
+                disabled={zoomIdx <= 0}
+                onClick={(e) => { e.stopPropagation(); setZoomIdx((i) => Math.max(0, i - 1)); }}>+</button>
+            </div>
           </div>
-          <TimingDiagram timing={timing} clock={clockRef} />
+          <TimingDiagram timing={timing} clock={clockRef} windowPris={ZOOM_PRIS[zoomIdx]} />
         </div>
       </div>
     </div>

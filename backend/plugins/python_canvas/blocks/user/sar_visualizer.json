@@ -199,6 +199,13 @@
       "dtype": "number",
       "default": "60",
       "hidden": true
+    },
+    {
+      "id": "timing_zoom",
+      "label": "Timing zoom index",
+      "dtype": "number",
+      "default": "1",
+      "hidden": true
     }
   ],
   "inputs": [
