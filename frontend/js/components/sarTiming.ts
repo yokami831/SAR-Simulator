@@ -42,8 +42,11 @@ export function bandFillCss(k: number, N: number): string {
 export interface SubBand {
   txStart: number;
   pw: number;
-  nearArrive: number;
+  nearReflect: number;  // txStart + rNear/c (leading edge reaches near edge)
+  nearArrive: number;   // txStart + 2*rNear/c (echo returns)
   farArrive: number;
+  rNear: number;
+  rFar: number;
 }
 export interface PulseEvent {
   id: number;
@@ -90,8 +93,10 @@ function makeSubBands(parent: Omit<PulseEvent, 'subBands'>, N: number,
     out.push({
       txStart: txStartK,
       pw: subDur,
+      nearReflect: txStartK + rNear / C,
       nearArrive: txStartK + (2 * rNear) / C,
       farArrive: txStartK + (2 * rFar) / C,
+      rNear, rFar,
     });
   }
   return out;
@@ -135,6 +140,27 @@ export function isOverlapAt(t: number, pulses: ReadonlyArray<PulseEvent>) {
   const txActive = pulses.some((p) => p.txStart <= t && t < p.txStart + p.pw);
   const rxActive = pulses.some((p) => p.nearArrive <= t && t < p.farArrive + p.pw);
   return { txActive, rxActive, overlap: txActive && rxActive };
+}
+
+/**
+ * Visible slice of a propagating wave packet (physics/timing.ts
+ * computePulseSlice). Returns the midpoint range and visible length [m] of the
+ * packet at sim time, or null if it hasn't launched / has passed maxRangeM.
+ *   lifeM = (simTime - launchTime) * c   (leading-edge range)
+ *   head = lifeM, tail = lifeM - lengthM, clipped to [0, maxRangeM].
+ */
+export function computePulseSlice(launchTime: number, simTime: number, lengthM: number, maxRangeM: number):
+  { midM: number; visibleLenM: number } | null {
+  const lifeM = (simTime - launchTime) * C;
+  if (lifeM < 0) return null;
+  const headM = lifeM;
+  if (headM > maxRangeM) return null;
+  const tailM = headM - lengthM;
+  if (tailM >= maxRangeM) return null;
+  const visibleTail = Math.max(0, tailM);
+  const visibleLenM = headM - visibleTail;
+  if (visibleLenM <= 0) return null;
+  return { midM: (headM + visibleTail) / 2, visibleLenM };
 }
 
 export { C as SPEED_OF_LIGHT };

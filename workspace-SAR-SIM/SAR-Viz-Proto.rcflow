@@ -4,10 +4,8 @@
   "title": "SAR-Viz-Proto",
   "description": "",
   "created": "2026-05-24T14:30:51.164208+00:00",
-  "modified": "2026-05-25T14:23:31.589929+00:00",
+  "modified": "2026-05-25T14:30:57.788860+00:00",
   "canvas": {
-    "name": "flowgraph",
-    "savedAt": "2026-05-25T14:23:31.587Z",
     "nodes": [
       {
         "id": "n1",
@@ -16,7 +14,6 @@
           "x": 337.47625884711346,
           "y": 85.86181689913136
         },
-        "width": 760,
         "data": {
           "label": "SAR Visualizer",
           "category": "processing",
@@ -50,13 +47,24 @@
             "chirp_dir": "up",
             "obs_mode": "stripmap",
             "label": "SAR Observation Geometry",
-            "timing_height": "60",
+            "timing_height": "161",
             "controls_width": "230",
             "timing_zoom": "1"
           }
+        },
+        "width": 760,
+        "height": 667,
+        "style": {
+          "width": 780,
+          "height": 480
         }
       }
     ],
-    "edges": []
+    "edges": [],
+    "viewport": {
+      "x": -199.7235025592064,
+      "y": 9.29711485692036,
+      "zoom": 0.9515625
+    }
   }
 }

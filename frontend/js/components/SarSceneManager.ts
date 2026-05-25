@@ -22,7 +22,7 @@
 
 import type * as THREE_NS from 'three';
 import type { OrbitControls as OrbitControlsType } from 'three/examples/jsm/controls/OrbitControls.js';
-import { schedulePulses, chirpRampColor, TimingInput, SPEED_OF_LIGHT } from './sarTiming.js';
+import { schedulePulses, chirpRampColor, computePulseSlice, TimingInput, SPEED_OF_LIGHT } from './sarTiming.js';
 
 /** Mutable sim clock shared with SarVisualizer's 2D timing diagram. */
 export interface SimClock { t: number; running: boolean; slowMoExp: number; }
@@ -329,22 +329,25 @@ export async function createSarScene(host: HTMLDivElement): Promise<SarSceneHand
   swath.rotation.x = -Math.PI / 2;
   scene.add(swath);
 
-  // ---- TX/RX pulse animation -----------------------------------------------
-  // A small pool of spheres represents the leading edge of each in-flight pulse:
-  // TX travels satellite -> beam centre along the slant line; RX travels beam
-  // centre -> satellite. Colour follows the chirp ramp. Kept to a small pool so
-  // a node stays light (the original uses InstancedMesh with 128/256 capacity).
-  const PULSE_POOL = 24;
-  const pulseGeo = new T.SphereGeometry(0.045, 10, 8);
-  const pulseGroup = new T.Group();
-  const pulseMeshes: THREE_NS.Mesh[] = [];
-  for (let i = 0; i < PULSE_POOL; i++) {
-    const mesh = new T.Mesh(pulseGeo, new T.MeshBasicMaterial({ color: 0xffffff }));
-    mesh.visible = false;
-    pulseGroup.add(mesh);
-    pulseMeshes.push(mesh);
-  }
-  scene.add(pulseGroup);
+  // ---- TX/RX pulse animation (port of PulsesLayer.tsx) ---------------------
+  // TX: per sub-band thin cylinders that travel satellite -> beam centre.
+  // RX: per sub-band thin cylinders that travel ground (near edge) -> satellite.
+  // Each cylinder is a wave-packet slice (computePulseSlice): positioned at the
+  // packet midpoint along the beam direction and scaled to its visible length.
+  // Colour = chirpRampColor(k/(N-1)) per sub-band, so TX is a coloured comb and
+  // the RX column reads as a gradient — no shader patch needed (per-instance
+  // colour via InstancedMesh.setColorAt). Capacity is bounded so the node stays
+  // light; excess in-flight slices beyond the cap are simply not drawn.
+  const TX_RADIUS = 0.05, RX_RADIUS = 0.05;
+  const TX_CAP = 1536, RX_CAP = 1536;   // ~ pulses(24) * subbands(64)
+  // Unit cylinder along +Y, height 1 (scaled per instance).
+  const txCylGeo = new T.CylinderGeometry(TX_RADIUS, TX_RADIUS, 1, 8, 1, false);
+  const rxCylGeo = new T.CylinderGeometry(RX_RADIUS, RX_RADIUS, 1, 8, 1, false);
+  const txMesh = new T.InstancedMesh(txCylGeo, new T.MeshBasicMaterial({ transparent: true, opacity: 0.95 }), TX_CAP);
+  const rxMesh = new T.InstancedMesh(rxCylGeo, new T.MeshBasicMaterial({ transparent: true, opacity: 0.85 }), RX_CAP);
+  txMesh.frustumCulled = false; rxMesh.frustumCulled = false;
+  txMesh.count = 0; rxMesh.count = 0;
+  scene.add(txMesh); scene.add(rxMesh);
 
   let current: SarParams | null = null;
   let timingInput: TimingInput | null = null;
@@ -355,46 +358,71 @@ export async function createSarScene(host: HTMLDivElement): Promise<SarSceneHand
     simClock = clock;
   }
 
-  // Advance the pulse pool to sim time `t`. Each in-flight pulse is shown as a
-  // moving leading-edge marker on the slant path (TX outbound, RX inbound).
+  // Reusable temporaries to avoid per-frame allocation.
+  const _up = new T.Vector3(0, 1, 0);
+  const _pos = new T.Vector3();
+  const _quat = new T.Quaternion();
+  const _scl = new T.Vector3();
+  const _mat = new T.Matrix4();
+  const _col = new T.Color();
+
+  // Place one cylinder instance from `origin` along unit `dir`, centred at
+  // distance midM (metres) with visible length lenM (metres). Colour by k/N.
+  function writeInstance(mesh: THREE_NS.InstancedMesh, i: number, origin: THREE_NS.Vector3,
+                         dir: THREE_NS.Vector3, midM: number, lenM: number, k: number, N: number) {
+    _pos.copy(dir).multiplyScalar(m(midM)).add(origin);
+    _quat.setFromUnitVectors(_up, dir);
+    _scl.set(1, Math.max(m(lenM), 1e-4), 1);
+    _mat.compose(_pos, _quat, _scl);
+    mesh.setMatrixAt(i, _mat);
+    const c = chirpRampColor(N < 2 ? 0.5 : k / (N - 1));
+    _col.setRGB(c[0] / 255, c[1] / 255, c[2] / 255);
+    mesh.setColorAt(i, _col);
+  }
+
   function updatePulses() {
-    if (!timingInput || !simClock || !current) {
-      for (const mm of pulseMeshes) mm.visible = false;
-      return;
-    }
+    if (!timingInput || !simClock || !current) { txMesh.count = 0; rxMesh.count = 0; return; }
     const t = simClock.t;
     const p = current;
     const satX = m(p.satAzimuthM), satY = m(p.altitudeM);
-    const fp = footprint(p);
-    const bcZ = m(fp.centerZ);
-    const slant = p.altitudeM / Math.cos(p.lookRad);   // metres
-    const oneWay = slant / SPEED_OF_LIGHT;             // seconds to beam centre
-    const sat = new T.Vector3(satX, satY, 0);
-    const bc = new T.Vector3(satX, 0, bcZ);
+    const satScene = new T.Vector3(satX, satY, 0);
 
+    // Beam centre + near edge on the ground (flat earth), in metres.
+    const groundCenterM = p.altitudeM * Math.tan(p.lookRad);
+    const groundNearM = p.altitudeM * Math.tan(p.lookRad - p.beamRgRad / 2);
+    // World positions (scene units).
+    const groundCenter = new T.Vector3(satX, 0, m(groundCenterM));
+    const groundNear = new T.Vector3(satX, 0, m(groundNearM));
+    // Beam directions (unit).
+    const txDir = new T.Vector3().subVectors(groundCenter, satScene).normalize();
+    const rxDir = new T.Vector3().subVectors(satScene, groundNear).normalize();
+
+    const N = Math.max(1, Math.floor(timingInput.nSub));
     const pulses = schedulePulses(timingInput, t - 0.02, t + 0.02);
-    let mi = 0;
+    let txI = 0, rxI = 0;
     for (const pulse of pulses) {
-      // TX leading edge: fraction of one-way travel since txStart.
-      const fTx = (t - pulse.txStart) / oneWay;
-      if (fTx >= 0 && fTx <= 1 && mi < PULSE_POOL) {
-        const mesh = pulseMeshes[mi++];
-        mesh.visible = true;
-        mesh.position.lerpVectors(sat, bc, fTx);
-        const col = chirpRampColor(0.85); // TX shown near high-f end
-        (mesh.material as THREE_NS.MeshBasicMaterial).color.setRGB(col[0] / 255, col[1] / 255, col[2] / 255);
-      }
-      // RX leading edge: returning after reflection (txStart + oneWay .. +2*oneWay).
-      const fRx = (t - (pulse.txStart + oneWay)) / oneWay;
-      if (fRx >= 0 && fRx <= 1 && mi < PULSE_POOL) {
-        const mesh = pulseMeshes[mi++];
-        mesh.visible = true;
-        mesh.position.lerpVectors(bc, sat, fRx);
-        const col = chirpRampColor(0.15); // RX shown near low-f end
-        (mesh.material as THREE_NS.MeshBasicMaterial).color.setRGB(col[0] / 255, col[1] / 255, col[2] / 255);
+      for (let k = 0; k < pulse.subBands.length; k++) {
+        const sb = pulse.subBands[k];
+        // TX slice: packet of spatial length pw*c, cut off at the mid slant range.
+        const txLenM = sb.pw * SPEED_OF_LIGHT;
+        const txMaxR = (sb.rNear + sb.rFar) / 2;
+        const txSlice = computePulseSlice(sb.txStart, t, txLenM, txMaxR);
+        if (txSlice && txI < TX_CAP) {
+          writeInstance(txMesh, txI++, satScene, txDir, txSlice.midM, txSlice.visibleLenM, k, N);
+        }
+        // RX slice: echo returning from the near edge toward the satellite.
+        const rxLenM = sb.pw * SPEED_OF_LIGHT + 2 * (sb.rFar - sb.rNear);
+        const rxSlice = computePulseSlice(sb.nearReflect, t, rxLenM, sb.rNear);
+        if (rxSlice && rxI < RX_CAP) {
+          writeInstance(rxMesh, rxI++, groundNear, rxDir, rxSlice.midM, rxSlice.visibleLenM, k, N);
+        }
       }
     }
-    for (; mi < PULSE_POOL; mi++) pulseMeshes[mi].visible = false;
+    txMesh.count = txI; rxMesh.count = rxI;
+    txMesh.instanceMatrix.needsUpdate = true;
+    rxMesh.instanceMatrix.needsUpdate = true;
+    if (txMesh.instanceColor) txMesh.instanceColor.needsUpdate = true;
+    if (rxMesh.instanceColor) rxMesh.instanceColor.needsUpdate = true;
   }
 
   // ---- update logic --------------------------------------------------------
