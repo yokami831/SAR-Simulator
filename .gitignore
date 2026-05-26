@@ -59,7 +59,9 @@ tmp_*.png
 
 # Scratch folder for SKILL workflow (canvas_api.py code_file / @file payloads)
 # All temp files generated when updating nodes go here so they don't pollute the repo root.
-tmp/
+# Use tmp/* (not tmp/) so the negation for .gitkeep works (git can't re-include
+# files in an excluded directory).
+tmp/*
 !tmp/.gitkeep
 
 # Renderer crash diagnostics (local-only runtime logs, written by src/main.js)
