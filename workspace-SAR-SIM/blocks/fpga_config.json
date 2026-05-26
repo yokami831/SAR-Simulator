@@ -1,0 +1,77 @@
+{
+  "id": "fpga_config",
+  "label": "FPGA Config",
+  "category": "FPGA",
+  "description": "All FPGA route parameters for the SAR simulator in one panel. Route C-out (save coefficients) reads save_path and include_golden. Route C-in (load FPGA IQ) reads load_path, adj_pos (sample offset for IQ alignment), and iq_swap. Common ADC quantisation parameters are also here. Each field assigns one kernel variable at flow run time.",
+  "gui_widget": {
+    "type": "form",
+    "dtype": "gui_form"
+  },
+  "parameters": [
+    {
+      "id": "save_path",
+      "label": "FPGA Save Path (.mat)",
+      "widget": "file_picker",
+      "var_name": "save_path",
+      "dtype": "filepath",
+      "accept": "mat",
+      "default": "workspace-SAR-SIM/fpga_coeffs.mat"
+    },
+    {
+      "id": "include_golden",
+      "label": "Include golden s_raw",
+      "widget": "toggle",
+      "var_name": "include_golden",
+      "dtype": "boolean",
+      "label_on": "INCLUDE",
+      "label_off": "OMIT",
+      "default": "true"
+    },
+    {
+      "id": "load_path",
+      "label": "FPGA Load Path (.npy)",
+      "widget": "file_picker",
+      "var_name": "load_path",
+      "dtype": "filepath",
+      "accept": "npy",
+      "default": ""
+    },
+    {
+      "id": "adj_pos",
+      "label": "Range adj_pos (samples)",
+      "widget": "slider",
+      "var_name": "adj_pos",
+      "dtype": "number",
+      "min": "0",
+      "max": "10000",
+      "step": "1",
+      "default": "3500"
+    },
+    {
+      "id": "iq_swap",
+      "label": "I/Q swap",
+      "widget": "toggle",
+      "var_name": "iq_swap",
+      "dtype": "boolean",
+      "label_on": "SWAP",
+      "label_off": "AS-IS",
+      "default": "false"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "in_0",
+      "label": "",
+      "dtype": "any"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out_0",
+      "label": "",
+      "dtype": "any"
+    }
+  ],
+  "code_template": "",
+  "default_width": 320
+}

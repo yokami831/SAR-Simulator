@@ -4,45 +4,9 @@
   "title": "SAR-Simulator-FPGA2",
   "description": "",
   "created": "2026-05-26T07:53:12.642190+00:00",
-  "modified": "2026-05-26T11:38:59.815795+00:00",
+  "modified": "2026-05-26T14:12:04.722971+00:00",
   "canvas": {
     "nodes": [
-      {
-        "id": "n1",
-        "type": "canvasNode",
-        "position": {
-          "x": 118.17077150726453,
-          "y": -406.9212327865245
-        },
-        "data": {
-          "label": "Python Code",
-          "category": "processing",
-          "blockType": "python_code",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "in_0",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "out_0",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "code": "import numpy as np\nfrom scipy.constants import c\n\n# ---- Fixed system parameters (PoC scale; B/Fs/Tp reduced for tractability) ----\nfc   = 9.65e9          # X-band carrier [Hz]\nB    = 300e6/4            # chirp bandwidth [Hz]   (real: 600e6)\nTp   = 10e-6           # pulse width [s]        (real: 30e-6)\nFs   = 360e6/4            # range sampling rate [Hz] \nPRF  = 4000.0          # pulse repetition frequency [Hz]\nH    = 514e3           # orbit altitude [m]\nV    = 7600.0          # platform velocity [m/s]\nlook = np.deg2rad(25)  # off-nadir angle [rad]\nLa   = 4.8             # antenna length, azimuth (along-track) [m]\nLr   = 0.8             # antenna length, range (elevation) [m]\n# Range swath half-width [m]. Sets the observed range window (Nr grid). Physical\n# upper bound is the elevation beam footprint theta_rg*R0 ~ +/-11 km (lam/Lr*R0);\n# real SAR narrows it via the receive window. 2 km here: wide enough for image\n# targets, far cheaper than the full 11 km. (Was hardcoded 80 m in n2 — too small.)\nR_half = 4000.0\nprint('params set: fc=%.2fGHz B=%.0fMHz Tp=%.0fus PRF=%.0f La=%.1fm Lr=%.1fm' % (fc/1e9, B/1e6, Tp*1e6, PRF, La, Lr))\n\n# ============================================================================\n# Scene controls (sar-visualizer parity). The focused-image display window is\n# a 0-centred symmetric box of half-extent float(view_scale) [m]; point\n# targets (and later clutter) live inside it. n_targets / view_scale are set\n# by GUI blocks; these fallbacks apply when those haven't run yet.\n# ============================================================================\n# n_targets and view_scale come from GUI blocks that run earlier in the\n# flow. view_scale comes from the GUI dropdown (Crop Area [m]) as a half-extent\n# metres value held as a string, so callers use float(view_scale). No fallbacks\n# here on purpose: if a downstream node sees NameError it\n# means the GUI block is missing or out of order — that must surface as a real\n# error, not be hidden by a default.\n\ndef make_rand(seed):\n    \"\"\"mulberry32 PRNG (exact port). float in [0,1).\"\"\"\n    box = {'a': int(seed) & 0xFFFFFFFF}\n    M = 0xFFFFFFFF\n    def _rand():\n        box['a'] = (box['a'] + 0x6d2b79f5) & M\n        t = box['a']\n        t = (((t ^ (t >> 15)) & M) * ((1 | t) & M)) & M           # Math.imul(t^(t>>>15), 1|t)\n        t = ((t + ((((t ^ (t >> 7)) & M) * ((61 | t) & M)) & M)) & M) ^ t  # +Math.imul(t^(t>>>7),61|t), ^t\n        t &= M\n        return ((t ^ (t >> 14)) & M) / 4294967296.0\n    return _rand\n\ndef make_point_targets(count, half_az_m, half_range_m, seed, R0):\n    \"\"\"Point targets, sar-visualizer parity. T1 is always the centre\n    reference (az 0, slant R0); extras are seeded-random inside +/-0.85*half\n    so they sit clearly within the display window.\"\"\"\n    out = [('T1', 0.0, R0)]\n    rnd = make_rand(seed)\n    az_span = half_az_m * 0.85\n    r_span = half_range_m * 0.85\n    for i in range(1, int(count)):\n        az_m = (rnd() * 2 - 1) * az_span\n        sr_m = R0 + (rnd() * 2 - 1) * r_span\n        out.append(('T%d' % (i + 1), az_m, sr_m))\n    return out\n# Plot helpers (surface3d_gl, surface3d_pair_gl, upsample_complex, upsample_complex_range, ...) are\n# defined in the \"Plot Library\" node (unconnected, runs first) and shared via\n# the kernel namespace. They are workspace-local, NOT HiyoCanvas core. See that\n# node's SPEC and CLAUDE.md (\"common helpers go in a visible Library node\").",
-            "label": "Common Parameters",
-            "spec": "Shared SAR system parameters (TerraSAR-X reference, X-band).\nBound once here and read by every downstream block via the shared kernel namespace.\n\nReal values (full-res spec):\n- fc 9.65 GHz, B 600 MHz, Tp 30 us, Fs 720 MHz (1.2*B), PRF 4 kHz\n- H 514 km, V 7600 m/s, look 25 deg, La 4.8 m\n\nSimulation note: this PoC lowers B/Fs 10x and Tp 3x so the grid stays browser-tractable; geometry params unchanged."
-          },
-          "codeCollapsed": true,
-          "enabled": false
-        },
-        "width": 400,
-        "style": {}
-      },
       {
         "id": "n2",
         "type": "canvasNode",
@@ -74,7 +38,7 @@
             "spec": "Generate the transmit linear-FM (chirp) pulse and the imaging grid.\n\nParameters (from mindmap):\n- Frequency: min/max  -> chirp sweeps fc-B/2 .. fc+B/2\n- Pulse width: Tp\n- PRF: pulse repetition frequency\n\nPhysics:\n- chirp rate  Kr = B/Tp\n- baseband chirp  s(t) = rect(|t|<=Tp/2) * exp(j*pi*Kr*t^2)\n- wavelength lam = c/fc, ref slant range R0 = H/cos(look)\n\nThis block also designs the range/azimuth sampling grid (Nr,Na,t_r,eta,az_pos) the echo will live on."
           },
           "codeCollapsed": true,
-          "executionOrder": 12
+          "executionOrder": 8
         },
         "width": 400,
         "style": {}
@@ -110,7 +74,7 @@
             "spec": "REAL HW: mixes the baseband chirp up to the RF carrier fc (CenterFrequency).\n\nSimulation: SKIPPED. The simulator works at baseband with R_eta phase carrying the carrier term (-4*pi*R/lam), so explicit up-conversion is not modeled. Placeholder block kept so the structure matches the real transmit chain."
           },
           "codeCollapsed": true,
-          "executionOrder": 13
+          "executionOrder": 9
         },
         "width": 400,
         "style": {}
@@ -146,7 +110,7 @@
             "spec": "REAL HW: high-power amplifier. Characteristics: saturation, noise floor (NF), frequency flatness.\n\nSimulation: SKIPPED (ideal linear amplification assumed). Placeholder for future refinement (e.g. add AM/AM saturation, NF)."
           },
           "codeCollapsed": true,
-          "executionOrder": 15
+          "executionOrder": 11
         },
         "width": 400,
         "style": {}
@@ -182,7 +146,7 @@
             "spec": "REAL HW: RF band-pass filter. Characteristic: filter response shapes the transmit spectrum.\n\nSimulation: SKIPPED (ideal flat passband assumed). Placeholder for future refinement."
           },
           "codeCollapsed": true,
-          "executionOrder": 16
+          "executionOrder": 12
         },
         "width": 400,
         "style": {}
@@ -218,7 +182,7 @@
             "spec": "REAL HW: antenna pattern shapes the illumination. Characteristics (mindmap): range direction, azimuth direction, gain.\n\nSimulation: azimuth pattern modeled as normalized-sinc^2 with first null at the beamwidth theta_a:\n  pat(squint) = sinc(squint/theta_a)^2\nThis is a first-null beamwidth approximation (NOT 3 dB). Range-direction pattern and absolute gain are not modeled (relative pattern only)."
           },
           "codeCollapsed": true,
-          "executionOrder": 17
+          "executionOrder": 13
         },
         "width": 400,
         "style": {}
@@ -253,7 +217,7 @@
             "label": "Analog BPF",
             "spec": "REAL HW (Receive): analog band-pass filter on the received echo before down-conversion. Selects the signal band, rejects out-of-band noise/interference.\n\nSimulation: SKIPPED (ideal — the raw echo is already band-limited). Placeholder so the structure matches the real receive chain."
           },
-          "executionOrder": 21
+          "executionOrder": 19
         },
         "width": 400,
         "style": {}
@@ -288,7 +252,7 @@
             "label": "Downconvert",
             "spec": "REAL HW (Receive): mixes the received RF signal down to baseband (I/Q demodulation).\n\nSimulation: SKIPPED. The simulator already works at baseband (the echo phase carries -4*pi*R/lam directly), so explicit down-conversion is not modeled. Placeholder."
           },
-          "executionOrder": 22
+          "executionOrder": 20
         },
         "width": 400,
         "style": {}
@@ -323,7 +287,7 @@
             "label": "Filtering",
             "spec": "REAL HW (Receive): anti-alias / channel filtering after down-conversion.\n\nSimulation: SKIPPED (ideal). Placeholder for future refinement."
           },
-          "executionOrder": 23
+          "executionOrder": 21
         },
         "width": 400,
         "style": {}
@@ -358,7 +322,7 @@
             "label": "Down sample & filter",
             "spec": "REAL HW (Receive): decimation to the processing sample rate with the matching anti-alias filter.\n\nSimulation: SKIPPED. The grid is already designed at Fs=1.2*B, so no resampling is modeled. Placeholder."
           },
-          "executionOrder": 24
+          "executionOrder": 22
         },
         "width": 400,
         "style": {}
@@ -393,7 +357,7 @@
             "label": "BAQ compression",
             "spec": "REAL HW (Receive): Block Adaptive Quantization — onboard lossy compression of the raw echo to save downlink bandwidth. Parameter: number of bits.\n\nSimulation: SKIPPED (full-precision complex64 kept). Placeholder; a future refinement could quantize s_raw to N bits/sample to study BAQ artifacts."
           },
-          "executionOrder": 25
+          "executionOrder": 23
         },
         "width": 400,
         "style": {}
@@ -429,7 +393,7 @@
             "spec": "PROCESSING (RDA step 1): compress each range line by matched filtering with the conjugate of the transmit chirp.\n\nPhysics:\n  H_range = conj( FFT( ifftshift(ref_chirp) ) )\n  s_rc = IFFT( FFT(s_raw, axis=range) * H_range )\nConcentrates each target's chirp smear into a sharp range peak."
           },
           "codeCollapsed": true,
-          "executionOrder": 26
+          "executionOrder": 24
         },
         "width": 400,
         "style": {}
@@ -465,7 +429,7 @@
             "spec": "PROCESSING (RDA step 2): FFT along azimuth (slow-time) to enter the Range-Doppler domain. Range axis is never shifted; azimuth is fftshift-ed so the Doppler axis is centered.\n\n  S_rd  = fftshift( FFT(s_rc, axis=azimuth) )\n  f_eta = fftshift( fftfreq(Na, 1/PRF) )   # Doppler axis"
           },
           "codeCollapsed": true,
-          "executionOrder": 27
+          "executionOrder": 26
         },
         "width": 400,
         "style": {}
@@ -537,7 +501,7 @@
             "spec": "PROCESSING (RDA step 4): focus in azimuth with the conjugate azimuth matched filter, then inverse azimuth FFT -> focused complex image.\n\nMETHOD C (range-dependent azimuth FM rate). Each range column uses its own slant range R_col = R0 + range_offset, so its own Ka(r):\n  Ka(r) = 2 V^2 / (lam * R_col)            # per range column (Nr,)\n  H_az  = exp(-j pi f_eta^2 / Ka(r))       # 2-D (Na, Nr), conjugate, focuses at az=0\n  img   = IFFT( ifftshift( S_rd_rcmc * H_az ) )\n\nWhy: a single Ka fixed at R0 mis-focuses far-range targets once the swath is wide. Verified (verify_rcmc_swath_sweep.py): the range-independent filter mis-places corner targets by 1-2 azimuth cells from ~+-1 km swath; Ka(r) brings them back to 0. At narrow swath Ka(r) == single-Ka, so this is a safe always-on upgrade.\n\nNote on RCMC (n16): kept parabolic on purpose. The exact-hyperbolic dR was verified to make NO measurable difference even at B=600 MHz / +-2 km (R0 ~ 567 km geometry), so azimuth Ka(r) is the ONLY focusing fix that matters for wide swath; do not 'fix' the RCMC unless geometry changes drastically.\n\nResult: each point target collapses to its impulse response (IRF), correctly placed across the full swath."
           },
           "codeCollapsed": true,
-          "executionOrder": 29
+          "executionOrder": 30
         },
         "width": 400,
         "style": {}
@@ -573,7 +537,7 @@
             "spec": "Display-only: 3-D surface of the focused image |img| in dB (the final RDA output). Each point target should appear as a sharp peak (its impulse response / IRF). Interactive; Expand opens a large copy. Does not modify any physical array."
           },
           "codeCollapsed": true,
-          "executionOrder": 30
+          "executionOrder": 31
         },
         "width": 832,
         "style": {}
@@ -604,14 +568,15 @@
             }
           ],
           "defaultParameters": {
-            "code": "# Step 3: Range-compressed — full view + adaptive-x crop in ONE block, faithful\n# (surface3d_pair_gl, NO max-pool). The crop is complex-upsampled by F so the\n# range sinc sidelobes are smooth; the crop title/status note the upsample factor.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = float(view_scale)\n\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_ac = np.where((az_pos  >= -_W) & (az_pos  <= _W))[0]\n_sub = s_rc[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\nF = crop_upsample_factor(len(_azx), len(_rgx))\n_mag = upsample_complex(_sub, F)\n_rgu = upsample_axis(_rgx, F); _azu = upsample_axis(_azx, F)\n\nsurface3d_pair_gl(\n    s_rc, rg_axis, az_pos, 'Step 3: Range-compressed (full view)',\n    _mag, _rgu, _azu, 'Step 3: Range-compressed (x%d crop)' % F,\n    status_b='upsample x%d' % F)",
+            "code": "# Step 3: Range-compressed — full view + adaptive-x crop in ONE block, faithful\n# (surface3d_pair_gl, NO max-pool). The crop is complex-upsampled by F so the\n# range sinc sidelobes are smooth; the crop title/status note the upsample factor.\n# peak_relative=True: pre-azimuth-compression levels still sit well below ADC FS\n# (LNA tuning isn't enough yet); slide the 40 dB dB window so each panel's peak\n# sits at the top of the colormap. Visual jump from n27 → n19 → n18 then shows\n# how much each processing stage raises the signal vs. the noise floor.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = float(view_scale)\n\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_ac = np.where((az_pos  >= -_W) & (az_pos  <= _W))[0]\n_sub = s_rc[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\nF = crop_upsample_factor(len(_azx), len(_rgx))\n_mag = upsample_complex(_sub, F)\n_rgu = upsample_axis(_rgx, F); _azu = upsample_axis(_azx, F)\n\nsurface3d_pair_gl(\n    s_rc, rg_axis, az_pos, 'Step 3: Range-compressed (full view)',\n    _mag, _rgu, _azu, 'Step 3: Range-compressed (x%d crop)' % F,\n    status_b='upsample x%d' % F,\n    peak_relative=True)\n",
             "label": "Plot: Range-compressed",
             "spec": "Display-only: 3-D dB surface of |s_rc| after range compression. Targets are now sharp in range (thin ridges) but still spread in azimuth. Full resolution (no downsampling); the Crop view is complex-upsampled to reveal range sidelobes. Toggle Full/Crop; Expand for a large copy."
           },
-          "enabled": false,
-          "codeCollapsed": true
+          "codeCollapsed": true,
+          "executionOrder": 25
         },
-        "width": 400
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n20",
@@ -643,10 +608,11 @@
             "label": "Plot: Range-Doppler",
             "spec": "Display-only: 3-D dB surface of |S_rd| in the Range-Doppler domain. A target's energy lies on the RCM parabola (curved ridge across range vs Doppler) — this is why RCMC is needed. Axes: range [m] x Doppler [Hz]. Full resolution (no downsampling); the Crop view is range-upsampled. Toggle Full/Crop."
           },
-          "enabled": false,
-          "codeCollapsed": true
+          "codeCollapsed": true,
+          "executionOrder": 27
         },
-        "width": 400
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n21",
@@ -678,83 +644,10 @@
             "label": "Plot: RCMC",
             "spec": "Display-only: 3-D dB surface of |S_rd_rcmc| after Range Cell Migration Correction. The curved RCM ridge from the previous step is now straightened (energy aligned to one range cell across Doppler). Axes: range [m] x Doppler [Hz]. Full resolution (no downsampling); the Crop view is range-upsampled. Toggle Full/Crop."
           },
-          "enabled": false,
-          "codeCollapsed": true
+          "codeCollapsed": true,
+          "executionOrder": 29
         },
-        "width": 400
-      },
-      {
-        "id": "n23",
-        "type": "canvasNode",
-        "position": {
-          "x": 2061.0352370935925,
-          "y": -39.37473848662674
-        },
-        "data": {
-          "label": "Slider",
-          "category": "gui",
-          "blockType": "gui_slider",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "n_targets",
-            "value": "1",
-            "min": "1",
-            "max": "10",
-            "step": "1",
-            "label": "Targets (count)"
-          },
-          "enabled": false
-        },
-        "width": 250,
-        "style": {}
-      },
-      {
-        "id": "n24",
-        "type": "canvasNode",
-        "position": {
-          "x": 117.49921556141638,
-          "y": -558.0263327365312
-        },
-        "data": {
-          "label": "Dropdown",
-          "category": "gui",
-          "blockType": "gui_dropdown",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "view_scale",
-            "options_csv": "5,10,20,40,100,200,500",
-            "label": "Crop Area (m)",
-            "value": "40"
-          },
-          "enabled": false
-        },
-        "width": 250,
+        "width": 400,
         "style": {}
       },
       {
@@ -762,7 +655,7 @@
         "type": "canvasNode",
         "position": {
           "x": -488.98322183952496,
-          "y": 1286.6358343928084
+          "y": 1927
         },
         "data": {
           "label": "Python Code",
@@ -788,7 +681,7 @@
             "spec": "【LNA (Level 2 RF Front-End, explicit link budget)】\n\n3段処理:\n1. リンクバジェット連鎖 (EIRP − L_path + G_r + G_LNA) を s_raw に voltage scaling として一括適用。アンテナ寸法 (La, Lr) と波長 (λ) から G_t = G_r を 4π·η·La·Lr/λ² で算出。調整ノブは G_LNA (slider n53) 一個に集約。\n2. 熱雑音 (kTBF) — ADC基準で固定。G_LNA を変えても雑音床は動かない設計 (signal だけ動く → SNR が実際に変わる)。AGC とは別物。\n3. ADC clip 率を per-sample で表示 (>0% で飽和警告)。\n\n内訳 (コメント・出力に同じ数値を表示):\n  Tx     P_t = +63 dBm (~2 kW)\n         G_t = 10·log10(4π·η·La·Lr / λ²)   η=0.6\n         EIRP = P_t + G_t\n  Channel L_path = 30·log10(4π) + 40·log10(R0) − 20·log10(λ) − 10·log10(σ_ref=1m²)\n         (per-scatterer 1/R² 変動は n32 で既に反映済)\n  Rx     G_r = G_t (monostatic, shared aperture)\n         G_LNA = slider n53 (level-tune knob)\n  Net    K_total = 10^((EIRP − L_path + G_r + G_LNA) / 20)\n\nG_LNA が物理的に大きい (~100–150 dB) 理由:\nn32 の s_raw は |peak| ≈ 1.0 の正規化値。実物理では ~−156 dBm 相当を 1 V ADC FS に持ち上げるために ~165 dB の受信機鎖ゲインが必要。本シミュレータは LNA / mixer / IF amp / baseband / AGC を G_LNA 一つに集約している (コメントで各物理寄与は明示)。\n\n入力 (kernel namespace):\n  s_raw  ← n42/n43/n47 のいずれか (n32 で σ°_max + 1/R² 反映済)\n  R0, lam ← n6, La, Lr, B ← n1\n\nGUI 入力:\n  nf_db     ← n26 (Noise Figure dB)\n  g_lna_db  ← n53 (LNA / total Rx-chain gain, level-tune knob; default 110 dB → reference peak ≈ −30 dBFS)\n\n旧 signal_peak_dbfs スライダ (校正ターゲット dBFS) は同等の g_lna_db に内部で変換する fallback 付き。\n\n出力 (kernel namespace):\n  s_raw → 後段 SAR 処理 (n9〜n18) が消費。peak はシーン依存、ADC FS=1.0 V_peak 単位。\n  console に link budget breakdown + achieved peak dBFS + ADC clip% + noise floor + SNR を表示。\n\nシーン別の振る舞い:\n  - 点標的 1 個 (σ°=0 dB): achieved peak ≈ (chain_no_lna + g_lna_db) dBFS  (default: −30)\n  - σ°_max を +20 dB: peak が +20 dB → 飽和の可能性\n  - σ°_max を −40 dB: peak が雑音床近くまで沈む → SNR 低下を観測可能\n  - 多数散乱体の画像: コヒーレント和で peak が ~sqrt(N) 以上に成長 → ADC 飽和の可能性"
           },
           "codeCollapsed": true,
-          "executionOrder": 20
+          "executionOrder": 17
         },
         "width": 400,
         "style": {}
@@ -826,7 +719,7 @@
             "step": "1",
             "label": "Noise Figure (dB)"
           },
-          "executionOrder": 8
+          "executionOrder": 4
         },
         "width": 250,
         "style": {}
@@ -857,89 +750,14 @@
             }
           ],
           "defaultParameters": {
-            "code": "# Step 2: Raw echo with noise (after LNA) — full view + adaptive-x crop in ONE\n# block, faithful (surface3d_pair_gl, NO max-pool). The crop is complex-upsampled\n# by F; its title/status note the upsample factor. Toggle Full/Crop in the plot.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = float(view_scale)\n\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_ac = np.where((az_pos  >= -_W) & (az_pos  <= _W))[0]\n_sub = s_raw[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\nF = crop_upsample_factor(len(_azx), len(_rgx))\n_mag = upsample_complex(_sub, F)\n_rgu = upsample_axis(_rgx, F); _azu = upsample_axis(_azx, F)\n\nsurface3d_pair_gl(\n    s_raw, rg_axis, az_pos, 'Step 2: Raw echo with noise (full view)',\n    _mag, _rgu, _azu, 'Step 2: Raw echo with noise (x%d crop)' % F,\n    status_b='upsample x%d' % F)",
+            "code": "# Step 2: Raw echo with noise (after LNA) — full view + adaptive-x crop in ONE\n# block, faithful (surface3d_pair_gl, NO max-pool). The crop is complex-upsampled\n# by F; its title/status note the upsample factor. Toggle Full/Crop in the plot.\n# peak_relative=True: raw-echo level is far below ADC FS (no matched-filter gain\n# yet), so the absolute -40..0 dBFS window would show black. Slide the 40 dB\n# window so the panel's peak sits at the top of the colormap; the title still\n# prints the absolute peak in dBFS so you can compare across stages.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = float(view_scale)\n\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_ac = np.where((az_pos  >= -_W) & (az_pos  <= _W))[0]\n_sub = s_raw[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\nF = crop_upsample_factor(len(_azx), len(_rgx))\n_mag = upsample_complex(_sub, F)\n_rgu = upsample_axis(_rgx, F); _azu = upsample_axis(_azx, F)\n\nsurface3d_pair_gl(\n    s_raw, rg_axis, az_pos, 'Step 2: Raw echo with noise (full view)',\n    _mag, _rgu, _azu, 'Step 2: Raw echo with noise (x%d crop)' % F,\n    status_b='upsample x%d' % F,\n    peak_relative=True)\n",
             "label": "Plot Raw Echo with noise",
             "spec": "Display-only: show |s_raw| (raw echo amplitude) over (range, azimuth). Does not modify any physical array."
           },
-          "enabled": false,
-          "codeCollapsed": true
+          "codeCollapsed": true,
+          "executionOrder": 18
         },
-        "width": 400
-      },
-      {
-        "id": "n28",
-        "type": "canvasNode",
-        "position": {
-          "x": 2330.901408088625,
-          "y": -163.69839282637565
-        },
-        "data": {
-          "label": "Slider",
-          "category": "gui",
-          "blockType": "gui_slider",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "clutter_n",
-            "value": "0",
-            "min": "0",
-            "max": "400",
-            "step": "10",
-            "label": "Clutter N"
-          },
-          "enabled": false
-        },
-        "width": 250,
-        "style": {}
-      },
-      {
-        "id": "n29",
-        "type": "canvasNode",
-        "position": {
-          "x": 2332.69992816726,
-          "y": -17.698392826375652
-        },
-        "data": {
-          "label": "Slider",
-          "category": "gui",
-          "blockType": "gui_slider",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "clutter_rcs_db",
-            "value": "-20",
-            "min": "-40",
-            "max": "0",
-            "step": "1",
-            "label": "Clutter level (dB)"
-          },
-          "enabled": false
-        },
-        "width": 250,
+        "width": 400,
         "style": {}
       },
       {
@@ -972,7 +790,7 @@
             "label": "Fixed Parameters"
           },
           "codeCollapsed": true,
-          "executionOrder": 14
+          "executionOrder": 10
         },
         "width": 485,
         "style": {}
@@ -981,8 +799,8 @@
         "id": "n31",
         "type": "canvasNode",
         "position": {
-          "x": 42.607394574897626,
-          "y": 138.4434996482545
+          "x": 2.6462366243377744,
+          "y": 424.8317982939334
         },
         "data": {
           "label": "Python Code",
@@ -1003,12 +821,12 @@
             }
           ],
           "defaultParameters": {
-            "code": "# === Plot library (workspace-local) ===\n# Display/interpolation helpers for this SAR workspace. Defined here as a\n# visible first node (not hidden in app code) so they are easy to find and\n# edit, and shared with every downstream node via the kernel namespace.\n# See this block's SPEC for what each function does.\n\nimport json as _json\nfrom IPython.display import display as _display, HTML as _HTML\n\n# Display vertex cap used by crop_upsample_factor to bound the upsampled-crop\n# vertex count so a complex-upsampled crop stays under the 4GB-capped renderer\n# heap. (The _gl display path is full resolution / no max-pool.)\nMAX_VERTS = 250000  # ~500x500\n\ndef crop_upsample_factor(n_rows, n_cols, cap=MAX_VERTS, fmax=6, range_only=False):\n    \"\"\"Largest integer upsample factor F in [1..fmax] keeping the upsampled crop\n    under `cap` vertices, so a crop can be x-upsampled WITHOUT being max-pooled\n    afterwards (pooling a deliberate upsample is self-defeating).\n      2D  (upsample_complex, both axes): verts ~= ((R-1)*F+1)*((C-1)*F+1)\n          -> F ~= floor(sqrt(cap/(R*C)))\n      range-only (upsample_complex_range, only last axis; rows stay full):\n          verts ~= R*((C-1)*F+1) -> F ~= floor((cap/R - 1)/(C-1))\n          (If R alone already nears cap, F clamps to 1 and the caller should pool\n           the ROW axis only via pool='rows' to fit — that keeps range detail.)\n    n_rows/n_cols are the crop's sample counts BEFORE upsampling.\"\"\"\n    import math as _math\n    R = max(1, int(n_rows)); C = max(1, int(n_cols))\n    if range_only:\n        if C <= 1:\n            return max(1, min(fmax, int(cap // R)))\n        F = int((cap / R - 1) // (C - 1))\n    else:\n        F = int(_math.floor(_math.sqrt(cap / (R * C))))\n    return max(1, min(fmax, F))\n\n\ndef _catmull(p0,p1,p2,p3,t):\n    t2=t*t; t3=t2*t\n    return 0.5*(2*p1+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3)\ndef _interp_axis(a, f):\n    import numpy as _np\n    N=a.shape[-1]; outN=(N-1)*f+1; oc=_np.arange(outN); fc=oc/f\n    c1=_np.minimum(N-2,_np.floor(fc).astype(int)); tc=fc-c1\n    cm1=_np.clip(c1-1,0,N-1); c0=_np.clip(c1,0,N-1); cp1=_np.clip(c1+1,0,N-1); cp2=_np.clip(c1+2,0,N-1)\n    return _catmull(a[...,cm1],a[...,c0],a[...,cp1],a[...,cp2],tc)\ndef upsample_complex(field, factor):\n    import numpy as _np\n    f=int(factor)\n    if f<=1: return _np.abs(field)\n    re=field.real; im=field.imag\n    re=_interp_axis(re,f); im=_interp_axis(im,f)\n    re=_np.moveaxis(_interp_axis(_np.moveaxis(re,0,-1),f),-1,0)\n    im=_np.moveaxis(_interp_axis(_np.moveaxis(im,0,-1),f),-1,0)\n    return _np.hypot(re,im)\ndef upsample_axis(ax, f):\n    import numpy as _np\n    f=int(f); return _np.linspace(float(ax[0]), float(ax[-1]), (len(ax)-1)*f+1) if f>1 else _np.asarray(ax)\n\ndef upsample_complex_range(field, factor):\n    \"\"\"Complex upsample along the LAST axis (range) only — re/im interpolated\n    separately, then magnitude. Use for Range-Doppler/RCMC crops where only the\n    range axis is cropped and the Doppler axis must stay as-is.\"\"\"\n    import numpy as _np\n    f = int(factor)\n    if f <= 1:\n        return _np.abs(field)\n    re = _interp_axis(field.real, f)\n    im = _interp_axis(field.imag, f)\n    return _np.hypot(re, im)\n\ndef _emit_surface_gl(tv, xa, ya, title, xlabel, ylabel, status, H=0.35):\n    \"\"\"Emit the surface as the new binary single-renderer mime.\n    tv: float32 0..1 dB-normalised grid (same definition as _surf_db_payload).\n    Vertices go out as base64(Float32Array) — emitted ONCE (no double-embed).\n    db_vmin/db_vmax tell the frontend ColorBar what absolute dBFS range tv=[0,1] maps to.\"\"\"\n    import numpy as _np, base64 as _b64, json as _json2\n    tvf = _np.ascontiguousarray(tv, dtype=_np.float32)\n    nr, nc = tvf.shape\n    meta = {'kind':'single','title':title,'status':status,\n        'nrows':int(nr),'ncols':int(nc),'H':float(H),\n        'xr':[float(_np.min(xa)),float(_np.max(xa))],\n        'yr':[float(_np.min(ya)),float(_np.max(ya))],\n        'xlabel':xlabel,'ylabel':ylabel,'dtype':'float32',\n        'db_vmin':float(DB_VMIN), 'db_vmax':float(DB_VMAX),\n        'field_b64':_b64.b64encode(tvf.tobytes()).decode('ascii')}\n    _display({'application/x-hiyocanvas-surface3d': _json2.dumps(meta)}, raw=True)\n    print('surface3d_gl: %d x %d = %d cells, payload %.1f MB (binary path)' %\n          (nr, nc, nr*nc, len(meta['field_b64'])/1e6))\n\nDB_VMIN = -40.0   # display floor [dBFS]  (40 dB dynamic range, typical SAR)\nDB_VMAX =   0.0   # display ceiling [dBFS] = ADC/DAC full scale (physical cap).\n                  # Focused images can exceed 0 dBFS due to matched-filter gain;\n                  # those samples saturate (white) — this IS the visual signal\n                  # that \"FPGA output exceeds DAC FS / gain is too high\"\n\ndef surface3d_gl(field, x_axis, y_axis, title, xlabel='range [m]', ylabel='azimuth [m]',\n                 x_range=None, y_range=None, status=None):\n    \"\"\"Binary single-renderer twin of surface3d (NO max-pool, NO string double-embed).\n    Absolute dBFS display (reference = 1.0 = ADC FS), fixed range [DB_VMIN, DB_VMAX]\n    so signal-level changes (signal_peak_dbfs / σ°_max) move colors instead of being\n    hidden by peak normalisation.\"\"\"\n    import numpy as _np\n    A = _np.abs(field) if _np.iscomplexobj(field) else _np.asarray(field)\n    xa = _np.asarray(x_axis); ya = _np.asarray(y_axis)\n    if x_range is not None:\n        sel=_np.where((xa>=x_range[0])&(xa<=x_range[1]))[0]; j0,j1=int(sel[0]),int(sel[-1]); A=A[:,j0:j1+1]; xa=xa[j0:j1+1]\n    if y_range is not None:\n        sel=_np.where((ya>=y_range[0])&(ya<=y_range[1]))[0]; i0,i1=int(sel[0]),int(sel[-1]); A=A[i0:i1+1,:]; ya=ya[i0:i1+1]\n    peak_dbfs = float(20*_np.log10(A.max()+1e-12))\n    dbv = 20*_np.log10(A + 1e-12); dbv = _np.clip(dbv, DB_VMIN, DB_VMAX)\n    tv = ((dbv - DB_VMIN) / (DB_VMAX - DB_VMIN)).astype(_np.float32)\n    title = title + ' (peak=%+.1f dBFS)' % peak_dbfs\n    _emit_surface_gl(tv, xa, ya, title, xlabel, ylabel, status)\n\n\ndef _surf_gl_sub(field, x_axis, y_axis, title, xlabel, ylabel, status, H=0.35):\n    \"\"\"Build one sub-payload dict (a or b) for surface3d_pair_gl. Absolute dBFS\n    display (reference = 1.0 = ADC FS), fixed range [DB_VMIN, DB_VMAX].\"\"\"\n    import numpy as _np, base64 as _b64\n    A = _np.abs(field) if _np.iscomplexobj(field) else _np.asarray(field)\n    xa = _np.asarray(x_axis); ya = _np.asarray(y_axis)\n    peak_dbfs = float(20*_np.log10(A.max()+1e-12))\n    dbv = 20*_np.log10(A + 1e-12); dbv = _np.clip(dbv, DB_VMIN, DB_VMAX)\n    tv = ((dbv - DB_VMIN) / (DB_VMAX - DB_VMIN)).astype(_np.float32); tvf=_np.ascontiguousarray(tv,dtype=_np.float32)\n    title = title + ' (peak=%+.1f dBFS)' % peak_dbfs\n    nr,nc = tvf.shape\n    return {'title':title,'status':status,'nrows':int(nr),'ncols':int(nc),'H':float(H),\n        'xr':[float(_np.min(xa)),float(_np.max(xa))],'yr':[float(_np.min(ya)),float(_np.max(ya))],\n        'xlabel':xlabel,'ylabel':ylabel,'dtype':'float32',\n        'db_vmin':float(DB_VMIN), 'db_vmax':float(DB_VMAX),\n        'field_b64':_b64.b64encode(tvf.tobytes()).decode('ascii')}\n\ndef surface3d_pair_gl(field_a, xa, ya, title_a, field_b, xb, yb, title_b,\n                      xlabel_a='range [m]', ylabel_a='azimuth [m]', xlabel_b=None, ylabel_b=None,\n                      status_a=None, status_b=None):\n    \"\"\"Binary single-renderer twin of surface3d_pair (Full=a / Crop=b toggle).\n    NO max-pool, NO string double-embed. dB-norm identical to surface3d_pair_gl single.\"\"\"\n    import json as _json2\n    if xlabel_b is None: xlabel_b = xlabel_a\n    if ylabel_b is None: ylabel_b = ylabel_a\n    a = _surf_gl_sub(field_a, xa, ya, title_a, xlabel_a, ylabel_a, status_a)\n    b = _surf_gl_sub(field_b, xb, yb, title_b, xlabel_b, ylabel_b, status_b)\n    meta = {'kind':'pair','a':a,'b':b}\n    _display({'application/x-hiyocanvas-surface3d': _json2.dumps(meta)}, raw=True)\n    print('surface3d_pair_gl: A %dx%d / B %dx%d, payload %.1f MB (binary path)' %\n          (a['nrows'],a['ncols'],b['nrows'],b['ncols'],(len(a['field_b64'])+len(b['field_b64']))/1e6))\n\nprint('plot library ready: crop_upsample_factor, upsample_complex, upsample_complex_range, upsample_axis, surface3d_gl, surface3d_pair_gl')\n",
+            "code": "# === Plot library (workspace-local) ===\n# Display/interpolation helpers for this SAR workspace. Defined here as a\n# visible first node (not hidden in app code) so they are easy to find and\n# edit, and shared with every downstream node via the kernel namespace.\n# See this block's SPEC for what each function does.\n\nimport json as _json\nfrom IPython.display import display as _display, HTML as _HTML\n\n# Display vertex cap used by crop_upsample_factor to bound the upsampled-crop\n# vertex count so a complex-upsampled crop stays under the 4GB-capped renderer\n# heap. (The _gl display path is full resolution / no max-pool.)\nMAX_VERTS = 250000  # ~500x500\n\ndef crop_upsample_factor(n_rows, n_cols, cap=MAX_VERTS, fmax=6, range_only=False):\n    \"\"\"Largest integer upsample factor F in [1..fmax] keeping the upsampled crop\n    under `cap` vertices, so a crop can be x-upsampled WITHOUT being max-pooled\n    afterwards (pooling a deliberate upsample is self-defeating).\n      2D  (upsample_complex, both axes): verts ~= ((R-1)*F+1)*((C-1)*F+1)\n          -> F ~= floor(sqrt(cap/(R*C)))\n      range-only (upsample_complex_range, only last axis; rows stay full):\n          verts ~= R*((C-1)*F+1) -> F ~= floor((cap/R - 1)/(C-1))\n          (If R alone already nears cap, F clamps to 1 and the caller should pool\n           the ROW axis only via pool='rows' to fit — that keeps range detail.)\n    n_rows/n_cols are the crop's sample counts BEFORE upsampling.\"\"\"\n    import math as _math\n    R = max(1, int(n_rows)); C = max(1, int(n_cols))\n    if range_only:\n        if C <= 1:\n            return max(1, min(fmax, int(cap // R)))\n        F = int((cap / R - 1) // (C - 1))\n    else:\n        F = int(_math.floor(_math.sqrt(cap / (R * C))))\n    return max(1, min(fmax, F))\n\n\ndef _catmull(p0,p1,p2,p3,t):\n    t2=t*t; t3=t2*t\n    return 0.5*(2*p1+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3)\ndef _interp_axis(a, f):\n    import numpy as _np\n    N=a.shape[-1]; outN=(N-1)*f+1; oc=_np.arange(outN); fc=oc/f\n    c1=_np.minimum(N-2,_np.floor(fc).astype(int)); tc=fc-c1\n    cm1=_np.clip(c1-1,0,N-1); c0=_np.clip(c1,0,N-1); cp1=_np.clip(c1+1,0,N-1); cp2=_np.clip(c1+2,0,N-1)\n    return _catmull(a[...,cm1],a[...,c0],a[...,cp1],a[...,cp2],tc)\ndef upsample_complex(field, factor):\n    import numpy as _np\n    f=int(factor)\n    if f<=1: return _np.abs(field)\n    re=field.real; im=field.imag\n    re=_interp_axis(re,f); im=_interp_axis(im,f)\n    re=_np.moveaxis(_interp_axis(_np.moveaxis(re,0,-1),f),-1,0)\n    im=_np.moveaxis(_interp_axis(_np.moveaxis(im,0,-1),f),-1,0)\n    return _np.hypot(re,im)\ndef upsample_axis(ax, f):\n    import numpy as _np\n    f=int(f); return _np.linspace(float(ax[0]), float(ax[-1]), (len(ax)-1)*f+1) if f>1 else _np.asarray(ax)\n\ndef upsample_complex_range(field, factor):\n    \"\"\"Complex upsample along the LAST axis (range) only — re/im interpolated\n    separately, then magnitude. Use for Range-Doppler/RCMC crops where only the\n    range axis is cropped and the Doppler axis must stay as-is.\"\"\"\n    import numpy as _np\n    f = int(factor)\n    if f <= 1:\n        return _np.abs(field)\n    re = _interp_axis(field.real, f)\n    im = _interp_axis(field.imag, f)\n    return _np.hypot(re, im)\n\ndef _emit_surface_gl(tv, xa, ya, title, xlabel, ylabel, status, db_vmin, db_vmax, H=0.35):\n    \"\"\"Emit the surface as the binary single-renderer mime.\n    tv: float32 0..1 dB-normalised grid (already mapped to [db_vmin, db_vmax]).\n    Vertices go out as base64(Float32Array).\n    db_vmin/db_vmax tell the frontend ColorBar what absolute dBFS range tv=[0,1] maps to.\"\"\"\n    import numpy as _np, base64 as _b64, json as _json2\n    tvf = _np.ascontiguousarray(tv, dtype=_np.float32)\n    nr, nc = tvf.shape\n    meta = {'kind':'single','title':title,'status':status,\n        'nrows':int(nr),'ncols':int(nc),'H':float(H),\n        'xr':[float(_np.min(xa)),float(_np.max(xa))],\n        'yr':[float(_np.min(ya)),float(_np.max(ya))],\n        'xlabel':xlabel,'ylabel':ylabel,'dtype':'float32',\n        'db_vmin':float(db_vmin), 'db_vmax':float(db_vmax),\n        'field_b64':_b64.b64encode(tvf.tobytes()).decode('ascii')}\n    _display({'application/x-hiyocanvas-surface3d': _json2.dumps(meta)}, raw=True)\n    print('surface3d_gl: %d x %d = %d cells, payload %.1f MB (binary path)' %\n          (nr, nc, nr*nc, len(meta['field_b64'])/1e6))\n\nDB_VMIN_DEFAULT = -40.0   # display floor [dBFS]  (40 dB dynamic range, typical SAR)\nDB_VMAX_DEFAULT =   0.0   # display ceiling [dBFS] = ADC/DAC full scale.\nDB_WINDOW       =  40.0   # default dynamic range window [dB] used by peak_relative mode\n\ndef _resolve_db_range(peak_dbfs, peak_relative, db_window, db_vmin, db_vmax):\n    \"\"\"Pick (vmin, vmax) for a panel.\n      peak_relative=False: use (db_vmin or DB_VMIN_DEFAULT, db_vmax or DB_VMAX_DEFAULT)\n                           — absolute dBFS, ADC full-scale = top.\n      peak_relative=True:  slide a `db_window` (default 40 dB) window so the peak\n                           sits at vmax (rounded up to a nice 5 dB step). Lets you\n                           see signals far below ADC FS (pre-compression stages)\n                           without losing 40 dB dynamic range.\n    \"\"\"\n    if peak_relative:\n        import math as _math\n        # Round up to nearest 5 dB so the top tick is a tidy number.\n        vmax = 5.0 * _math.ceil(peak_dbfs / 5.0)\n        vmin = vmax - float(db_window)\n    else:\n        vmax = DB_VMAX_DEFAULT if db_vmax is None else float(db_vmax)\n        vmin = DB_VMIN_DEFAULT if db_vmin is None else float(db_vmin)\n    return vmin, vmax\n\ndef surface3d_gl(field, x_axis, y_axis, title, xlabel='range [m]', ylabel='azimuth [m]',\n                 x_range=None, y_range=None, status=None,\n                 peak_relative=False, db_window=DB_WINDOW, db_vmin=None, db_vmax=None):\n    \"\"\"Binary single-renderer surface plot in dB.\n    Default (peak_relative=False): absolute dBFS display, range [-40, 0] dBFS\n      so signal-level changes (g_lna_db / σ°_max) move colors instead of being\n      hidden by peak normalisation. ADC FS = 0 dBFS = visual saturation marker.\n    peak_relative=True: window slides so peak sits at vmax (rounded to 5 dB),\n      vmin = vmax - db_window. Use for plots where signal sits far below FS\n      (pre-compression stages) so you can still see structure with 40 dB DR.\"\"\"\n    import numpy as _np\n    A = _np.abs(field) if _np.iscomplexobj(field) else _np.asarray(field)\n    xa = _np.asarray(x_axis); ya = _np.asarray(y_axis)\n    if x_range is not None:\n        sel=_np.where((xa>=x_range[0])&(xa<=x_range[1]))[0]; j0,j1=int(sel[0]),int(sel[-1]); A=A[:,j0:j1+1]; xa=xa[j0:j1+1]\n    if y_range is not None:\n        sel=_np.where((ya>=y_range[0])&(ya<=y_range[1]))[0]; i0,i1=int(sel[0]),int(sel[-1]); A=A[i0:i1+1,:]; ya=ya[i0:i1+1]\n    peak_dbfs = float(20*_np.log10(A.max()+1e-12))\n    vmin, vmax = _resolve_db_range(peak_dbfs, peak_relative, db_window, db_vmin, db_vmax)\n    dbv = 20*_np.log10(A + 1e-12); dbv = _np.clip(dbv, vmin, vmax)\n    tv = ((dbv - vmin) / (vmax - vmin)).astype(_np.float32)\n    title = title + ' (peak=%+.1f dBFS)' % peak_dbfs\n    _emit_surface_gl(tv, xa, ya, title, xlabel, ylabel, status, vmin, vmax)\n\n\ndef _surf_gl_sub(field, x_axis, y_axis, title, xlabel, ylabel, status,\n                 peak_relative, db_window, db_vmin, db_vmax, H=0.35):\n    \"\"\"Build one sub-payload dict (a or b) for surface3d_pair_gl.\"\"\"\n    import numpy as _np, base64 as _b64\n    A = _np.abs(field) if _np.iscomplexobj(field) else _np.asarray(field)\n    xa = _np.asarray(x_axis); ya = _np.asarray(y_axis)\n    peak_dbfs = float(20*_np.log10(A.max()+1e-12))\n    vmin, vmax = _resolve_db_range(peak_dbfs, peak_relative, db_window, db_vmin, db_vmax)\n    dbv = 20*_np.log10(A + 1e-12); dbv = _np.clip(dbv, vmin, vmax)\n    tv = ((dbv - vmin) / (vmax - vmin)).astype(_np.float32); tvf=_np.ascontiguousarray(tv,dtype=_np.float32)\n    title = title + ' (peak=%+.1f dBFS)' % peak_dbfs\n    nr,nc = tvf.shape\n    return {'title':title,'status':status,'nrows':int(nr),'ncols':int(nc),'H':float(H),\n        'xr':[float(_np.min(xa)),float(_np.max(xa))],'yr':[float(_np.min(ya)),float(_np.max(ya))],\n        'xlabel':xlabel,'ylabel':ylabel,'dtype':'float32',\n        'db_vmin':float(vmin), 'db_vmax':float(vmax),\n        'field_b64':_b64.b64encode(tvf.tobytes()).decode('ascii')}\n\ndef surface3d_pair_gl(field_a, xa, ya, title_a, field_b, xb, yb, title_b,\n                      xlabel_a='range [m]', ylabel_a='azimuth [m]', xlabel_b=None, ylabel_b=None,\n                      status_a=None, status_b=None,\n                      peak_relative=False, db_window=DB_WINDOW, db_vmin=None, db_vmax=None):\n    \"\"\"Pair (Full=a / Crop=b toggle). dB-norm options same as surface3d_gl.\n    peak_relative is per-panel: each panel's vmax tracks its own peak.\"\"\"\n    import json as _json2\n    if xlabel_b is None: xlabel_b = xlabel_a\n    if ylabel_b is None: ylabel_b = ylabel_a\n    a = _surf_gl_sub(field_a, xa, ya, title_a, xlabel_a, ylabel_a, status_a,\n                     peak_relative, db_window, db_vmin, db_vmax)\n    b = _surf_gl_sub(field_b, xb, yb, title_b, xlabel_b, ylabel_b, status_b,\n                     peak_relative, db_window, db_vmin, db_vmax)\n    meta = {'kind':'pair','a':a,'b':b}\n    _display({'application/x-hiyocanvas-surface3d': _json2.dumps(meta)}, raw=True)\n    print('surface3d_pair_gl: A %dx%d / B %dx%d, payload %.1f MB (binary path)' %\n          (a['nrows'],a['ncols'],b['nrows'],b['ncols'],(len(a['field_b64'])+len(b['field_b64']))/1e6))\n\nprint('plot library ready: crop_upsample_factor, upsample_complex, upsample_complex_range, upsample_axis, surface3d_gl, surface3d_pair_gl  (peak_relative supported)')\n",
             "label": "Plot Library",
             "spec": "Plot library for this SAR workspace (workspace-local, not app code). Defined as an unconnected first node so it runs before everything (input-unconnected nodes execute first) and shares its functions with all downstream nodes via the kernel namespace.\n\nFunctions:\n- surface3d(field, x_axis, y_axis, title, xlabel, ylabel, x_range, y_range, status): interactive Three.js 3D dB surface (inferno, -40..0 dB). x_range/y_range crop range/azimuth. On-demand render; left-drag rotate, right-drag pan, wheel zoom; Expand opens a new window.\n- upsample_complex(field, factor): 2-axis complex Catmull-Rom upsample (re/im then |z|) for smooth sidelobes on cropped views.\n- upsample_complex_range(field, factor): complex upsample along the range axis only (Range-Doppler/RCMC crops; Doppler stays as-is).\n- upsample_axis(ax, factor): matching linear upsample of an axis vector.\n- _catmull/_interp_axis: internal Catmull-Rom helpers."
           },
           "codeCollapsed": true,
-          "executionOrder": 11
+          "executionOrder": 7
         },
         "width": 400,
         "style": {}
@@ -1044,156 +862,9 @@
             "spec": "【共通ステージ】NUFFTで反射係数を生成するだけのノード。s_raw は計算しない。\n\n出力（kernel namespace 経由で下流の FPGA ルートノードへ）:\n- S_all (Na, Nr) complex64  — 周波数領域反射係数（NUFFT 直出力）\n- chirp_fft (Nr,) complex64 — fft(ref_chirp)、共役なし・ifftshift なし\n- fir_coefficients (Na, Nr) complex64 — 時間領域FIRタップ = ifftshift(ifft(S_all, axis=1))。FPGA Notebook（target_sim_FFT_FPGA_convert2Image2_375M.ipynb）と同じ形式\n\n3つのFPGAルート（Float / Fixed-point / 外部FPGA）はすべてこのノードの出力を共有する。下記ルートノードのいずれかを Enabled にして s_raw を生成する:\n- n32_Float       : Route A — 浮動小数点理想 IFFT（デフォルト Enabled）\n- n32_Fixed       : Route B — fxpmath 固定小数点（3ステージ Q-format）\n- n32_FPGA_Save   : Route C-out — 係数を .mat に書き出し（HDL シミュ用）\n- n32_FPGA_Load   : Route C-in  — FPGA出力の .npy を取り込み s_raw として使用\n\n性能: NUFFT本体（~84s on RTX 5080）は旧 n32 と同じ。末尾の IFFT（~1秒）だけ各ルートノードへ移動した。"
           },
           "codeCollapsed": true,
-          "executionOrder": 18
+          "executionOrder": 14
         },
         "width": 503,
-        "style": {}
-      },
-      {
-        "id": "n33",
-        "type": "canvasNode",
-        "position": {
-          "x": -167.68542709048725,
-          "y": -563.3084919710627
-        },
-        "data": {
-          "label": "Dropdown",
-          "category": "gui",
-          "blockType": "gui_dropdown",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "target_mode",
-            "options_csv": "point,image",
-            "label": "Target Mode",
-            "value": "point"
-          },
-          "enabled": false
-        },
-        "width": 250,
-        "style": {}
-      },
-      {
-        "id": "n37",
-        "type": "canvasNode",
-        "position": {
-          "x": -167.68542709048725,
-          "y": -435.3084919710627
-        },
-        "data": {
-          "label": "File Picker",
-          "category": "gui",
-          "blockType": "gui_file_picker",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "image_path",
-            "accept": "png,jpg,jpeg,bmp",
-            "label": "Image File",
-            "value": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\images\\strix.png"
-          },
-          "enabled": false
-        },
-        "width": 250,
-        "style": {}
-      },
-      {
-        "id": "n39",
-        "type": "canvasNode",
-        "position": {
-          "x": -167.68542709048725,
-          "y": -311.3084919710627
-        },
-        "data": {
-          "label": "Toggle",
-          "category": "gui",
-          "blockType": "gui_toggle",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "invert_image",
-            "value": "false",
-            "label_on": "invert ON",
-            "label_off": "invert OFF",
-            "label": "Invert B/W"
-          },
-          "enabled": false
-        },
-        "width": 250,
-        "style": {}
-      },
-      {
-        "id": "n40",
-        "type": "canvasNode",
-        "position": {
-          "x": -168.7354764741451,
-          "y": -178.58858063406262
-        },
-        "data": {
-          "label": "Slider",
-          "category": "gui",
-          "blockType": "gui_slider",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "range_scale",
-            "value": "1",
-            "min": "1",
-            "max": "10",
-            "step": "0.5",
-            "label": "Range scale (image)"
-          },
-          "enabled": false
-        },
-        "width": 250,
         "style": {}
       },
       {
@@ -1226,7 +897,7 @@
             "label": "Plot Focused Image (2-D)"
           },
           "codeCollapsed": true,
-          "executionOrder": 31
+          "executionOrder": 32
         },
         "width": 687,
         "style": {}
@@ -1262,7 +933,7 @@
             "spec": "【Route A: 浮動小数点理想ルート】\n\nこのノードを Enable にすると S_all × chirp_fft → IFFT を浮動小数点 (complex64) で計算し、理想的な s_raw を生成する。デフォルトで有効。\n\n入力（kernel namespace 経由）:\n  S_all      (Na, Nr) complex64  — n32 (NUFFT共通) が生成\n  chirp_fft  (Nr,)    complex64  — n32 が生成\n\n出力（kernel namespace）:\n  s_raw      (Na, Nr) complex64  — n25 (LNA) が消費\n\n排他関係:\n  Route B (n32_Fixed) / Route C-in (n32_FPGA_Load) と同時 Enable 不可\n  （s_raw が衝突する）。Route C-out (n32_FPGA_Save) とは併用可。"
           },
           "codeCollapsed": true,
-          "executionOrder": 19
+          "executionOrder": 15
         },
         "width": 400,
         "style": {}
@@ -1337,79 +1008,6 @@
         "width": 400
       },
       {
-        "id": "n45",
-        "type": "canvasNode",
-        "position": {
-          "x": 3644.166804692305,
-          "y": -53.651592842891034
-        },
-        "data": {
-          "label": "File Picker",
-          "category": "gui",
-          "blockType": "gui_file_picker",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "save_path",
-            "accept": "mat",
-            "label": "FPGA Save Path",
-            "value": "workspace-SAR-SIM/fpga_coeffs.mat"
-          },
-          "executionOrder": 2
-        },
-        "width": 250,
-        "style": {}
-      },
-      {
-        "id": "n46",
-        "type": "canvasNode",
-        "position": {
-          "x": 3645.3155030473017,
-          "y": 70.34840715710897
-        },
-        "data": {
-          "label": "Toggle",
-          "category": "gui",
-          "blockType": "gui_toggle",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "include_golden",
-            "value": "true",
-            "label_on": "INCLUDE",
-            "label_off": "OMIT",
-            "label": "Include golden s_raw"
-          },
-          "executionOrder": 4
-        },
-        "width": 250,
-        "style": {}
-      },
-      {
         "id": "n47",
         "type": "canvasNode",
         "position": {
@@ -1445,122 +1043,11 @@
         "width": 400
       },
       {
-        "id": "n48",
-        "type": "canvasNode",
-        "position": {
-          "x": 3643.8770495334675,
-          "y": 200.34840715710897
-        },
-        "data": {
-          "label": "File Picker",
-          "category": "gui",
-          "blockType": "gui_file_picker",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "load_path",
-            "accept": "npy",
-            "label": "FPGA Load Path",
-            "value": ""
-          },
-          "executionOrder": 6
-        },
-        "width": 250,
-        "style": {}
-      },
-      {
-        "id": "n49",
-        "type": "canvasNode",
-        "position": {
-          "x": 3919.564654732756,
-          "y": 128.9320232619578
-        },
-        "data": {
-          "label": "Slider",
-          "category": "gui",
-          "blockType": "gui_slider",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "adj_pos",
-            "value": "3500",
-            "min": "0",
-            "max": "10000",
-            "step": "1",
-            "label": "Range adj_pos (samples)"
-          },
-          "executionOrder": 5
-        },
-        "width": 250,
-        "style": {}
-      },
-      {
-        "id": "n50",
-        "type": "canvasNode",
-        "position": {
-          "x": 3920.7133530877536,
-          "y": -1.9042802923278828
-        },
-        "data": {
-          "label": "Toggle",
-          "category": "gui",
-          "blockType": "gui_toggle",
-          "inputs": [
-            {
-              "id": "in_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "outputs": [
-            {
-              "id": "out_0",
-              "label": "",
-              "portType": "any"
-            }
-          ],
-          "defaultParameters": {
-            "var_name": "iq_swap",
-            "value": "false",
-            "label_on": "SWAP",
-            "label_off": "AS-IS",
-            "label": "I/Q swap"
-          },
-          "executionOrder": 3
-        },
-        "width": 250,
-        "style": {}
-      },
-      {
         "id": "n52",
         "type": "canvasNode",
         "position": {
           "x": -488,
-          "y": 1678.6358343928084
+          "y": 2319
         },
         "data": {
           "label": "Slider",
@@ -1588,7 +1075,7 @@
             "step": "1",
             "label": "σ°_max (dB)"
           },
-          "executionOrder": 9
+          "executionOrder": 5
         },
         "width": 250,
         "style": {}
@@ -1598,7 +1085,7 @@
         "type": "canvasNode",
         "position": {
           "x": -488,
-          "y": 1824.6358343928084
+          "y": 2465
         },
         "data": {
           "label": "Slider",
@@ -1626,7 +1113,7 @@
             "step": "1",
             "label": "LNA Gain (dB)"
           },
-          "executionOrder": 10
+          "executionOrder": 6
         },
         "width": 250,
         "style": {}
@@ -1635,8 +1122,8 @@
         "id": "n54",
         "type": "canvasNode",
         "position": {
-          "x": -869.4371984552223,
-          "y": 362.18590145492306
+          "x": -401.00362470143733,
+          "y": -450.35764353979397
         },
         "data": {
           "label": "SAR Visualizer",
@@ -1656,7 +1143,6 @@
               "portType": "float"
             }
           ],
-          "params": "",
           "defaultParameters": {
             "altitude_km": "514",
             "look_deg": "25",
@@ -1665,8 +1151,8 @@
             "antenna_la_m": "4.8",
             "antenna_lr_m": "0.8",
             "obs_mode": "stripmap",
-            "prf_hz": "4000",
-            "pulse_width_us": "10",
+            "prf_hz": "3280",
+            "pulse_width_us": "52",
             "bandwidth_mhz": "75",
             "sampling_mhz": "90",
             "range_swath_half_m": "4000",
@@ -1676,23 +1162,17 @@
             "label": "SAR Observation Geometry",
             "timing_height": "167"
           },
-          "gui_widget": {
-            "type": "sar_visualizer",
-            "dtype": "sar_params"
-          },
-          "executionOrder": 7
+          "executionOrder": 1
         },
-        "style": {
-          "width": 780,
-          "minHeight": 480
-        }
+        "width": 780,
+        "style": {}
       },
       {
         "id": "n55",
         "type": "canvasNode",
         "position": {
-          "x": -456.367476923773,
-          "y": -201.3920688515663
+          "x": -397.6975128996419,
+          "y": 381.83105365290345
         },
         "data": {
           "label": "Target Config",
@@ -1712,7 +1192,6 @@
               "portType": "any"
             }
           ],
-          "params": "",
           "defaultParameters": {
             "target_mode": "image",
             "n_targets": "1",
@@ -1725,15 +1204,83 @@
             "label": "Target Config",
             "image_path": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\images\\strix.png"
           },
-          "gui_widget": {
-            "type": "form",
-            "dtype": "gui_form"
-          },
-          "executionOrder": 1
+          "executionOrder": 3
         },
-        "style": {
-          "width": 320
-        }
+        "width": 320,
+        "style": {}
+      },
+      {
+        "id": "n58",
+        "type": "canvasNode",
+        "position": {
+          "x": -467.1594743922747,
+          "y": 1092.8289819718716
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === Level Diagram (SAR link budget waterfall) ===\n# Absolute power level [dBm] through each RF chain stage from HPA output down\n# to LNA input. Reads everything from the kernel namespace so the plot tracks\n# n25 (LNA), sar_visualizer (geometry), antenna params, σ_max live. Shows the\n# noise floor kTB·F as a horizontal line — direct visual check of per-pulse\n# SNR (without matched-filter processing gain).\n#\n# Stages (per pulse, σ_ref point scatterer at slant range R0):\n#   1) HPA out         P_t                                      [dBm]\n#   2) TX feed out     P_t - L_tx_feed                          [dBm]\n#   3) EIRP            P_t - L_tx_feed + G_t                    [dBm]\n#   4) After uplink    EIRP - 10·log10(4πR0²)                   [dBm/m²]\n#   5) Target reflect  + σ_dBsm                                  [dBm]\n#   6) After downlink  - 10·log10(4πR0²)                        [dBm/m²]\n#   7) After RX ant    + 10·log10(Aeff), Aeff = G_r·λ²/(4π)      [dBm]\n#   8) LNA input       (signal at LNA terminal, before amp)      [dBm]\n#\n# Stops at LNA input. Past LNA, the simulator treats noise as ADC-referred-fixed\n# (so g_lna_db moves signal, not noise — see n25 spec), which is incompatible\n# with a continuing dBm waterfall. The LNA gain knob is annotated separately.\n\nimport numpy as np\nimport matplotlib\nmatplotlib.use('Agg')\nimport matplotlib.pyplot as plt\nimport io, base64\nfrom IPython.display import display\n\n# --- Design constants (kept in sync with n25 LNA hard-coded values) ---\nP_t_dbm      = 63.0       # HPA peak power [dBm] (~2 kW)\nL_tx_feed_db = 3.0        # Tx feedline / waveguide loss [dB]\neta_ant      = 0.6        # Antenna aperture efficiency\nT_K          = 290.0      # Reference noise temperature [K]\n\n# --- Live values from kernel namespace ---\nnf_db_v   = float(globals().get('nf_db',        3.0))\ng_lna_v   = float(globals().get('g_lna_db',   110.0))   # annotation only\nsigma_max_db_v = float(globals().get('sigma0_max_db', 0.0))\nsigma_dbsm = sigma_max_db_v   # display the brightest-scatterer RCS in the chain\n\n# --- Derived (uses the same formulas as n25) ---\nG_ant_dbi   = 10.0 * np.log10(4.0 * np.pi * eta_ant * La * Lr / (lam ** 2))\nAeff_m2     = (10.0 ** (G_ant_dbi / 10.0)) * (lam ** 2) / (4.0 * np.pi)\nAeff_db     = 10.0 * np.log10(Aeff_m2)\nL_oneway_db = 10.0 * np.log10(4.0 * np.pi * R0 ** 2)     # one-leg spreading factor [dB]\nktbf_dbm    = -174.0 + 10.0 * np.log10(B) + nf_db_v      # noise floor [dBm] at LNA input\n\n# --- Build the cumulative-level chain ---\nstages = []\nlvl = P_t_dbm;          stages.append(('HPA out',         lvl))\nlvl -= L_tx_feed_db;    stages.append(('TX feed out',     lvl))\nlvl += G_ant_dbi;       stages.append(('EIRP',            lvl))\nlvl -= L_oneway_db;     stages.append(('After uplink',    lvl))\nlvl += sigma_dbsm;      stages.append(('Target reflect',  lvl))\nlvl -= L_oneway_db;     stages.append(('After downlink',  lvl))\nlvl += Aeff_db;         stages.append(('After RX ant',    lvl))\nstages.append(('LNA input', lvl))\nlabels = [s[0] for s in stages]\nlevels = [s[1] for s in stages]\n\n# --- Plot ---\nfig, ax = plt.subplots(figsize=(11, 5))\nax.plot(range(len(stages)), levels, '-o', color='#5fa8d3', linewidth=2.0, markersize=7, label='Signal level')\nax.axhline(ktbf_dbm, color='#e8696b', linestyle='--', linewidth=1.5,\n           label='Noise floor kTB·F = %+.1f dBm  (B=%.0f MHz, NF=%.1f dB)' % (ktbf_dbm, B/1e6, nf_db_v))\n\n# Inter-stage delta annotations\nfor i in range(1, len(stages)):\n    dl = levels[i] - levels[i-1]\n    if abs(dl) >= 0.05:\n        sign = '+' if dl >= 0 else ''\n        ax.annotate('%s%.1f dB' % (sign, dl),\n                    xy=((i-1+i)/2, (levels[i-1]+levels[i])/2),\n                    xytext=(0, 8 if dl >= 0 else -14), textcoords='offset points',\n                    ha='center', fontsize=8, color='#cdd6f4')\n\nax.set_xticks(range(len(stages))); ax.set_xticklabels(labels, rotation=20, ha='right')\nax.set_ylabel('Level [dBm]')\nax.set_title('SAR Link Budget Waterfall  (σ=%+.0f dBsm  R=%.1f km  λ=%.2f cm  ant %.1fx%.1f m  G_ant=%+.1f dBi)' %\n             (sigma_dbsm, R0/1e3, lam*100, La, Lr, G_ant_dbi))\nax.grid(True, alpha=0.3)\nax.legend(loc='lower left', fontsize=9)\n\n# SNR-at-LNA-input annotation\nsnr_in_db = levels[-1] - ktbf_dbm\nsnr_color = '#a6e3a1' if snr_in_db >= 0 else '#f9e2af' if snr_in_db >= -10 else '#f38ba8'\nax.annotate('SNR @ LNA in: %+.1f dB' % snr_in_db,\n            xy=(len(stages)-1, levels[-1]),\n            xytext=(-8, -34), textcoords='offset points', ha='right', fontsize=10, color=snr_color,\n            arrowprops=dict(arrowstyle='->', color=snr_color, lw=1))\n\n# G_LNA side note (it's applied after this waterfall)\nax.text(0.99, 0.97, 'G_LNA = %+.1f dB  (applied past LNA input — see n25)' % g_lna_v,\n        transform=ax.transAxes, ha='right', va='top', fontsize=8, color='#a6adc8')\n\nfig.tight_layout()\nbuf = io.BytesIO(); fig.savefig(buf, format='png', dpi=110, bbox_inches='tight')\nplt.close(fig)\ndisplay({'image/png': base64.b64encode(buf.getvalue()).decode('ascii')}, raw=True)\n\nprint('Link budget waterfall:')\nfor lab, lvl in stages:\n    print('  %-16s  %+8.1f dBm' % (lab, lvl))\nprint('  %-16s  %+8.1f dBm  (kTB·F)' % ('Noise floor', ktbf_dbm))\nprint('  %-16s  %+8.1f dB'  % ('SNR @ LNA in', snr_in_db))\nprint('  (G_LNA = %+.1f dB applied downstream — see n25)' % g_lna_v)\n",
+            "label": "Level Diagram (Link Budget)"
+          },
+          "executionOrder": 16,
+          "codeCollapsed": true
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n59",
+        "type": "canvasNode",
+        "position": {
+          "x": 3700,
+          "y": -50
+        },
+        "data": {
+          "label": "FPGA Config",
+          "category": "hdl",
+          "blockType": "fpga_config",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "save_path": "workspace-SAR-SIM/fpga_coeffs.mat",
+            "include_golden": "true",
+            "adj_pos": "3500",
+            "iq_swap": "false",
+            "label": "FPGA Config",
+            "load_path": ""
+          },
+          "executionOrder": 2
+        },
+        "width": 320,
+        "style": {}
       }
     ],
     "edges": [
@@ -1826,8 +1373,7 @@
         "source": "n17",
         "sourceHandle": "out_0",
         "target": "n18",
-        "targetHandle": "in_0",
-        "selected": false
+        "targetHandle": "in_0"
       },
       {
         "id": "e_1779513686551_04g8",
@@ -1848,13 +1394,6 @@
         "source": "n16",
         "sourceHandle": "out_0",
         "target": "n21",
-        "targetHandle": "in_0"
-      },
-      {
-        "id": "e_1779537023441_4xwo",
-        "source": "n1",
-        "sourceHandle": "out_0",
-        "target": "n2",
         "targetHandle": "in_0"
       },
       {
@@ -1942,34 +1481,38 @@
         "targetHandle": "in_0"
       },
       {
-        "type": "rateEdge",
+        "id": "xy-edge__n55out_0-n31in_0",
         "source": "n55",
         "sourceHandle": "out_0",
         "target": "n31",
-        "targetHandle": "in_0",
-        "id": "xy-edge__n55out_0-n31in_0"
+        "targetHandle": "in_0"
       },
       {
-        "type": "rateEdge",
+        "id": "xy-edge__n31out_0-n2in_0",
         "source": "n31",
         "sourceHandle": "out_0",
         "target": "n2",
-        "targetHandle": "in_0",
-        "id": "xy-edge__n31out_0-n2in_0"
+        "targetHandle": "in_0"
       },
       {
-        "type": "rateEdge",
+        "id": "xy-edge__n54out_0-n2in_0",
         "source": "n54",
         "sourceHandle": "out_0",
-        "target": "n31",
-        "targetHandle": "in_0",
-        "id": "xy-edge__n54out_0-n31in_0"
+        "target": "n2",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779797469015_ldng",
+        "source": "n6",
+        "sourceHandle": "out_0",
+        "target": "n58",
+        "targetHandle": "in_0"
       }
     ],
     "viewport": {
-      "x": 809.6026318189214,
-      "y": 434.3609622682477,
-      "zoom": 0.5743491774985174
+      "x": 490.72027680255667,
+      "y": 160.4089577074827,
+      "zoom": 0.22735748497655967
     }
   }
 }
