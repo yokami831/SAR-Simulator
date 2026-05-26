@@ -4,7 +4,7 @@
   "title": "SAR-Simulator-FPGA2",
   "description": "",
   "created": "2026-05-26T07:53:12.642190+00:00",
-  "modified": "2026-05-26T14:17:38.832911+00:00",
+  "modified": "2026-05-26T14:35:27.060532+00:00",
   "canvas": {
     "nodes": [
       {
@@ -537,7 +537,8 @@
             "spec": "Display-only: 3-D surface of the focused image |img| in dB (the final RDA output). Each point target should appear as a sharp peak (its impulse response / IRF). Interactive; Expand opens a large copy. Does not modify any physical array."
           },
           "codeCollapsed": true,
-          "executionOrder": 31
+          "executionOrder": 31,
+          "barColor": "#f59e0b"
         },
         "width": 832,
         "style": {}
@@ -573,7 +574,8 @@
             "spec": "Display-only: 3-D dB surface of |s_rc| after range compression. Targets are now sharp in range (thin ridges) but still spread in azimuth. Full resolution (no downsampling); the Crop view is complex-upsampled to reveal range sidelobes. Toggle Full/Crop; Expand for a large copy."
           },
           "codeCollapsed": true,
-          "executionOrder": 25
+          "executionOrder": 25,
+          "barColor": "#f59e0b"
         },
         "width": 400,
         "style": {}
@@ -609,7 +611,8 @@
             "spec": "Display-only: 3-D dB surface of |S_rd| in the Range-Doppler domain. A target's energy lies on the RCM parabola (curved ridge across range vs Doppler) — this is why RCMC is needed. Axes: range [m] x Doppler [Hz]. Full resolution (no downsampling); the Crop view is range-upsampled. Toggle Full/Crop."
           },
           "codeCollapsed": true,
-          "executionOrder": 27
+          "executionOrder": 27,
+          "barColor": "#f59e0b"
         },
         "width": 400,
         "style": {}
@@ -645,7 +648,8 @@
             "spec": "Display-only: 3-D dB surface of |S_rd_rcmc| after Range Cell Migration Correction. The curved RCM ridge from the previous step is now straightened (energy aligned to one range cell across Doppler). Axes: range [m] x Doppler [Hz]. Full resolution (no downsampling); the Crop view is range-upsampled. Toggle Full/Crop."
           },
           "codeCollapsed": true,
-          "executionOrder": 29
+          "executionOrder": 29,
+          "barColor": "#f59e0b"
         },
         "width": 400,
         "style": {}
@@ -719,7 +723,8 @@
             "step": "1",
             "label": "Noise Figure (dB)"
           },
-          "executionOrder": 4
+          "executionOrder": 4,
+          "barColor": "#a3e635"
         },
         "width": 250,
         "style": {}
@@ -755,7 +760,8 @@
             "spec": "Display-only: show |s_raw| (raw echo amplitude) over (range, azimuth). Does not modify any physical array."
           },
           "codeCollapsed": true,
-          "executionOrder": 18
+          "executionOrder": 18,
+          "barColor": "#f59e0b"
         },
         "width": 400,
         "style": {}
@@ -826,7 +832,8 @@
             "spec": "Plot library for this SAR workspace (workspace-local, not app code). Defined as an unconnected first node so it runs before everything (input-unconnected nodes execute first) and shares its functions with all downstream nodes via the kernel namespace.\n\nFunctions:\n- surface3d(field, x_axis, y_axis, title, xlabel, ylabel, x_range, y_range, status): interactive Three.js 3D dB surface (inferno, -40..0 dB). x_range/y_range crop range/azimuth. On-demand render; left-drag rotate, right-drag pan, wheel zoom; Expand opens a new window.\n- upsample_complex(field, factor): 2-axis complex Catmull-Rom upsample (re/im then |z|) for smooth sidelobes on cropped views.\n- upsample_complex_range(field, factor): complex upsample along the range axis only (Range-Doppler/RCMC crops; Doppler stays as-is).\n- upsample_axis(ax, factor): matching linear upsample of an axis vector.\n- _catmull/_interp_axis: internal Catmull-Rom helpers."
           },
           "codeCollapsed": true,
-          "executionOrder": 7
+          "executionOrder": 7,
+          "barColor": "#f59e0b"
         },
         "width": 400,
         "style": {}
@@ -897,7 +904,8 @@
             "label": "Plot Focused Image (2-D)"
           },
           "codeCollapsed": true,
-          "executionOrder": 32
+          "executionOrder": 32,
+          "barColor": "#f59e0b"
         },
         "width": 687,
         "style": {}
@@ -1075,7 +1083,8 @@
             "step": "1",
             "label": "σ°_max (dB)"
           },
-          "executionOrder": 5
+          "executionOrder": 5,
+          "barColor": "#a3e635"
         },
         "width": 250,
         "style": {}
@@ -1113,7 +1122,8 @@
             "step": "1",
             "label": "LNA Gain (dB)"
           },
-          "executionOrder": 6
+          "executionOrder": 6,
+          "barColor": "#a3e635"
         },
         "width": 250,
         "style": {}
@@ -1162,7 +1172,8 @@
             "label": "SAR Observation Geometry",
             "timing_height": "167"
           },
-          "executionOrder": 1
+          "executionOrder": 1,
+          "barColor": "#facc15"
         },
         "width": 780,
         "style": {}
@@ -1204,7 +1215,8 @@
             "label": "Target Config",
             "image_path": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\images\\strix.png"
           },
-          "executionOrder": 3
+          "executionOrder": 3,
+          "barColor": "#a3e635"
         },
         "width": 320,
         "style": {}
@@ -1238,8 +1250,9 @@
             "code": "# === Level Diagram (SAR link budget waterfall) ===\n# Absolute power level [dBm] through each RF chain stage from HPA output down\n# to LNA input. Reads everything from the kernel namespace so the plot tracks\n# n25 (LNA), sar_visualizer (geometry), antenna params, σ_max live. Shows the\n# noise floor kTB·F as a horizontal line — direct visual check of per-pulse\n# SNR (without matched-filter processing gain).\n#\n# Stages (per pulse, σ_ref point scatterer at slant range R0):\n#   1) HPA out         P_t                                      [dBm]\n#   2) TX feed out     P_t - L_tx_feed                          [dBm]\n#   3) EIRP            P_t - L_tx_feed + G_t                    [dBm]\n#   4) After uplink    EIRP - 10·log10(4πR0²)                   [dBm/m²]\n#   5) Target reflect  + σ_dBsm                                  [dBm]\n#   6) After downlink  - 10·log10(4πR0²)                        [dBm/m²]\n#   7) After RX ant    + 10·log10(Aeff), Aeff = G_r·λ²/(4π)      [dBm]\n#   8) LNA input       (signal at LNA terminal, before amp)      [dBm]\n#\n# Stops at LNA input. Past LNA, the simulator treats noise as ADC-referred-fixed\n# (so g_lna_db moves signal, not noise — see n25 spec), which is incompatible\n# with a continuing dBm waterfall. The LNA gain knob is annotated separately.\n\nimport numpy as np\nimport matplotlib\nmatplotlib.use('Agg')\nimport matplotlib.pyplot as plt\nimport io, base64\nfrom IPython.display import display\n\n# --- Design constants (kept in sync with n25 LNA hard-coded values) ---\nP_t_dbm      = 63.0       # HPA peak power [dBm] (~2 kW)\nL_tx_feed_db = 3.0        # Tx feedline / waveguide loss [dB]\neta_ant      = 0.6        # Antenna aperture efficiency\nT_K          = 290.0      # Reference noise temperature [K]\n\n# --- Live values from kernel namespace ---\nnf_db_v   = float(globals().get('nf_db',        3.0))\ng_lna_v   = float(globals().get('g_lna_db',   110.0))   # annotation only\nsigma_max_db_v = float(globals().get('sigma0_max_db', 0.0))\nsigma_dbsm = sigma_max_db_v   # display the brightest-scatterer RCS in the chain\n\n# --- Derived (uses the same formulas as n25) ---\nG_ant_dbi   = 10.0 * np.log10(4.0 * np.pi * eta_ant * La * Lr / (lam ** 2))\nAeff_m2     = (10.0 ** (G_ant_dbi / 10.0)) * (lam ** 2) / (4.0 * np.pi)\nAeff_db     = 10.0 * np.log10(Aeff_m2)\nL_oneway_db = 10.0 * np.log10(4.0 * np.pi * R0 ** 2)     # one-leg spreading factor [dB]\nktbf_dbm    = -174.0 + 10.0 * np.log10(B) + nf_db_v      # noise floor [dBm] at LNA input\n\n# --- Build the cumulative-level chain ---\nstages = []\nlvl = P_t_dbm;          stages.append(('HPA out',         lvl))\nlvl -= L_tx_feed_db;    stages.append(('TX feed out',     lvl))\nlvl += G_ant_dbi;       stages.append(('EIRP',            lvl))\nlvl -= L_oneway_db;     stages.append(('After uplink',    lvl))\nlvl += sigma_dbsm;      stages.append(('Target reflect',  lvl))\nlvl -= L_oneway_db;     stages.append(('After downlink',  lvl))\nlvl += Aeff_db;         stages.append(('After RX ant',    lvl))\nstages.append(('LNA input', lvl))\nlabels = [s[0] for s in stages]\nlevels = [s[1] for s in stages]\n\n# --- Plot ---\nfig, ax = plt.subplots(figsize=(11, 5))\nax.plot(range(len(stages)), levels, '-o', color='#5fa8d3', linewidth=2.0, markersize=7, label='Signal level')\nax.axhline(ktbf_dbm, color='#e8696b', linestyle='--', linewidth=1.5,\n           label='Noise floor kTB·F = %+.1f dBm  (B=%.0f MHz, NF=%.1f dB)' % (ktbf_dbm, B/1e6, nf_db_v))\n\n# Inter-stage delta annotations\nfor i in range(1, len(stages)):\n    dl = levels[i] - levels[i-1]\n    if abs(dl) >= 0.05:\n        sign = '+' if dl >= 0 else ''\n        ax.annotate('%s%.1f dB' % (sign, dl),\n                    xy=((i-1+i)/2, (levels[i-1]+levels[i])/2),\n                    xytext=(0, 8 if dl >= 0 else -14), textcoords='offset points',\n                    ha='center', fontsize=8, color='#cdd6f4')\n\nax.set_xticks(range(len(stages))); ax.set_xticklabels(labels, rotation=20, ha='right')\nax.set_ylabel('Level [dBm]')\nax.set_title('SAR Link Budget Waterfall  (σ=%+.0f dBsm  R=%.1f km  λ=%.2f cm  ant %.1fx%.1f m  G_ant=%+.1f dBi)' %\n             (sigma_dbsm, R0/1e3, lam*100, La, Lr, G_ant_dbi))\nax.grid(True, alpha=0.3)\nax.legend(loc='lower left', fontsize=9)\n\n# SNR-at-LNA-input annotation\nsnr_in_db = levels[-1] - ktbf_dbm\nsnr_color = '#a6e3a1' if snr_in_db >= 0 else '#f9e2af' if snr_in_db >= -10 else '#f38ba8'\nax.annotate('SNR @ LNA in: %+.1f dB' % snr_in_db,\n            xy=(len(stages)-1, levels[-1]),\n            xytext=(-8, -34), textcoords='offset points', ha='right', fontsize=10, color=snr_color,\n            arrowprops=dict(arrowstyle='->', color=snr_color, lw=1))\n\n# G_LNA side note (it's applied after this waterfall)\nax.text(0.99, 0.97, 'G_LNA = %+.1f dB  (applied past LNA input — see n25)' % g_lna_v,\n        transform=ax.transAxes, ha='right', va='top', fontsize=8, color='#a6adc8')\n\nfig.tight_layout()\nbuf = io.BytesIO(); fig.savefig(buf, format='png', dpi=110, bbox_inches='tight')\nplt.close(fig)\ndisplay({'image/png': base64.b64encode(buf.getvalue()).decode('ascii')}, raw=True)\n\nprint('Link budget waterfall:')\nfor lab, lvl in stages:\n    print('  %-16s  %+8.1f dBm' % (lab, lvl))\nprint('  %-16s  %+8.1f dBm  (kTB·F)' % ('Noise floor', ktbf_dbm))\nprint('  %-16s  %+8.1f dB'  % ('SNR @ LNA in', snr_in_db))\nprint('  (G_LNA = %+.1f dB applied downstream — see n25)' % g_lna_v)\n",
             "label": "Level Diagram (Link Budget)"
           },
+          "codeCollapsed": true,
           "executionOrder": 16,
-          "codeCollapsed": true
+          "barColor": "#f59e0b"
         },
         "width": 400,
         "style": {}
@@ -1277,41 +1290,11 @@
             "label": "FPGA Config",
             "load_path": ""
           },
-          "executionOrder": 2
+          "executionOrder": 2,
+          "barColor": "#a3e635"
         },
         "width": 320,
         "style": {}
-      },
-      {
-        "id": "n60",
-        "type": "canvasNode",
-        "position": {
-          "x": 3078.6706583806526,
-          "y": 2565.7504324456377
-        },
-        "data": {
-          "label": "Comment",
-          "category": "utility",
-          "blockType": "comment",
-          "inputs": [],
-          "outputs": [],
-          "params": "",
-          "defaultParameters": {
-            "font_size": "48",
-            "font_weight": "normal",
-            "text_color": "#e0e0e0",
-            "bg_color": "#000000",
-            "border_color": "#5078c8",
-            "border_style": "dashed",
-            "border_width": "0",
-            "text": "test"
-          }
-        },
-        "width": 473,
-        "height": 262,
-        "style": {
-          "width": 400
-        }
       }
     ],
     "edges": [
@@ -1541,9 +1524,9 @@
       }
     ],
     "viewport": {
-      "x": -1198.313824233709,
-      "y": -1099.1428810197508,
-      "zoom": 0.6280670247910298
+      "x": 828.9826842382747,
+      "y": 224.4755553348043,
+      "zoom": 0.36725380623703874
     }
   }
 }
