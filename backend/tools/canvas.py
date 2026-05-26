@@ -143,9 +143,13 @@ async def get_element(node_id: str) -> dict[str, Any]:
 async def update_element(node_id: str, **kwargs: Any) -> dict[str, Any]:
     """Update one or more properties of a node.
 
-    Supported kwargs: label, code, spec, enabled, code_collapsed, position, width, height, params
-    The 'params' dict updates arbitrary node parameters via update_param WebSocket command.
-    'spec' is the node's free-text description (the "Spec" panel in the UI).
+    Supported kwargs: label, code, spec, enabled, code_collapsed, position,
+    width, height, barColor, params
+
+    The 'params' dict updates arbitrary node parameters via update_param
+    WebSocket command. 'spec' is the node's free-text description (the
+    "Spec" panel in the UI). 'barColor' overrides the per-node accent bar
+    color (CSS color string, or null/empty to revert to the category default).
     """
     # Validate node exists
     try:
@@ -165,7 +169,7 @@ async def update_element(node_id: str, **kwargs: Any) -> dict[str, Any]:
     # NOT applied here and used to return success with an empty change set,
     # masking the error. Fail loudly with a hint to the correct form.
     _KNOWN = {"label", "code", "spec", "enabled", "code_collapsed",
-              "position", "width", "height", "params"}
+              "position", "width", "height", "params", "barColor"}
     unknown = [k for k in kwargs if k not in _KNOWN]
     if unknown:
         hint = ""
@@ -236,6 +240,24 @@ async def update_element(node_id: str, **kwargs: Any) -> dict[str, Any]:
                 errors.append(f"enabled: {result.get('error', 'failed')}")
         except Exception as e:
             errors.append(f"enabled: {e}")
+
+    # barColor: per-node accent-bar color override. Stored on node.data.
+    # Pass through as-is; the frontend handler accepts string OR null/empty
+    # (null/empty clears the override and reverts to the category default).
+    if "barColor" in kwargs:
+        bar_color = kwargs.get("barColor")
+        try:
+            result = await send_command({
+                "action": "set_bar_color",
+                "node_id": node_id,
+                "bar_color": bar_color,
+            })
+            if result.get("success"):
+                changed.append("barColor")
+            else:
+                errors.append(f"barColor: {result.get('error', 'failed')}")
+        except Exception as e:
+            errors.append(f"barColor: {e}")
 
     # code_collapsed uses set_code_collapsed
     if code_collapsed is not None:

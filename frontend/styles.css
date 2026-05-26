@@ -535,13 +535,27 @@ button, a, [role="button"] { cursor: pointer; }
 /* ===== GRC-style Block Node ===== */
 .grc-block {
   min-width: 180px; border-radius: 4px; font-size: 12px;
-  box-shadow: 0 2px 8px var(--overlay-medium); border: 2px solid;
+  box-shadow: 0 2px 8px var(--overlay-medium);
+  border: 1px solid var(--white-alpha-08);
   overflow: visible;
   display: flex; flex-direction: column;
   width: 100%; height: 100%;
   position: relative;
   /* Solid-ish body so overlapping blocks stay readable (was transparent). */
   background: rgba(30, 30, 30, 0.92);
+}
+/* Category accent bar (6px) on the left edge. Color is overridden per
+   category class below. Default neutral gray for blocks without a recognized
+   category so they still get a visible bar. */
+.grc-block::before {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 6px;
+  background: var(--cat-color, rgba(255, 255, 255, 0.15));
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+  pointer-events: none;
 }
 .react-flow__node.selected .grc-block { box-shadow: 0 0 0 2px var(--node-selected-ring), 0 2px 8px var(--overlay-medium); }
 .grc-block-header {
@@ -624,6 +638,7 @@ button, a, [role="button"] { cursor: pointer; }
 .grc-block.comment-styled {
   box-shadow: none;
 }
+.grc-block.comment-styled::before { display: none; }
 .grc-block.comment-styled .grc-block-header {
   background: transparent;
   opacity: 0.55;
@@ -742,27 +757,37 @@ select.grc-param-input { cursor: pointer; }
 .react-flow__handle[data-porttype="message"] { background: var(--port-message); }
 .react-flow__handle[data-porttype="audio"]   { background: var(--port-audio); }
 
-/* Block type colors */
-.grc-block.source { border-color: var(--block-source); }
-.grc-block.source .grc-block-header { background: var(--block-source); color: var(--block-source-text); }
-.grc-block.processing { border-color: var(--block-processing); }
-.grc-block.processing .grc-block-header { background: var(--block-processing); color: var(--block-processing-text); }
-.grc-block.sink { border-color: var(--block-sink); }
-.grc-block.sink .grc-block-header { background: var(--block-sink); color: var(--block-sink-text); }
-.grc-block.gui { border-color: var(--block-gui); }
-.grc-block.gui .grc-block-header { background: var(--block-gui); color: var(--block-gui-text); }
-.grc-block.utility { border-color: var(--block-utility); }
-.grc-block.utility .grc-block-header { background: var(--block-utility); color: var(--block-utility-text); }
-.grc-block.hdl .grc-block-header { background: linear-gradient(135deg, var(--block-hdl-start), var(--block-hdl-end)); color: var(--block-hdl-text); }
+/* Block type colors — each category sets --cat-color, which is consumed by
+   the 6px left accent bar (.grc-block::before) and the execution-state
+   border/glow rules below. Header no longer has a colored fill. */
+.grc-block.source     { --cat-color: var(--block-source); }
+.grc-block.processing { --cat-color: var(--block-processing); }
+.grc-block.sink       { --cat-color: var(--block-sink); }
+.grc-block.gui        { --cat-color: var(--block-gui); }
+.grc-block.utility    { --cat-color: var(--block-utility); }
+.grc-block.hdl        { --cat-color: var(--block-hdl-start); }
 .grc-block.hdl { min-width: 280px; }
 
 /* ===== Node Execution Status ===== */
+/* Legacy keyframe — kept defined for compatibility but no longer referenced
+   by .exec-executing (which now uses exec-pulse-cat for per-category color). */
 @keyframes exec-pulse {
   0%, 100% { box-shadow: 0 0 4px 1px var(--exec-pulse-start); }
   50% { box-shadow: 0 0 12px 3px var(--exec-pulse-mid); }
 }
-.grc-block.exec-executing { animation: exec-pulse 1.2s ease-in-out infinite; border-color: var(--exec-executing); }
-.grc-block.exec-completed { border-color: var(--exec-completed); box-shadow: 0 0 6px 1px var(--exec-completed-glow); }
+/* Category-color-aware pulse: glows in the block's own --cat-color. */
+@keyframes exec-pulse-cat {
+  0%, 100% { box-shadow: 0 0 4px 1px color-mix(in srgb, var(--cat-color, #2196f3) 40%, transparent); }
+  50%      { box-shadow: 0 0 12px 3px color-mix(in srgb, var(--cat-color, #2196f3) 80%, transparent); }
+}
+.grc-block.exec-executing {
+  border-color: var(--cat-color, var(--exec-executing));
+  animation: exec-pulse-cat 1.2s ease-in-out infinite;
+}
+.grc-block.exec-completed {
+  border-color: var(--cat-color, var(--exec-completed));
+  box-shadow: 0 0 6px 1px color-mix(in srgb, var(--cat-color, var(--exec-completed)) 50%, transparent);
+}
 .grc-block.exec-error { border-color: var(--exec-error); box-shadow: 0 0 6px 1px var(--exec-error-glow); }
 .grc-block.exec-next {
   border: 2px dashed var(--exec-next);
@@ -837,7 +862,7 @@ select.grc-param-input { cursor: pointer; }
   user-select: text; -webkit-user-select: text; cursor: text;
 }
 .grc-exec-output { color: var(--exec-output-text); white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; }
-.grc-exec-result.exec-executing { border-left: 3px solid var(--exec-executing); opacity: 0.85; }
+.grc-exec-result.exec-executing { border-left: 3px solid var(--cat-color, var(--exec-executing)); opacity: 0.85; }
 .grc-exec-error { color: var(--exec-error-text); }
 .grc-exec-error-text { white-space: pre-wrap; word-break: break-all; }
 .grc-exec-error-toggle {

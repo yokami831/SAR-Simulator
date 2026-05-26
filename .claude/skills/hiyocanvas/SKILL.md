@@ -226,11 +226,62 @@ API get_execution_status                             # Check execution result
 | Type ID | Purpose |
 |---------|---------|
 | `python_code` | Run arbitrary Python code. Parameters: `label`, `code` |
-| `comment` | Text note (not executed). Parameters: `label`, `text` |
+| `comment` | Text annotation (not executed). Doubles as a labelled frame when `border_width > 0`. See "Comment Blocks" and "Frame Blocks" below |
 
 Nodes display rich output: `print()` → text, `plt.show()` → inline image, DataFrame → HTML table, `display(SVG(...))` → inline SVG. For 3D/HTML/SVG templates, see [references/rich-display.md](references/rich-display.md).
 
 **IMPORTANT:** Do NOT use `matplotlib.use("Agg")` in node code — it disables Jupyter inline display capture and `plt.show()` will produce no output. The kernel handles the backend automatically.
+
+### Comment Blocks
+
+`comment` is a pure-decoration node: no header, no ports, no execution, no
+category bar. It exists to label regions of a flow with formatted text.
+
+Style fields live in `params` (same convention as GUI widgets):
+
+| Param         | Values                                   | Notes                                  |
+|---------------|------------------------------------------|----------------------------------------|
+| `text`        | string                                   | The body text shown in the node        |
+| `font_size`   | `12` / `14` / `16` / `20` / `24` / `32` / `48` | Default `14`                        |
+| `font_weight` | `normal` / `bold`                        | Default `normal`                       |
+| `text_color`  | CSS color (`#e0e0e0`, `rgba(...)`, etc.) | Default `#e0e0e0`                      |
+| `bg_color`    | CSS color or `transparent`               | Default `transparent`                  |
+| `border_color`| CSS color                                | Used only when `border_width > 0`      |
+| `border_style`| `solid` / `dashed` / `dotted`            | Default `dashed`                       |
+| `border_width`| `0` – `4`                                | `0` = no border (pure text annotation) |
+
+Comments are resizable: select the node and drag the corner handle (standard
+NodeResizer). Setting `border_width > 0` lets a comment double as a labelled
+frame around other nodes.
+
+```powershell
+'{"type":"comment"}' | API add_element                            # → n5
+'{"node_id":"n5","params":{"text":"Step 1: load data","font_size":"16","font_weight":"bold","text_color":"#e0e0e0","bg_color":"rgba(80,120,200,0.1)"}}' | API update_element
+```
+
+The per-node `barColor` override (see below) does NOT apply to comments —
+they are decoration, not blocks, and have no category bar to recolor.
+
+### Frame Blocks
+
+There is no separate `frame` block type — the comment block doubles as a
+frame. Set `border_width > 0` on a `comment` (with `text` empty or a short
+title) to get a decorative rectangle that visually groups other nodes:
+
+```powershell
+# Labelled frame around a region of the flow
+'{"type":"comment"}' | API add_element                            # → n6
+'{"node_id":"n6","params":{"text":"RF Front-End","font_size":"20","font_weight":"bold","text_color":"#a050c8","bg_color":"rgba(160,80,200,0.06)","border_color":"#a050c8","border_style":"dashed","border_width":"2"}}' | API update_element
+```
+
+Like a plain comment, a framed comment has no ports, does not participate in
+execution, has no category bar (so `barColor` does not apply), and is
+resizable via the standard NodeResizer. Other blocks placed over it appear
+in front; moving the frame does not drag the contained blocks (deliberate).
+
+The codebase still references a `frame` node type in a few defensive checks
+(menu suppression for the bar-color override, etc.), but the standalone
+`frame` block was merged into `comment` early in development.
 
 ### GUI Controls (Widget Blocks)
 
@@ -274,6 +325,36 @@ Disabled nodes are greyed out and skipped during `start_execution`, but connecti
 '{"node_id":"n2","enabled":false}' | API update_element   # Disable (comment out)
 '{"node_id":"n2","enabled":true}' | API update_element    # Re-enable
 ```
+
+### Per-Node Bar Color
+
+Each regular block has a 6px colored accent bar on its left edge. The bar
+defaults to the block's category color (`source` / `processing` / `sink` /
+`gui` / `utility` / `hdl`) and also drives the executing-pulse and
+completed-border colors via the `--cat-color` CSS custom property.
+
+An individual node can override its bar color via `node.data.barColor` (any
+CSS color string — `"#a855f7"`, `"hsl(...)"`, named colors, etc.). The
+override persists in the `.rcflow` file automatically (no schema change —
+it's just another field on `node.data`). Pass `barColor` at the top level
+of `update_element` (same level as `enabled` / `label`, NOT nested in
+`params`):
+
+```powershell
+# Set a per-node bar color (purple highlight for a key visualization node)
+'{"node_id":"n12","barColor":"#a855f7"}' | API update_element
+
+# Clear it (revert to category default)
+'{"node_id":"n12","barColor":null}' | API update_element
+```
+
+The `exec-executing` pulse and `exec-completed` border follow the override
+too, because they all read the same `--cat-color`. Comment/frame nodes
+have no category bar, so `barColor` is ignored on them.
+
+Users can also set this interactively: right-click a node → `Set bar
+color…` opens a native color picker. `Reset color` appears only when an
+override is currently set.
 
 ### Error Handling
 

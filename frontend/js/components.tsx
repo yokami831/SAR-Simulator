@@ -123,6 +123,7 @@ interface BlockNodeData {
   blockType?: string;
   codeCollapsed?: boolean;
   gui_widget?: GuiWidgetDef;
+  barColor?: string;
   _requestedTab?: string;
   _tabRequestId?: number;
   [key: string]: unknown;
@@ -1027,6 +1028,8 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
   // checkbox + run button. (comment now has its own renderer above.)
   const isNonExecutable = blockTypeStr === 'group_spec';
 
+  const barColor = typeof data.barColor === 'string' ? data.barColor : undefined;
+
   return (
     <div
       className={`grc-block ${category || ''}${!isEnabled ? ' disabled' : ''}${executionStatus ? ` exec-${executionStatus}` : ''}${isShim ? ' shim' : ''}`}
@@ -1034,6 +1037,7 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
       data-node-id={id}
       data-block-type={blockTypeStr}
       title={isShim ? `Missing block definition: ${blockType}. Copy ${blockType}.json into <workspace>/blocks/ and reload.` : undefined}
+      style={barColor ? ({ '--cat-color': barColor } as React.CSSProperties) : undefined}
     >
       <NodeResizer minWidth={NODE_MIN_WIDTH} minHeight={NODE_COMPACT_HEIGHT} isVisible={selected} color={NODE_RESIZER_COLOR} />
 
@@ -1251,7 +1255,7 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
 
 /** Right-click context menu for nodes with delete option */
 export function ContextMenu({ x, y, nodeId, edgeId, selectionCount, onClose, onDelete, onDeleteEdge,
-  nodeType, collapsed, nodeLabel, nodeDescription, onToggleCollapse, onUngroup, onRename, onSetDescription, onCreateSubgraph, onEditStyle }: {
+  nodeType, collapsed, nodeLabel, nodeDescription, barColor, onToggleCollapse, onUngroup, onRename, onSetDescription, onCreateSubgraph, onEditStyle, onSetBarColor, onResetBarColor }: {
   x: number;
   y: number;
   nodeId?: string;
@@ -1264,12 +1268,15 @@ export function ContextMenu({ x, y, nodeId, edgeId, selectionCount, onClose, onD
   collapsed?: boolean;
   nodeLabel?: string;
   nodeDescription?: string;
+  barColor?: string;
   onToggleCollapse?: (nodeId: string) => void;
   onUngroup?: (nodeId: string) => void;
   onRename?: (nodeId: string, name: string) => void;
   onSetDescription?: (nodeId: string, desc: string) => void;
   onCreateSubgraph?: (nodeIds: string[], name: string) => void;
   onEditStyle?: (nodeId: string) => void;
+  onSetBarColor?: (nodeId: string) => void;
+  onResetBarColor?: (nodeId: string) => void;
 }) {
   useEffect(() => {
     const handler = () => onClose();
@@ -1324,6 +1331,19 @@ export function ContextMenu({ x, y, nodeId, edgeId, selectionCount, onClose, onD
           Edit Style…
         </button>
       )}
+
+      {/* Per-node bar color (skip for comment/frame — they have their own style editor) */}
+      {nodeId && nodeType !== 'comment' && nodeType !== 'frame' && (
+        <button onClick={() => { onSetBarColor?.(nodeId); onClose(); }}>
+          Set bar color…
+        </button>
+      )}
+      {nodeId && nodeType !== 'comment' && nodeType !== 'frame' && barColor && (
+        <button onClick={() => { onResetBarColor?.(nodeId); onClose(); }}>
+          Reset color
+        </button>
+      )}
+      {nodeId && nodeType !== 'comment' && nodeType !== 'frame' && <div className="menu-sep" />}
 
       {/* Common items */}
       {nodeId && (

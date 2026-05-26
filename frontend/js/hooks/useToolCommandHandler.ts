@@ -225,6 +225,26 @@ export function useToolCommandHandler({
           break;
         }
 
+        case 'set_bar_color': {
+          // Per-node bar color override (CSS color string), or null/'' to clear.
+          // Stored on node.data.barColor. RegularBlockNode applies it inline
+          // as --cat-color, so the 6px sidebar + exec-state borders follow it.
+          pushHistory();
+          const bcNodeId = msg.node_id as string;
+          const bcValue = msg.bar_color as string | null | undefined;
+          setNodes(nds => nds.map(node => {
+            if (node.id !== bcNodeId) return node;
+            if (bcValue === null || bcValue === undefined || bcValue === '') {
+              const { barColor: _drop, ...restData } = node.data as Record<string, unknown>;
+              void _drop;
+              return { ...node, data: restData };
+            }
+            return { ...node, data: { ...node.data, barColor: bcValue } };
+          }));
+          respond({ success: true });
+          break;
+        }
+
         case 'set_code_collapsed': {
           pushHistory();
           const ccNodeId = msg.node_id as string;

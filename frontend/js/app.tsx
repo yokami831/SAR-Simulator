@@ -25,6 +25,7 @@ import { setNodesRef, setAddBlockCallback, resetNodeIdCounter, fetchBlockData, g
 import { BlockLibrarySidebar } from './components/BlockLibrarySidebar.js';
 import { CanvasNode, ContextMenu, Tooltip, HighlightRing } from './components.js';
 import { SubgraphNode } from './subgraph.js';
+import { GradientEdge } from './edges/GradientEdge.js';
 import { rcConfirmSave, rcStyleEditor } from './modal.js';
 import type { StyleField } from './modal.js';
 import { BookmarkBar } from './bookmarkBar.js';
@@ -57,7 +58,7 @@ registerToolbarComponent('flow', FlowToolbar as any);
 
 // ===== Node & Edge Types Registration =====
 const nodeTypes = { canvasNode: CanvasNode, subgraph: SubgraphNode };
-const edgeTypes = {};
+const edgeTypes = { rateEdge: GradientEdge };
 
 // ===== Initial Empty Canvas =====
 
@@ -91,6 +92,7 @@ function App() {
     collapsed?: boolean;
     nodeLabel?: string;
     nodeDescription?: string;
+    barColor?: string;
   }
   interface TooltipEntry {
     nodeId: string;
@@ -363,6 +365,46 @@ function App() {
       if (n.id !== nodeId) return n;
       const d = n.data as { defaultParameters?: Record<string, string> };
       return { ...n, data: { ...n.data, defaultParameters: { ...(d.defaultParameters || {}), ...result } } };
+    }));
+  }, [setNodes]);
+
+  // Per-node bar color: opens a native <input type="color"> picker positioned
+  // off-screen, applies the chosen color to node.data.barColor. The CSS
+  // custom property --cat-color is overridden inline on the .grc-block div
+  // (see RegularBlockNode), so the 6px sidebar + exec-state borders all
+  // follow the new color automatically.
+  const handleSetBarColor = useCallback((nodeId: string) => {
+    const node = rfInstance.current?.getNode(nodeId);
+    const current = (node?.data as { barColor?: string } | undefined)?.barColor || '#a855f7';
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = current;
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    input.style.opacity = '0';
+    input.style.pointerEvents = 'none';
+    document.body.appendChild(input);
+    const cleanup = () => {
+      if (input.parentNode) input.parentNode.removeChild(input);
+    };
+    input.addEventListener('change', () => {
+      const v = input.value;
+      setNodes((nds) => nds.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, barColor: v } } : n
+      ));
+      cleanup();
+    });
+    input.addEventListener('blur', cleanup, { once: true });
+    input.click();
+  }, [setNodes]);
+
+  const handleResetBarColor = useCallback((nodeId: string) => {
+    setNodes((nds) => nds.map((n) => {
+      if (n.id !== nodeId) return n;
+      const data = n.data as Record<string, unknown>;
+      const { barColor: _drop, ...rest } = data;
+      void _drop;
+      return { ...n, data: rest };
     }));
   }, [setNodes]);
 
@@ -806,6 +848,7 @@ function App() {
       collapsed: node.data?.collapsed as boolean | undefined,
       nodeLabel: node.data?.label as string | undefined,
       nodeDescription: node.data?.description as string | undefined,
+      barColor: node.data?.barColor as string | undefined,
     });
   }, [wasRightDrag]);
 
@@ -1069,6 +1112,8 @@ function App() {
       onSetDescription: setSubgraphDescription,
       onCreateSubgraph: createSubgraph,
       onEditStyle,
+      onSetBarColor: handleSetBarColor,
+      onResetBarColor: handleResetBarColor,
     })
   );
 }

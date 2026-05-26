@@ -81,18 +81,18 @@
   --white-alpha-40:   rgba(255, 255, 255, 0.4);
 
   /* === Block Type Colors === */
-  --block-source:         #4caf50;
+  --block-source:         #22c55e;
   --block-source-text:    #1b5e20;
-  --block-processing:     #2196f3;
+  --block-processing:     #22d3ee;
   --block-processing-text:#0d47a1;
-  --block-sink:           #f44336;
+  --block-sink:           #ec4899;
   --block-sink-text:      #b71c1c;
-  --block-gui:            #9c27b0;
+  --block-gui:            #f59e0b;
   --block-gui-text:       #4a148c;
-  --block-utility:        #ffc107;
+  --block-utility:        #06b6d4;
   --block-utility-text:   #6d4c00;
-  --block-hdl-start:      #ff8c00;
-  --block-hdl-end:        #ff6b00;
+  --block-hdl-start:      #fb923c;
+  --block-hdl-end:        #f97316;
   --block-hdl-text:       #7a3300;
 
   /* === Port Type Colors === */
