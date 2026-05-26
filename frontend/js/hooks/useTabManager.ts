@@ -11,7 +11,7 @@ import { consoleLog } from '../backend.js';
 import { resetNodeIdCounter } from '../blockLibraryData.js';
 import { DELAY_RESIZE_EVENT } from '../constants.js';
 import { initGlobalChat } from '../chat.js';
-import { rcNewFlow, rcConfirmSave } from '../modal.js';
+import { rcNewFlow, rcConfirmSave, rcAlert } from '../modal.js';
 import { createTabState, computeMaxNodeId } from '../utils.js';
 import type { TabInstance, TabState } from '../types.js';
 import { getTabType } from '../tabRegistry.js';
@@ -172,6 +172,20 @@ export function useTabManager({
       const resp = await fetch(`/api/workspaces/${filename}`);
       if (!resp.ok) throw new Error('Failed to load workspace');
       const wsData = await resp.json();
+      // Notify user if the flow references blocks not in the registry. The
+      // flow still opens (shim nodes preserve structure); the user can copy
+      // the missing JSON files into <workspace>/blocks/ and reload.
+      const missing = wsData._missing_blocks as Array<{ type: string; count: number }> | undefined;
+      if (missing && missing.length > 0) {
+        const summary = missing.map(m => `${m.type} (${m.count})`).join(', ');
+        consoleLog('error', `Workspace "${filename}" uses unknown block types: ${summary}`, '', 'file');
+        rcAlert(
+          `このフローには次のブロック定義が見つかりません:\n\n${summary}\n\n` +
+          `元のworkspaceから <workspace>/blocks/<id>.json を該当ファイルにコピーして再読み込みしてください。\n` +
+          `不足ブロックはグレー枠で表示され、フロー実行は中断されます。`,
+          { title: '不足ブロックがあります' },
+        );
+      }
       const tabId = `tab-${Date.now()}`;
       const newTab: TabInstance = {
         id: tabId,

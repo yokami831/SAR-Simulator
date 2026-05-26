@@ -550,6 +550,22 @@ button, a, [role="button"] { cursor: pointer; }
   position: absolute !important;
 }
 
+/* Shim node: block definition is missing from the registry */
+.grc-block.shim {
+  background: #4a3a3a;
+  border: 2px dashed #c97070;
+  opacity: 0.85;
+}
+.grc-shim-warning {
+  background: #c97070;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.75em;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
 /* Code textarea area (Jupyter-style) */
 .grc-code-area {
   width: 100%; min-height: 60px; max-height: 540px; padding: 6px 8px;

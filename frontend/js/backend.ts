@@ -227,6 +227,18 @@ function _doConnect(): void {
       return;
     }
 
+    // Block definitions changed (e.g. workspace switch loaded different blocks/)
+    if (msg.type === 'blocks_changed') {
+      consoleLog('info', `Block definitions changed (source: ${msg.source || 'unknown'}). Reloading library.`);
+      // Dynamic import to avoid circular dependency with blockLibraryData.ts
+      import('./blockLibraryData').then(mod => {
+        mod.fetchBlockData().catch(e => {
+          consoleLog('error', 'Failed to reload block library after blocks_changed', String(e));
+        });
+      });
+      return;
+    }
+
     // Node execution status (from flow_executor via tools.py)
     if (msg.type === 'node_execution_status') {
       if (_nodeExecutionHandler) _nodeExecutionHandler(msg);

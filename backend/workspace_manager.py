@@ -271,6 +271,11 @@ def create_workspace(workspace_type: str, title: str, description: str = "", fol
 def load_workspace(filename: str) -> dict:
     """Load a workspace's full data.
 
+    For flow workspaces, scans canvas.nodes for unknown block types
+    (i.e. types not in block_registry) and attaches `_missing_blocks`
+    describing what needs to be supplied. Frontend uses this to render
+    shim nodes and show a notification banner.
+
     Raises:
         FileNotFoundError: If workspace file doesn't exist.
         ValueError: If file is invalid JSON.
@@ -286,7 +291,66 @@ def load_workspace(filename: str) -> dict:
 
     data["filename"] = filename
     data["path"] = str(filepath)
+
+    # Only flow workspaces have block-typed nodes
+    if data.get("type", "flow") == "flow":
+        data["_missing_blocks"] = _detect_missing_blocks(data)
+
     return data
+
+
+def _detect_missing_blocks(data: dict) -> list[dict]:
+    """Scan flow nodes for block types not registered in block_registry.
+
+    Returns a list of {type, count, node_ids}. Empty list if all blocks
+    resolve. Logs a warning + narrator event when any are missing.
+    """
+    from backend import block_registry
+
+    nodes = ((data.get("canvas") or {}).get("nodes")) or []
+    # Special node types that have no backing block definition
+    SKIP_REACT_FLOW_TYPES = {"subgraph", "group", "groupSpec"}
+
+    missing: dict[str, list[str]] = {}
+    for n in nodes:
+        if not isinstance(n, dict):
+            continue
+        # React Flow's outer type (canvasNode for normal blocks, or subgraph etc.)
+        rf_type = n.get("type")
+        if rf_type in SKIP_REACT_FLOW_TYPES:
+            continue
+        # The real block id lives in data.blockType for canvasNode wrappers.
+        block_type = ((n.get("data") or {}).get("blockType")) or rf_type
+        if not block_type or block_type in SKIP_REACT_FLOW_TYPES:
+            continue
+        if block_registry.get_block(block_type) is None:
+            missing.setdefault(block_type, []).append(n.get("id", "?"))
+
+    if not missing:
+        return []
+
+    result = [
+        {"type": t, "count": len(ids), "node_ids": ids}
+        for t, ids in sorted(missing.items())
+    ]
+    logger.warning(
+        "Flow %s has %d missing block type(s): %s",
+        data.get("filename"), len(result), [r["type"] for r in result],
+    )
+    try:
+        from backend import narrator
+        narrator.emit(
+            "FLOW",
+            "FLOW_LOAD_WARNING",
+            {
+                "filename": data.get("filename"),
+                "missing_blocks": [r["type"] for r in result],
+            },
+        )
+    except Exception:
+        # Narrator is best-effort observability; never block a load
+        pass
+    return result
 
 
 def save_workspace(filename: str, data: dict) -> dict:

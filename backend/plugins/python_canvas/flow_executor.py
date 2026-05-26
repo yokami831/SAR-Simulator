@@ -97,6 +97,43 @@ class FlowExecutor:
             self._running = False
             return {"status": "completed", "node_results": {}, "total_time": 0.0}
 
+        # Refuse to execute flows containing unknown block types (shim nodes).
+        # Mid-flight discovery of a missing block would corrupt downstream
+        # state; we surface it up-front so the user can copy the missing
+        # JSON into <workspace>/blocks/ and try again.
+        from backend import block_registry
+        missing_ids: dict[str, list[str]] = {}
+        for n in nodes:
+            bt = self._get_block_type(n)
+            if not bt or bt in ("subgraph", "group", "groupSpec", "comment"):
+                continue
+            if block_registry.get_block(bt) is None:
+                missing_ids.setdefault(bt, []).append(n.get("id", "?"))
+        if missing_ids:
+            self._running = False
+            summary = ", ".join(f"{bt}({len(ids)})" for bt, ids in sorted(missing_ids.items()))
+            err_msg = (
+                "Flow contains unknown block types: " + summary
+                + ". Copy the missing block JSON file(s) into <workspace>/blocks/ "
+                "and reload, then retry."
+            )
+            logger.error(err_msg)
+            from backend import narrator as _narrator
+            _narrator.emit("FLOW", "FLOW_LOAD_WARNING", {
+                "missing_blocks": list(missing_ids.keys()),
+                "stage": "pre_execute",
+            })
+            return {
+                "status": "error",
+                "node_results": {},
+                "total_time": 0.0,
+                "error": err_msg,
+                "missing_blocks": [
+                    {"type": t, "count": len(ids), "node_ids": ids}
+                    for t, ids in sorted(missing_ids.items())
+                ],
+            }
+
         try:
             # Start kernel
             await self._kernel.start(cwd=workspace_path)

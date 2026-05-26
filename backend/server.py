@@ -62,14 +62,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from backend.plugins.python_canvas.plugin import PythonCanvasPlugin
     from backend import block_registry
 
-    # Register Python Canvas block directory
+    # Register Python Canvas block directory (Tier 1+2: builtin + plugin user)
     _python_blocks_dir = Path(__file__).parent / "plugins" / "python_canvas" / "blocks"
-    block_registry.register_block_dir(_python_blocks_dir)
+    block_registry.register_plugin_block_dir(_python_blocks_dir)
 
     # Apply feature flag filtering to block registry
     features = get_feature_flags()
     if not features.get("fpga"):
         block_registry.set_excluded_categories(["hdl"])
+
+    # Tier 3: workspace-scoped blocks at <workspaces_dir>/blocks/
+    _ws_blocks_dir = get_workspaces_dir() / "blocks"
+    block_registry.set_workspace_blocks_dir(_ws_blocks_dir if _ws_blocks_dir.is_dir() else None)
 
     # Create and register Python Canvas plugin
     _python_plugin = PythonCanvasPlugin(
@@ -217,6 +221,18 @@ async def set_workspaces_dir_endpoint(req: dict) -> JSONResponse:
         return JSONResponse(status_code=400, content={"error": f"Directory not found: {new_path}"})
 
     set_workspaces_dir(p)
+
+    # Re-bind the workspace-scoped block tier to the new dir
+    from backend import block_registry
+    new_blocks_dir = p / "blocks"
+    block_registry.set_workspace_blocks_dir(new_blocks_dir if new_blocks_dir.is_dir() else None)
+
+    # Notify connected frontends so they re-fetch /api/blocks
+    await tools._ws_broadcast({
+        "type": "blocks_changed",
+        "source": "workspace_switch",
+        "path": str(p),
+    })
 
     # Persist to app-config.json (project root, not workspace folder)
     cfg = read_app_config()

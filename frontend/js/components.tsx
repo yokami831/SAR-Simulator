@@ -641,6 +641,11 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
   }, [id, codeCollapsed]);
 
   const blockDef = blockType ? getBlockDef(blockType) : null;
+  // Shim mode: the .rcflow references a block type that is not registered.
+  // We still render the node (so edges + structure stay intact) but mark it
+  // visually and disable execution. Ports come from the node's own saved
+  // data.inputs/outputs (the registry definition is unavailable).
+  const isShim = !!blockType && !blockDef && blockType !== 'python_code' && blockType !== 'comment';
   // gui_widget is a static block attribute — take it from the block definition
   // (survives save/load), falling back to any value stored on the node.
   const guiWidget = (blockDef?.gui_widget ?? data.gui_widget) as GuiWidgetDef | undefined;
@@ -693,10 +698,11 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
 
   return (
     <div
-      className={`grc-block ${category || ''}${!isEnabled ? ' disabled' : ''}${executionStatus ? ` exec-${executionStatus}` : ''}`}
+      className={`grc-block ${category || ''}${!isEnabled ? ' disabled' : ''}${executionStatus ? ` exec-${executionStatus}` : ''}${isShim ? ' shim' : ''}`}
       data-role="canvas-node"
       data-node-id={id}
       data-block-type={blockTypeStr}
+      title={isShim ? `Missing block definition: ${blockType}. Copy ${blockType}.json into <workspace>/blocks/ and reload.` : undefined}
     >
       <NodeResizer minWidth={NODE_MIN_WIDTH} minHeight={NODE_COMPACT_HEIGHT} isVisible={selected} color={NODE_RESIZER_COLOR} />
 
@@ -731,6 +737,9 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
           <span className="grc-exec-order" title="Execution order in the last run">
             {data.executionOrder as number}
           </span>
+        )}
+        {isShim && (
+          <span className="grc-shim-warning" title={`Missing block: ${blockType}`}>⚠ missing: {blockType}</span>
         )}
         <EditableLabel value={currentParams.label || label || ''} onChange={(v) => onParamChange('label', v)} />
         <span className="grc-header-id">{id}</span>

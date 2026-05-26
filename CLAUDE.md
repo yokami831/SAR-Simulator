@@ -213,6 +213,59 @@ tests/
 - **CDP (Chrome DevTools Protocol)**: WebSocketでは実現できない操作のみ（例: screenshot = ブラウザ画面キャプチャ）
 - 新規操作を追加する際はまずWebSocketで実現可能か検討し、不可能な場合のみCDPを使う
 
+## Block Definition System (3層構成) (IMPORTANT)
+
+ブロック定義の置き場所は **3層** に分かれている。**新規ブロックを追加する/既存ブロックを動かすときは必ずこの優先順位に従うこと。**
+
+| 層 | 場所 | 役割 | 例 |
+|----|------|------|-----|
+| 1. Built-in | `backend/plugins/python_canvas/blocks/_builtin/` | HiyoCanvas本体の土台。**触らない** | `python_code`, `comment`, `gui_slider`, `gui_dropdown`, … |
+| 2. Global Library (汎用テンプレ) | `backend/plugins/python_canvas/blocks/user/` | プロジェクトを跨いで使う汎用ブロック | `csv_reader`, `http_request`, `plot_chart`, `timer`, `data_filter`, `sdf_3d_*` |
+| 3. Workspace-scoped | `<workspaces_dir>/blocks/*.json` | そのワークスペース専用のブロック | `workspace-SAR-SIM/blocks/sar_visualizer.json`, `workspace-FPGA-HIL/blocks/hil_*.json` |
+
+### ロード順と優先順位
+
+`_builtin → plugin user → workspace` の順でロード、**同IDがあれば後勝ち + WARNING ログ**。
+つまり workspace > plugin user > _builtin。 workspaceでカスタマイズすれば global を上書きできる。
+
+### ワークスペース切替時の挙動
+
+`workspaces_dir` を切り替えると、 backend が自動的に旧 workspace の `blocks/` をアンロード、新 workspace の `blocks/` をロードする。同時に WebSocket で `blocks_changed` をフロントへ通知し、ブロックライブラリパネルが再フェッチされる。
+
+### 新規ブロックをどこに置くか判断
+
+- そのブロックが **特定ワークスペース固有** (SAR専用、HIL専用) → **`<該当workspace>/blocks/` に置く** ← **デフォルトはこれ**
+- 複数プロジェクトで汎用的に再利用したい (CSV読み込みのような) → `backend/plugins/python_canvas/blocks/user/` に置く
+- HiyoCanvas本体の土台機能 → `_builtin/` (ほぼ追加することはない)
+
+**判断に迷う場合は workspace 配下に置く。** あとから global に「昇格」させる方が、global を汚染してから戻すより安全。
+
+### `register_block` API のデフォルト保存先
+
+`POST /api/tools/register_block` で動的にブロックを追加するとき:
+- デフォルト (`scope:"auto"` または未指定): **active workspace の `blocks/` に保存**
+- `scope:"global"` 明示時のみ `plugin/blocks/user/` に保存
+- `scope:"workspace"` で workspace 強制 (未設定ならエラー)
+
+### 未知ブロックの扱い
+
+`.rcflow` を開いたときに使用ブロックが registry に見つからない場合:
+- **flow 自体は開ける** (shimブロック = 灰色プレースホルダで表示)
+- **不足ブロック名がバナーで明示通知**される
+- **実行は中断**される (中途半端な実行を防ぐ)
+- 復旧手順: 元 workspace から該当 `.json` を該当 workspace の `blocks/` フォルダにコピー → リロード
+
+### ⚠️ ファイル配布時の注意
+
+ワークスペースを誰かに渡す/別フォルダにコピーする時は、 **必ず `<workspace>/blocks/` フォルダごと**コピーすること。 `.rcflow` 単体ではブロック定義は付いてこない (定義埋め込みは行わない設計)。
+
+### ⚠️ やってはいけないこと
+
+- ❌ workspace 専用のブロックを `plugin/blocks/user/` (global) に置く — 他プロジェクトに不要なブロックが混ざる
+- ❌ `.rcflow` ファイルにブロック定義を直接埋め込む — 真実の源が分裂し、同期問題が発生する
+- ❌ `register_block` で global を上書きする — workspace スコープを明示すること
+- ❌ `<workspace>/blocks/` のJSONファイル名と `id` フィールドを不一致にする — ロード時の確認に使う
+
 ## Coding Conventions
 
 ### 共通関数・ヘルパーの置き場所 (CRITICAL)
