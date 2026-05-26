@@ -4,10 +4,10 @@
   "title": "SAR-Simulator-FPGA2",
   "description": "",
   "created": "2026-05-26T07:53:12.642190+00:00",
-  "modified": "2026-05-26T11:02:58.409541+00:00",
+  "modified": "2026-05-26T11:28:35.319317+00:00",
   "canvas": {
     "name": "flowgraph",
-    "savedAt": "2026-05-26T11:02:58.407Z",
+    "savedAt": "2026-05-26T11:28:35.312Z",
     "nodes": [
       {
         "id": "n1",
@@ -40,6 +40,7 @@
             "label": "Common Parameters",
             "spec": "Shared SAR system parameters (TerraSAR-X reference, X-band).\nBound once here and read by every downstream block via the shared kernel namespace.\n\nReal values (full-res spec):\n- fc 9.65 GHz, B 600 MHz, Tp 30 us, Fs 720 MHz (1.2*B), PRF 4 kHz\n- H 514 km, V 7600 m/s, look 25 deg, La 4.8 m\n\nSimulation note: this PoC lowers B/Fs 10x and Tp 3x so the grid stays browser-tractable; geometry params unchanged."
           },
+          "enabled": false,
           "codeCollapsed": true
         }
       },
@@ -70,7 +71,7 @@
             }
           ],
           "defaultParameters": {
-            "code": "# ---- Derived quantities ----\nlam     = c / fc                 # wavelength [m]\nKr      = B / Tp                 # chirp rate [Hz/s]\nR0      = H / np.cos(look)       # T1 slant range [m]\ntheta_a = lam / La               # first-null beamwidth [rad]\naz_foot = theta_a * R0           # azimuth footprint [m]\n\n# ---- Range grid ----\nt_r_center = 2 * R0 / c\ndt_r = 1 / Fs\n# Receive window half-width in TIME. Two-way propagation: a target at\n# slant-range offset R_half returns at round-trip delay 2*R_half/c, so the\n# window half-width is 2*R_half/c. (Was R_half/c — one-way — which made the\n# range axis reach only R_half/2 + extras, e.g. R_half=3000 -> +/-2549 m.)\n# A small 5% guard band keeps targets at +/-R_half clear of the NUFFT fold\n# edge. Range axis spans +/- 1.05*R_half (proportional, e.g. 3000 -> 3150).\nRANGE_GUARD = 1.05\nt_r_half_window = 2 * R_half / c * RANGE_GUARD\nNr = int(np.ceil(2 * t_r_half_window / dt_r));  Nr += Nr % 2\nt_r = t_r_center + (np.arange(Nr) - Nr // 2) * dt_r\n\n# ---- Azimuth grid ----\naz_extent = 300.0 + az_foot / 2 + 200.0\nNa = int(np.ceil(2 * az_extent / V * PRF));  Na += Na % 2\neta = (np.arange(Na) - Na // 2) / PRF\naz_pos = V * eta\n\n# ---- Transmit reference chirp (baseband), centered at t=0 ----\nt_ref = (np.arange(Nr) - Nr // 2) * dt_r\nref_chirp = ((np.abs(t_ref) <= Tp/2).astype(np.float32)\n             * np.exp(1j * np.pi * Kr * t_ref**2)).astype(np.complex64)\nprint('Kr=%.3e Hz/s  R0=%.1f km  grid Nr=%d Na=%d' % (Kr, R0/1e3, Nr, Na))",
+            "code": "import numpy as np\nfrom scipy.constants import c\n\n# ---- Derived quantities ----\nlam     = c / fc                 # wavelength [m]\nKr      = B / Tp                 # chirp rate [Hz/s]\nR0      = H / np.cos(look)       # T1 slant range [m]\ntheta_a = lam / La               # first-null beamwidth [rad]\naz_foot = theta_a * R0           # azimuth footprint [m]\n\n# ---- Range grid ----\nt_r_center = 2 * R0 / c\ndt_r = 1 / Fs\n# Receive window half-width in TIME. Two-way propagation: a target at\n# slant-range offset R_half returns at round-trip delay 2*R_half/c, so the\n# window half-width is 2*R_half/c. (Was R_half/c — one-way — which made the\n# range axis reach only R_half/2 + extras, e.g. R_half=3000 -> +/-2549 m.)\n# A small 5% guard band keeps targets at +/-R_half clear of the NUFFT fold\n# edge. Range axis spans +/- 1.05*R_half (proportional, e.g. 3000 -> 3150).\nRANGE_GUARD = 1.05\nt_r_half_window = 2 * R_half / c * RANGE_GUARD\nNr = int(np.ceil(2 * t_r_half_window / dt_r));  Nr += Nr % 2\nt_r = t_r_center + (np.arange(Nr) - Nr // 2) * dt_r\n\n# ---- Azimuth grid ----\naz_extent = 300.0 + az_foot / 2 + 200.0\nNa = int(np.ceil(2 * az_extent / V * PRF));  Na += Na % 2\neta = (np.arange(Na) - Na // 2) / PRF\naz_pos = V * eta\n\n# ---- Transmit reference chirp (baseband), centered at t=0 ----\nt_ref = (np.arange(Nr) - Nr // 2) * dt_r\nref_chirp = ((np.abs(t_ref) <= Tp/2).astype(np.float32)\n             * np.exp(1j * np.pi * Kr * t_ref**2)).astype(np.complex64)\nprint('Kr=%.3e Hz/s  R0=%.1f km  grid Nr=%d Na=%d' % (Kr, R0/1e3, Nr, Na))\n",
             "label": "Generate chirp signal",
             "spec": "Generate the transmit linear-FM (chirp) pulse and the imaging grid.\n\nParameters (from mindmap):\n- Frequency: min/max  -> chirp sweeps fc-B/2 .. fc+B/2\n- Pulse width: Tp\n- PRF: pulse repetition frequency\n\nPhysics:\n- chirp rate  Kr = B/Tp\n- baseband chirp  s(t) = rect(|t|<=Tp/2) * exp(j*pi*Kr*t^2)\n- wavelength lam = c/fc, ref slant range R0 = H/cos(look)\n\nThis block also designs the range/azimuth sampling grid (Nr,Na,t_r,eta,az_pos) the echo will live on."
           },
@@ -1031,7 +1032,7 @@
             "var_name": "target_mode",
             "options_csv": "point,image",
             "label": "Target Mode",
-            "value": "image"
+            "value": "point"
           }
         }
       },
@@ -1490,7 +1491,7 @@
         "type": "canvasNode",
         "position": {
           "x": -488,
-          "y": 1625.717301627971
+          "y": 1650.717301627971
         },
         "width": 250,
         "data": {
@@ -1526,7 +1527,7 @@
         "type": "canvasNode",
         "position": {
           "x": -488,
-          "y": 1780
+          "y": 1796.717301627971
         },
         "width": 250,
         "data": {
@@ -1549,11 +1550,59 @@
           ],
           "defaultParameters": {
             "var_name": "g_lna_db",
-            "value": "110",
+            "value": "99",
             "min": "80",
             "max": "180",
             "step": "1",
             "label": "LNA Gain (dB)"
+          }
+        }
+      },
+      {
+        "id": "n54",
+        "type": "canvasNode",
+        "position": {
+          "x": -600,
+          "y": -50
+        },
+        "width": 780,
+        "height": 480,
+        "data": {
+          "label": "SAR Visualizer",
+          "category": "processing",
+          "blockType": "sar_visualizer",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "float"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "float"
+            }
+          ],
+          "defaultParameters": {
+            "altitude_km": "514",
+            "look_deg": "25",
+            "beam_az_deg": "0.5",
+            "beam_rg_deg": "2.0",
+            "antenna_la_m": "4.8",
+            "antenna_lr_m": "0.8",
+            "obs_mode": "stripmap",
+            "prf_hz": "4000",
+            "pulse_width_us": "10",
+            "bandwidth_mhz": "75",
+            "sampling_mhz": "90",
+            "range_swath_half_m": "4000",
+            "fc_ghz": "9.65",
+            "velocity_ms": "7600",
+            "chirp_dir": "up",
+            "label": "SAR Observation Geometry",
+            "timing_height": "167"
           }
         }
       }
