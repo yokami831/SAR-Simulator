@@ -1812,8 +1812,40 @@ select.grc-param-input { cursor: pointer; }
   margin-bottom: 2px;
   padding: 0 2px;
 }
+/* Compact 2-row layout: label on the left, value display on the right
+   (mirrors the SAR Visualizer's sarviz-row-head). */
+.gui-form-field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+  padding: 0 2px;
+}
+.gui-form-field-label-row .gui-form-field-label {
+  margin-bottom: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+}
+.gui-form-field-value {
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 11px;
+  color: var(--accent-blue);
+  opacity: 0.9;
+}
+.gui-form-field-label-row .gui-slider-number {
+  width: 60px;
+  padding: 1px 4px;
+  font-size: 11px;
+}
 .gui-form-field .gui-widget-body {
   padding: 2px 0;
+}
+/* Slider inside gui_form: drop the inner column gap since compact mode
+   has no labels/value rows anyway. */
+.gui-form-field .gui-slider-container {
+  gap: 0;
 }
 
 .gui-widget-var-row {

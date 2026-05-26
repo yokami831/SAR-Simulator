@@ -238,9 +238,10 @@ function ErrorDisplay({ error }: { error: string }) {
 // and assigned to kernel variables only during flow execution (topological order).
 // There is no out-of-band immediate-send to the kernel.
 
-function GuiTextInput({ params, onParamChange }: {
+function GuiTextInput({ params, onParamChange, compact }: {
   params: Record<string, string>;
   onParamChange: (id: string, val: string) => void;
+  compact?: boolean;
 }) {
   return (
     <div className="gui-widget-body nodrag nopan nowheel">
@@ -248,14 +249,15 @@ function GuiTextInput({ params, onParamChange }: {
         onChange={(e) => onParamChange('value', e.target.value)}
         onKeyDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}
         placeholder={params.placeholder || 'Enter text here...'} rows={4} />
-      {params.var_name && <div className="gui-value-row"><span className="gui-value-varname">{params.var_name}</span></div>}
+      {!compact && params.var_name && <div className="gui-value-row"><span className="gui-value-varname">{params.var_name}</span></div>}
     </div>
   );
 }
 
-function GuiSlider({ params, onParamChange }: {
+function GuiSlider({ params, onParamChange, compact }: {
   params: Record<string, string>;
   onParamChange: (id: string, val: string) => void;
+  compact?: boolean;
 }) {
   // Optional discrete snap targets (CSV, e.g. "1,2,4,8,16"). When present the
   // slider moves freely but every committed value snaps to the nearest entry,
@@ -280,23 +282,26 @@ function GuiSlider({ params, onParamChange }: {
   return (
     <div className="gui-widget-body nodrag nopan nowheel">
       <div className="gui-slider-container">
-        <div className="gui-slider-labels"><span>{min}</span><span>{max}</span></div>
+        {!compact && <div className="gui-slider-labels"><span>{min}</span><span>{max}</span></div>}
         <input type="range" className="gui-slider nodrag nopan" min={min} max={max} step={step} value={value}
           onChange={(e) => handleChange(parseFloat(e.target.value))} />
-        <div className="gui-value-row">
-          {params.var_name && <span className="gui-value-varname">{params.var_name}</span>}
-          <input type="number" className="gui-slider-number nodrag nopan" min={min} max={max} step={step} value={value}
-            onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) handleChange(v); }}
-            onKeyDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} />
-        </div>
+        {!compact && (
+          <div className="gui-value-row">
+            {params.var_name && <span className="gui-value-varname">{params.var_name}</span>}
+            <input type="number" className="gui-slider-number nodrag nopan" min={min} max={max} step={step} value={value}
+              onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) handleChange(v); }}
+              onKeyDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function GuiDropdown({ params, onParamChange }: {
+function GuiDropdown({ params, onParamChange, compact }: {
   params: Record<string, string>;
   onParamChange: (id: string, val: string) => void;
+  compact?: boolean;
 }) {
   const options = (params.options_csv || '').split(',').map(s => s.trim()).filter(Boolean);
 
@@ -307,14 +312,15 @@ function GuiDropdown({ params, onParamChange }: {
         <option value="">-- select --</option>
         {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
       </select>
-      {params.var_name && <div className="gui-value-row"><span className="gui-value-varname">{params.var_name}</span></div>}
+      {!compact && params.var_name && <div className="gui-value-row"><span className="gui-value-varname">{params.var_name}</span></div>}
     </div>
   );
 }
 
-function GuiToggle({ params, onParamChange }: {
+function GuiToggle({ params, onParamChange, compact }: {
   params: Record<string, string>;
   onParamChange: (id: string, val: string) => void;
+  compact?: boolean;
 }) {
   const isOn = params.value === 'true' || params.value === 'True';
 
@@ -331,14 +337,15 @@ function GuiToggle({ params, onParamChange }: {
         </div>
         <span className="gui-toggle-label-text">{params.label_on || 'ON'}</span>
       </div>
-      {params.var_name && <div className="gui-value-row"><span className="gui-value-varname">{params.var_name}</span></div>}
+      {!compact && params.var_name && <div className="gui-value-row"><span className="gui-value-varname">{params.var_name}</span></div>}
     </div>
   );
 }
 
-function GuiFilePicker({ params, onParamChange }: {
+function GuiFilePicker({ params, onParamChange, compact }: {
   params: Record<string, string>;
   onParamChange: (id: string, val: string) => void;
+  compact?: boolean;
 }) {
   const handleBrowse = useCallback(async () => {
     try {
@@ -366,7 +373,7 @@ function GuiFilePicker({ params, onParamChange }: {
           placeholder="Select a file..." />
         <button className="gui-file-browse-btn nodrag nopan" onClick={handleBrowse}>Browse...</button>
       </div>
-      {params.var_name && <div className="gui-value-row"><span className="gui-value-varname">{params.var_name}</span></div>}
+      {!compact && params.var_name && <div className="gui-value-row"><span className="gui-value-varname">{params.var_name}</span></div>}
     </div>
   );
 }
@@ -489,17 +496,43 @@ function GuiFormBody({ fields, params, onParamChange }: {
 
         let inner: React.ReactNode;
         switch (widget) {
-          case 'slider':      inner = <GuiSlider     params={fieldParams} onParamChange={onChildChange} />; break;
-          case 'dropdown':    inner = <GuiDropdown   params={fieldParams} onParamChange={onChildChange} />; break;
-          case 'toggle':      inner = <GuiToggle     params={fieldParams} onParamChange={onChildChange} />; break;
-          case 'file_picker': inner = <GuiFilePicker params={fieldParams} onParamChange={onChildChange} />; break;
-          case 'text_input':  inner = <GuiTextInput  params={fieldParams} onParamChange={onChildChange} />; break;
+          case 'slider':      inner = <GuiSlider     params={fieldParams} onParamChange={onChildChange} compact />; break;
+          case 'dropdown':    inner = <GuiDropdown   params={fieldParams} onParamChange={onChildChange} compact />; break;
+          case 'toggle':      inner = <GuiToggle     params={fieldParams} onParamChange={onChildChange} compact />; break;
+          case 'file_picker': inner = <GuiFilePicker params={fieldParams} onParamChange={onChildChange} compact />; break;
+          case 'text_input':  inner = <GuiTextInput  params={fieldParams} onParamChange={onChildChange} compact />; break;
           default: inner = <div>Unknown widget: {widget}</div>;
+        }
+
+        // Compact 2-row layout (SAR Visualizer style): label on the left of
+        // row 1, current value (read-only display, or a number input for
+        // sliders so precise values are still editable) on the right.
+        // Row 2 is the control itself with var_name/min-max/number-input
+        // stripped (via compact prop on inner widget).
+        const valStr = currentValues[field.id] ?? '';
+        let valueDisplay: React.ReactNode = null;
+        if (widget === 'slider') {
+          const minN = parseFloat(field.min ?? '') || 0;
+          const maxN = parseFloat(field.max ?? '') || 100;
+          const stepN = parseFloat(field.step ?? '') || 1;
+          valueDisplay = (
+            <input type="number" className="gui-slider-number nodrag nopan" min={minN} max={maxN} step={stepN}
+              value={valStr}
+              onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onParamChange(field.id, String(v)); }}
+              onKeyDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} />
+          );
+        } else if (widget !== 'toggle' && widget !== 'file_picker' && widget !== 'text_input') {
+          valueDisplay = <span className="gui-form-field-value">{valStr}</span>;
         }
 
         return (
           <div key={field.id} className="gui-form-field">
-            {field.label && <div className="gui-form-field-label">{field.label}</div>}
+            {(field.label || valueDisplay) && (
+              <div className="gui-form-field-label-row">
+                <span className="gui-form-field-label">{field.label}</span>
+                {valueDisplay}
+              </div>
+            )}
             {inner}
           </div>
         );
