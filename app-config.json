@@ -2,6 +2,6 @@
   "lastWorkspacesDir": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM",
   "features": {
     "fpga": false,
-    "rina": true
+    "rina": false
   }
 }
