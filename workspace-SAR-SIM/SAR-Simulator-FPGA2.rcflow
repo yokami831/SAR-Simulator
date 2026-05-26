@@ -4,19 +4,16 @@
   "title": "SAR-Simulator-FPGA2",
   "description": "",
   "created": "2026-05-26T07:53:12.642190+00:00",
-  "modified": "2026-05-26T11:28:35.319317+00:00",
+  "modified": "2026-05-26T11:34:23.650366+00:00",
   "canvas": {
-    "name": "flowgraph",
-    "savedAt": "2026-05-26T11:28:35.312Z",
     "nodes": [
       {
         "id": "n1",
         "type": "canvasNode",
         "position": {
-          "x": 43.29032258064515,
-          "y": 382.4434996482545
+          "x": 118.17077150726453,
+          "y": -406.9212327865245
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -40,9 +37,11 @@
             "label": "Common Parameters",
             "spec": "Shared SAR system parameters (TerraSAR-X reference, X-band).\nBound once here and read by every downstream block via the shared kernel namespace.\n\nReal values (full-res spec):\n- fc 9.65 GHz, B 600 MHz, Tp 30 us, Fs 720 MHz (1.2*B), PRF 4 kHz\n- H 514 km, V 7600 m/s, look 25 deg, La 4.8 m\n\nSimulation note: this PoC lowers B/Fs 10x and Tp 3x so the grid stays browser-tractable; geometry params unchanged."
           },
-          "enabled": false,
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "enabled": false
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n2",
@@ -51,7 +50,6 @@
           "x": 517.2533573264079,
           "y": -11.33625912520529
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -75,8 +73,11 @@
             "label": "Generate chirp signal",
             "spec": "Generate the transmit linear-FM (chirp) pulse and the imaging grid.\n\nParameters (from mindmap):\n- Frequency: min/max  -> chirp sweeps fc-B/2 .. fc+B/2\n- Pulse width: Tp\n- PRF: pulse repetition frequency\n\nPhysics:\n- chirp rate  Kr = B/Tp\n- baseband chirp  s(t) = rect(|t|<=Tp/2) * exp(j*pi*Kr*t^2)\n- wavelength lam = c/fc, ref slant range R0 = H/cos(look)\n\nThis block also designs the range/azimuth sampling grid (Nr,Na,t_r,eta,az_pos) the echo will live on."
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 19
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n3",
@@ -85,7 +86,6 @@
           "x": 1021.7200005608117,
           "y": 75.75599801846501
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -109,8 +109,11 @@
             "label": "UpConvert",
             "spec": "REAL HW: mixes the baseband chirp up to the RF carrier fc (CenterFrequency).\n\nSimulation: SKIPPED. The simulator works at baseband with R_eta phase carrying the carrier term (-4*pi*R/lam), so explicit up-conversion is not modeled. Placeholder block kept so the structure matches the real transmit chain."
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 20
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n4",
@@ -119,7 +122,6 @@
           "x": 1024.8599956069743,
           "y": 326.755998018465
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -143,8 +145,11 @@
             "label": "XPA",
             "spec": "REAL HW: high-power amplifier. Characteristics: saturation, noise floor (NF), frequency flatness.\n\nSimulation: SKIPPED (ideal linear amplification assumed). Placeholder for future refinement (e.g. add AM/AM saturation, NF)."
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 22
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n5",
@@ -153,7 +158,6 @@
           "x": 1031.1136753535654,
           "y": 518.755998018465
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -177,8 +181,11 @@
             "label": "RF-BPF",
             "spec": "REAL HW: RF band-pass filter. Characteristic: filter response shapes the transmit spectrum.\n\nSimulation: SKIPPED (ideal flat passband assumed). Placeholder for future refinement."
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 23
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n6",
@@ -187,7 +194,6 @@
           "x": 1591.4481321461037,
           "y": 66.49078550911027
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -211,8 +217,11 @@
             "label": "Antenna",
             "spec": "REAL HW: antenna pattern shapes the illumination. Characteristics (mindmap): range direction, azimuth direction, gain.\n\nSimulation: azimuth pattern modeled as normalized-sinc^2 with first null at the beamwidth theta_a:\n  pat(squint) = sinc(squint/theta_a)^2\nThis is a first-null beamwidth approximation (NOT 3 dB). Range-direction pattern and absolute gain are not modeled (relative pattern only)."
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 24
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n9",
@@ -221,7 +230,6 @@
           "x": 113.59353230894135,
           "y": 1816.0173193183614
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -244,8 +252,11 @@
             "code": "# (simulation: analog BPF not modeled; raw echo passed through)\npass",
             "label": "Analog BPF",
             "spec": "REAL HW (Receive): analog band-pass filter on the received echo before down-conversion. Selects the signal band, rejects out-of-band noise/interference.\n\nSimulation: SKIPPED (ideal — the raw echo is already band-limited). Placeholder so the structure matches the real receive chain."
-          }
-        }
+          },
+          "executionOrder": 28
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n10",
@@ -254,7 +265,6 @@
           "x": 116.09595350274219,
           "y": 2068.0173193183614
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -277,8 +287,11 @@
             "code": "# (simulation: down-conversion not modeled; baseband echo used directly)\npass",
             "label": "Downconvert",
             "spec": "REAL HW (Receive): mixes the received RF signal down to baseband (I/Q demodulation).\n\nSimulation: SKIPPED. The simulator already works at baseband (the echo phase carries -4*pi*R/lam directly), so explicit down-conversion is not modeled. Placeholder."
-          }
-        }
+          },
+          "executionOrder": 29
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n11",
@@ -287,7 +300,6 @@
           "x": 116.09595350274219,
           "y": 2320.0173193183614
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -310,8 +322,11 @@
             "code": "# (simulation: receive filtering not modeled)\npass",
             "label": "Filtering",
             "spec": "REAL HW (Receive): anti-alias / channel filtering after down-conversion.\n\nSimulation: SKIPPED (ideal). Placeholder for future refinement."
-          }
-        }
+          },
+          "executionOrder": 30
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n12",
@@ -320,7 +335,6 @@
           "x": 116.09595350274219,
           "y": 2572.0173193183614
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -343,8 +357,11 @@
             "code": "# (simulation: down-sampling not modeled; grid already at processing rate)\npass",
             "label": "Down sample & filter",
             "spec": "REAL HW (Receive): decimation to the processing sample rate with the matching anti-alias filter.\n\nSimulation: SKIPPED. The grid is already designed at Fs=1.2*B, so no resampling is modeled. Placeholder."
-          }
-        }
+          },
+          "executionOrder": 31
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n13",
@@ -353,7 +370,6 @@
           "x": 116.09595350274219,
           "y": 2824.0173193183614
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -376,8 +392,11 @@
             "code": "# (simulation: BAQ not modeled; full-precision s_raw kept)\npass",
             "label": "BAQ compression",
             "spec": "REAL HW (Receive): Block Adaptive Quantization — onboard lossy compression of the raw echo to save downlink bandwidth. Parameter: number of bits.\n\nSimulation: SKIPPED (full-precision complex64 kept). Placeholder; a future refinement could quantize s_raw to N bits/sample to study BAQ artifacts."
-          }
-        }
+          },
+          "executionOrder": 32
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n14",
@@ -386,7 +405,6 @@
           "x": 714.7787165463642,
           "y": 2096.9510393888813
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -410,8 +428,11 @@
             "label": "Range Compression",
             "spec": "PROCESSING (RDA step 1): compress each range line by matched filtering with the conjugate of the transmit chirp.\n\nPhysics:\n  H_range = conj( FFT( ifftshift(ref_chirp) ) )\n  s_rc = IFFT( FFT(s_raw, axis=range) * H_range )\nConcentrates each target's chirp smear into a sharp range peak."
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 33
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n15",
@@ -420,7 +441,6 @@
           "x": 1182.5562840177283,
           "y": 2477
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -444,8 +464,11 @@
             "label": "Azimuth FFT (Range-Doppler)",
             "spec": "PROCESSING (RDA step 2): FFT along azimuth (slow-time) to enter the Range-Doppler domain. Range axis is never shifted; azimuth is fftshift-ed so the Doppler axis is centered.\n\n  S_rd  = fftshift( FFT(s_rc, axis=azimuth) )\n  f_eta = fftshift( fftfreq(Na, 1/PRF) )   # Doppler axis"
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 34
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n16",
@@ -454,7 +477,6 @@
           "x": 1630.9735172615212,
           "y": 1982.2115243818807
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -478,8 +500,11 @@
             "label": "RCMC",
             "spec": "PROCESSING (RDA step 3): Range Cell Migration Correction. In the Range-Doppler domain a target's energy lies on a parabola across range cells; RCMC straightens it via a range-frequency phase shift.\n\n  delta_R = lam^2 * R0 * f_eta^2 / (8 V^2)   (narrow-beam)\n  shift   = exp(j 2pi f_r * 2 delta_R / c)\n  S_rd_rcmc = IFFT( FFT(S_rd, axis=range) * shift )"
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 35
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n17",
@@ -488,7 +513,6 @@
           "x": 2108.8720974586117,
           "y": 2089
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -512,8 +536,11 @@
             "label": "Azimuth Compression",
             "spec": "PROCESSING (RDA step 4): focus in azimuth with the conjugate azimuth matched filter, then inverse azimuth FFT -> focused complex image.\n\nMETHOD C (range-dependent azimuth FM rate). Each range column uses its own slant range R_col = R0 + range_offset, so its own Ka(r):\n  Ka(r) = 2 V^2 / (lam * R_col)            # per range column (Nr,)\n  H_az  = exp(-j pi f_eta^2 / Ka(r))       # 2-D (Na, Nr), conjugate, focuses at az=0\n  img   = IFFT( ifftshift( S_rd_rcmc * H_az ) )\n\nWhy: a single Ka fixed at R0 mis-focuses far-range targets once the swath is wide. Verified (verify_rcmc_swath_sweep.py): the range-independent filter mis-places corner targets by 1-2 azimuth cells from ~+-1 km swath; Ka(r) brings them back to 0. At narrow swath Ka(r) == single-Ka, so this is a safe always-on upgrade.\n\nNote on RCMC (n16): kept parabolic on purpose. The exact-hyperbolic dR was verified to make NO measurable difference even at B=600 MHz / +-2 km (R0 ~ 567 km geometry), so azimuth Ka(r) is the ONLY focusing fix that matters for wide swath; do not 'fix' the RCMC unless geometry changes drastically.\n\nResult: each point target collapses to its impulse response (IRF), correctly placed across the full swath."
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 36
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n18",
@@ -522,7 +549,6 @@
           "x": 2574.919043738965,
           "y": 1297.130104050218
         },
-        "width": 832,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -546,8 +572,11 @@
             "label": "Plot Focused Image",
             "spec": "Display-only: 3-D surface of the focused image |img| in dB (the final RDA output). Each point target should appear as a sharp peak (its impulse response / IRF). Interactive; Expand opens a large copy. Does not modify any physical array."
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 37
+        },
+        "width": 832,
+        "style": {}
       },
       {
         "id": "n19",
@@ -556,7 +585,6 @@
           "x": 681.0182097102215,
           "y": 1088.6531130425055
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -582,7 +610,8 @@
           },
           "enabled": false,
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n20",
@@ -591,7 +620,6 @@
           "x": 1126.4063171965938,
           "y": 1091.411949684278
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -617,7 +645,8 @@
           },
           "enabled": false,
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n21",
@@ -626,7 +655,6 @@
           "x": 1645.3812868104822,
           "y": 1066.9135980355052
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -652,7 +680,8 @@
           },
           "enabled": false,
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n23",
@@ -661,7 +690,6 @@
           "x": 2061.0352370935925,
           "y": -39.37473848662674
         },
-        "width": 250,
         "data": {
           "label": "Slider",
           "category": "gui",
@@ -687,17 +715,20 @@
             "max": "10",
             "step": "1",
             "label": "Targets (count)"
-          }
-        }
+          },
+          "executionOrder": 4,
+          "enabled": false
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n24",
         "type": "canvasNode",
         "position": {
-          "x": 41.44746240299202,
-          "y": -7.5565003517455125
+          "x": 117.49921556141638,
+          "y": -558.0263327365312
         },
-        "width": 250,
         "data": {
           "label": "Dropdown",
           "category": "gui",
@@ -721,17 +752,20 @@
             "options_csv": "5,10,20,40,100,200,500",
             "label": "Crop Area (m)",
             "value": "40"
-          }
-        }
+          },
+          "executionOrder": 6,
+          "enabled": false
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n25",
         "type": "canvasNode",
         "position": {
           "x": -488.98322183952496,
-          "y": 1258.717301627971
+          "y": 1286.6358343928084
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -755,8 +789,11 @@
             "label": "LNA (Level 2, link budget)",
             "spec": "【LNA (Level 2 RF Front-End, explicit link budget)】\n\n3段処理:\n1. リンクバジェット連鎖 (EIRP − L_path + G_r + G_LNA) を s_raw に voltage scaling として一括適用。アンテナ寸法 (La, Lr) と波長 (λ) から G_t = G_r を 4π·η·La·Lr/λ² で算出。調整ノブは G_LNA (slider n53) 一個に集約。\n2. 熱雑音 (kTBF) — ADC基準で固定。G_LNA を変えても雑音床は動かない設計 (signal だけ動く → SNR が実際に変わる)。AGC とは別物。\n3. ADC clip 率を per-sample で表示 (>0% で飽和警告)。\n\n内訳 (コメント・出力に同じ数値を表示):\n  Tx     P_t = +63 dBm (~2 kW)\n         G_t = 10·log10(4π·η·La·Lr / λ²)   η=0.6\n         EIRP = P_t + G_t\n  Channel L_path = 30·log10(4π) + 40·log10(R0) − 20·log10(λ) − 10·log10(σ_ref=1m²)\n         (per-scatterer 1/R² 変動は n32 で既に反映済)\n  Rx     G_r = G_t (monostatic, shared aperture)\n         G_LNA = slider n53 (level-tune knob)\n  Net    K_total = 10^((EIRP − L_path + G_r + G_LNA) / 20)\n\nG_LNA が物理的に大きい (~100–150 dB) 理由:\nn32 の s_raw は |peak| ≈ 1.0 の正規化値。実物理では ~−156 dBm 相当を 1 V ADC FS に持ち上げるために ~165 dB の受信機鎖ゲインが必要。本シミュレータは LNA / mixer / IF amp / baseband / AGC を G_LNA 一つに集約している (コメントで各物理寄与は明示)。\n\n入力 (kernel namespace):\n  s_raw  ← n42/n43/n47 のいずれか (n32 で σ°_max + 1/R² 反映済)\n  R0, lam ← n6, La, Lr, B ← n1\n\nGUI 入力:\n  nf_db     ← n26 (Noise Figure dB)\n  g_lna_db  ← n53 (LNA / total Rx-chain gain, level-tune knob; default 110 dB → reference peak ≈ −30 dBFS)\n\n旧 signal_peak_dbfs スライダ (校正ターゲット dBFS) は同等の g_lna_db に内部で変換する fallback 付き。\n\n出力 (kernel namespace):\n  s_raw → 後段 SAR 処理 (n9〜n18) が消費。peak はシーン依存、ADC FS=1.0 V_peak 単位。\n  console に link budget breakdown + achieved peak dBFS + ADC clip% + noise floor + SNR を表示。\n\nシーン別の振る舞い:\n  - 点標的 1 個 (σ°=0 dB): achieved peak ≈ (chain_no_lna + g_lna_db) dBFS  (default: −30)\n  - σ°_max を +20 dB: peak が +20 dB → 飽和の可能性\n  - σ°_max を −40 dB: peak が雑音床近くまで沈む → SNR 低下を観測可能\n  - 多数散乱体の画像: コヒーレント和で peak が ~sqrt(N) 以上に成長 → ADC 飽和の可能性"
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 27
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n26",
@@ -765,7 +802,6 @@
           "x": -398.3485967175327,
           "y": 1117.4087821824053
         },
-        "width": 250,
         "data": {
           "label": "Slider",
           "category": "gui",
@@ -791,8 +827,11 @@
             "max": "20",
             "step": "1",
             "label": "Noise Figure (dB)"
-          }
-        }
+          },
+          "executionOrder": 15
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n27",
@@ -801,7 +840,6 @@
           "x": 122.95939438515097,
           "y": 1086.468504618489
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -827,7 +865,8 @@
           },
           "enabled": false,
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n28",
@@ -836,7 +875,6 @@
           "x": 2330.901408088625,
           "y": -163.69839282637565
         },
-        "width": 250,
         "data": {
           "label": "Slider",
           "category": "gui",
@@ -862,8 +900,12 @@
             "max": "400",
             "step": "10",
             "label": "Clutter N"
-          }
-        }
+          },
+          "executionOrder": 1,
+          "enabled": false
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n29",
@@ -872,7 +914,6 @@
           "x": 2332.69992816726,
           "y": -17.698392826375652
         },
-        "width": 250,
         "data": {
           "label": "Slider",
           "category": "gui",
@@ -898,8 +939,12 @@
             "max": "0",
             "step": "1",
             "label": "Clutter level (dB)"
-          }
-        }
+          },
+          "executionOrder": 5,
+          "enabled": false
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n30",
@@ -908,7 +953,6 @@
           "x": 495.79938052923285,
           "y": 265.13453431833346
         },
-        "width": 485,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -931,8 +975,11 @@
             "code": "# Fixed Parameters — display-only summary table of the SAR system parameters\n# and the resolutions/grid they imply (mirrors the sar-visualizer panel).\n# Reads kernel variables defined upstream (n1 params, n2 derived); modifies\n# nothing. range res = c/(2B), azimuth res = La/2.\nfrom IPython.display import display as _display, HTML as _HTML\n\n_rows = [\n    (\"Carrier fc\",          \"%.2f GHz (&lambda;&approx;%.0f mm)\" % (fc / 1e9, lam * 1e3)),\n    (\"Bandwidth B\",         \"%.0f MHz\" % (B / 1e6)),\n    (\"Sampling rate Fs\",    \"%.0f MHz (Fs/B = %.2f, cell = c/(2Fs) = %.2f m)\"\n                            % (Fs / 1e6, Fs / B, c / (2 * Fs))),\n    (\"Pulse width Tp\",      \"%.0f &micro;s\" % (Tp * 1e6)),\n    (\"PRF\",                 \"%.0f Hz\" % PRF),\n    (\"Altitude H\",          \"%.0f km\" % (H / 1e3)),\n    (\"Velocity V\",          \"%.0f m/s\" % V),\n    (\"Look angle\",          \"%.0f&deg;\" % np.rad2deg(look)),\n    (\"Antenna La\",          \"%.1f m (&theta;a = &lambda;/La)\" % La),\n    (\"Range res (slant)\",   \"c/(2B) = %.2f m\" % (c / (2 * B))),\n    (\"Azimuth res\",         \"La/2 = %.2f m\" % (La / 2)),\n    (\"Target T1\",           \"az 0 m, slant range R0 &approx; %.1f km\" % (R0 / 1e3)),\n    (\"Samples (range &times; azimuth)\", \"%d &times; %d\" % (Nr, Na)),\n]\n\n_html = [\n    '<div style=\"display:inline-block;background:#0e1422;border:1px solid #2a3142;'\n    'border-radius:8px;padding:10px 14px;font:13px system-ui,sans-serif;color:#cfd6e6\">',\n    '<div style=\"color:#9aa4ba;font-size:11px;letter-spacing:1px;margin-bottom:8px\">FIXED PARAMETERS</div>',\n    '<table style=\"border-collapse:collapse\">',\n]\nfor _label, _val in _rows:\n    _html.append(\n        '<tr>'\n        '<td style=\"color:#7f8aa3;padding:2px 18px 2px 0;white-space:nowrap\">%s</td>'\n        '<td style=\"color:#cfd6e6;text-align:right;white-space:nowrap\">%s</td>'\n        '</tr>' % (_label, _val)\n    )\n_html.append('</table></div>')\n_display(_HTML(''.join(_html)))\nprint('fixed parameters displayed')",
             "label": "Fixed Parameters"
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 21
+        },
+        "width": 485,
+        "style": {}
       },
       {
         "id": "n31",
@@ -941,7 +988,6 @@
           "x": 42.607394574897626,
           "y": 138.4434996482545
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -965,8 +1011,11 @@
             "label": "Plot Library",
             "spec": "Plot library for this SAR workspace (workspace-local, not app code). Defined as an unconnected first node so it runs before everything (input-unconnected nodes execute first) and shares its functions with all downstream nodes via the kernel namespace.\n\nFunctions:\n- surface3d(field, x_axis, y_axis, title, xlabel, ylabel, x_range, y_range, status): interactive Three.js 3D dB surface (inferno, -40..0 dB). x_range/y_range crop range/azimuth. On-demand render; left-drag rotate, right-drag pan, wheel zoom; Expand opens a new window.\n- upsample_complex(field, factor): 2-axis complex Catmull-Rom upsample (re/im then |z|) for smooth sidelobes on cropped views.\n- upsample_complex_range(field, factor): complex upsample along the range axis only (Range-Doppler/RCMC crops; Doppler stays as-is).\n- upsample_axis(ax, factor): matching linear upsample of an axis vector.\n- _catmull/_interp_axis: internal Catmull-Rom helpers."
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 18
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n32",
@@ -975,7 +1024,6 @@
           "x": 2160.7966858033133,
           "y": 280.8485750918655
         },
-        "width": 503,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -999,17 +1047,19 @@
             "label": "Reflection Coefficients (NUFFT, common)",
             "spec": "【共通ステージ】NUFFTで反射係数を生成するだけのノード。s_raw は計算しない。\n\n出力（kernel namespace 経由で下流の FPGA ルートノードへ）:\n- S_all (Na, Nr) complex64  — 周波数領域反射係数（NUFFT 直出力）\n- chirp_fft (Nr,) complex64 — fft(ref_chirp)、共役なし・ifftshift なし\n- fir_coefficients (Na, Nr) complex64 — 時間領域FIRタップ = ifftshift(ifft(S_all, axis=1))。FPGA Notebook（target_sim_FFT_FPGA_convert2Image2_375M.ipynb）と同じ形式\n\n3つのFPGAルート（Float / Fixed-point / 外部FPGA）はすべてこのノードの出力を共有する。下記ルートノードのいずれかを Enabled にして s_raw を生成する:\n- n32_Float       : Route A — 浮動小数点理想 IFFT（デフォルト Enabled）\n- n32_Fixed       : Route B — fxpmath 固定小数点（3ステージ Q-format）\n- n32_FPGA_Save   : Route C-out — 係数を .mat に書き出し（HDL シミュ用）\n- n32_FPGA_Load   : Route C-in  — FPGA出力の .npy を取り込み s_raw として使用\n\n性能: NUFFT本体（~84s on RTX 5080）は旧 n32 と同じ。末尾の IFFT（~1秒）だけ各ルートノードへ移動した。"
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 25
+        },
+        "width": 503,
+        "style": {}
       },
       {
         "id": "n33",
         "type": "canvasNode",
         "position": {
-          "x": -490,
-          "y": -40
+          "x": -167.68542709048725,
+          "y": -563.3084919710627
         },
-        "width": 250,
         "data": {
           "label": "Dropdown",
           "category": "gui",
@@ -1033,17 +1083,20 @@
             "options_csv": "point,image",
             "label": "Target Mode",
             "value": "point"
-          }
-        }
+          },
+          "executionOrder": 3,
+          "enabled": false
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n37",
         "type": "canvasNode",
         "position": {
-          "x": -490,
-          "y": 88
+          "x": -167.68542709048725,
+          "y": -435.3084919710627
         },
-        "width": 250,
         "data": {
           "label": "File Picker",
           "category": "gui",
@@ -1067,17 +1120,20 @@
             "accept": "png,jpg,jpeg,bmp",
             "label": "Image File",
             "value": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\images\\strix.png"
-          }
-        }
+          },
+          "executionOrder": 9,
+          "enabled": false
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n39",
         "type": "canvasNode",
         "position": {
-          "x": -490,
-          "y": 212
+          "x": -167.68542709048725,
+          "y": -311.3084919710627
         },
-        "width": 250,
         "data": {
           "label": "Toggle",
           "category": "gui",
@@ -1102,17 +1158,20 @@
             "label_on": "invert ON",
             "label_off": "invert OFF",
             "label": "Invert B/W"
-          }
-        }
+          },
+          "executionOrder": 12,
+          "enabled": false
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n40",
         "type": "canvasNode",
         "position": {
-          "x": -491.05004938365784,
-          "y": 344.7199113370001
+          "x": -168.7354764741451,
+          "y": -178.58858063406262
         },
-        "width": 250,
         "data": {
           "label": "Slider",
           "category": "gui",
@@ -1138,8 +1197,12 @@
             "max": "10",
             "step": "0.5",
             "label": "Range scale (image)"
-          }
-        }
+          },
+          "executionOrder": 13,
+          "enabled": false
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n41",
@@ -1148,7 +1211,6 @@
           "x": 2606.207951414265,
           "y": 1990.130104050218
         },
-        "width": 687,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -1171,8 +1233,11 @@
             "code": "# Step 6 (2-D): top-down view of the focused image [img] in dB. The 3-D surface\n# (n18) shows valleys between azimuth ridges that, seen at an angle, can read as\n# features the image does not actually contain. This flat 2-D imshow is the\n# faithful top-down picture for judging the real focused image.\n#\n# Emits TWO separate PNGs (Full, then Crop). The frontend shows a Full/Crop\n# toggle + Expand for any node that emits multiple images. Display-only:\n# dB-normalised exactly like the 3-D path (20*log10(|img|/max), clipped -40..0),\n# inferno. Full is max-pooled to a display cap (peak-preserving, display only);\n# Crop is the view window at full resolution. The physical img is never modified.\n# Orientation: origin='upper' + y extent (max..min) so azimuth increases\n# DOWNWARD, matching the 3-D plot (n18) and keeping the image upright.\n# Aspect: aspect='equal' so range and azimuth share the same metric scale\n# (1 km in range = 1 km in azimuth on screen). The figure shape is driven by\n# the data extent, not stretched to fill the axes.\nimport numpy as np\nimport matplotlib\nmatplotlib.use('Agg')\nimport matplotlib.pyplot as plt\nimport io, base64\nfrom IPython.display import display\n\n# Absolute dBFS display (reference = 1.0 = ADC FS). 40 dB standard SAR\n# dynamic range. DB_VMAX = 0 dBFS is the physical cap (anything above = signal\n# exceeds ADC/DAC full scale = visual saturation as a realistic indicator).\nDB_VMIN = -40.0\nDB_VMAX =   0.0\n\ndef _db(a):\n    A = np.abs(a)\n    d = 20.0 * np.log10(A + 1e-12)\n    return np.clip(d, DB_VMIN, DB_VMAX)\n\ndef _pool_to(a, cap=1200):\n    R, C = a.shape\n    fr = max(1, int(np.ceil(R / cap))); fc = max(1, int(np.ceil(C / cap)))\n    if fr == 1 and fc == 1:\n        return a\n    Rt = (R // fr) * fr; Ct = (C // fc) * fc\n    return a[:Rt, :Ct].reshape(Rt // fr, fr, Ct // fc, fc).max(axis=(1, 3))\n\ndef _emit_png(field_db, x0, x1, y0, y1, title, peak_dbfs):\n    # Figure size sized to data extent so aspect='equal' fits without huge margins.\n    dx = abs(x1 - x0); dy = abs(y1 - y0)\n    base_h = 4.5\n    img_w = base_h * (dx / dy) if dy > 0 else base_h\n    img_w = max(3.0, min(12.0, img_w))\n    fig_w = img_w + 1.8\n    fig, ax = plt.subplots(figsize=(fig_w, base_h + 0.6))\n    im = ax.imshow(field_db, origin='upper', cmap='inferno', vmin=DB_VMIN, vmax=DB_VMAX,\n                   aspect='equal', extent=[x0, x1, y0, y1])\n    ax.set_title('%s  (peak=%+.1f dBFS)' % (title, peak_dbfs))\n    ax.set_xlabel('range [m]'); ax.set_ylabel('azimuth [m]')\n    fig.colorbar(im, ax=ax, label='[dBFS]', shrink=0.85)\n    buf = io.BytesIO(); fig.savefig(buf, format='png', dpi=110, bbox_inches='tight')\n    plt.close(fig)\n    display({'image/png': base64.b64encode(buf.getvalue()).decode('ascii')}, raw=True)\n\nrg_axis = (t_r - t_r_center) * c / 2\n_W = float(view_scale)\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_ac = np.where((az_pos >= -_W) & (az_pos <= _W))[0]\n_crop = np.abs(img[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1])\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\n\n# 1) FULL (max-pooled for display)\n_full_abs = _pool_to(np.abs(img))\n_full_peak_dbfs = float(20*np.log10(_full_abs.max() + 1e-12))\nfull_db = _db(_full_abs)\n_emit_png(full_db, rg_axis.min(), rg_axis.max(), az_pos.max(), az_pos.min(),\n          'Focused image FULL (2-D)', _full_peak_dbfs)\n# 2) CROP (view window, full resolution — no pool)\n_crop_peak_dbfs = float(20*np.log10(_crop.max() + 1e-12))\ncrop_db = _db(_crop)\n_emit_png(crop_db, _rgx.min(), _rgx.max(), _azx.max(), _azx.min(),\n          'Focused image CROP (+/-%dm)' % int(_W), _crop_peak_dbfs)\nprint('2-D focused: full %s pooled %s peak=%+.1f dBFS | crop %s peak=%+.1f dBFS'\n      % (img.shape, full_db.shape, _full_peak_dbfs, _crop.shape, _crop_peak_dbfs))\n",
             "label": "Plot Focused Image (2-D)"
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 38
+        },
+        "width": 687,
+        "style": {}
       },
       {
         "id": "n42",
@@ -1181,7 +1246,6 @@
           "x": 3038.881677049793,
           "y": -117.76567202830034
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -1205,8 +1269,11 @@
             "label": "FPGA Route A: Float Ideal (IFFT)",
             "spec": "【Route A: 浮動小数点理想ルート】\n\nこのノードを Enable にすると S_all × chirp_fft → IFFT を浮動小数点 (complex64) で計算し、理想的な s_raw を生成する。デフォルトで有効。\n\n入力（kernel namespace 経由）:\n  S_all      (Na, Nr) complex64  — n32 (NUFFT共通) が生成\n  chirp_fft  (Nr,)    complex64  — n32 が生成\n\n出力（kernel namespace）:\n  s_raw      (Na, Nr) complex64  — n25 (LNA) が消費\n\n排他関係:\n  Route B (n32_Fixed) / Route C-in (n32_FPGA_Load) と同時 Enable 不可\n  （s_raw が衝突する）。Route C-out (n32_FPGA_Save) とは併用可。"
           },
-          "codeCollapsed": true
-        }
+          "codeCollapsed": true,
+          "executionOrder": 26
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n43",
@@ -1215,7 +1282,6 @@
           "x": 3034.942793772455,
           "y": 111.48279160102358
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -1240,7 +1306,8 @@
             "spec": "【Route B: 固定小数点評価ルート (fxpmath)】\n\nFPGA で必然となるビット幅制限が SAR 画像品質にどう効くかを Python 側で評価するルート。FPGA でよくある FFT × 周波数乗算 × IFFT のパイプラインを fxpmath で量子化しながら模擬する。\n\n3ステージ独立 Q-format（ノードコード冒頭の定数を編集してチューニング）:\n\nStage A — 入力時間領域 (= ADC ビット幅):\n  Q_IN_W=10, Q_IN_F=9  (Q1.9, range ~ [-1, 1))\n  10bit ADC を想定。対象: fir_coefficients, ref_chirp\n\nStage B — FFT 後周波数領域 + 乗算後 (FPGA 内部演算):\n  Q_FFT_W=18, Q_FFT_F=10  (整数8bit + 小数10bit、Xilinx 7系 DSP 18bit に整合)\n  FFT 長 Nr で log2(Nr) のビット成長を吸収するため整数部に余裕を持たせる\n  対象: fft(fir_coefficients), fft(chirp), F × C[None,:]\n\nStage C — IFFT 後時間領域 (= DAC ビット幅):\n  Q_OUT_W=10, Q_OUT_F=9  (Q1.9)\n  10bit DAC を想定。対象: 最終 s_raw\n\n各ステージは auto-scale: peak を Q full-scale × 0.95 にマップして 5% のオーバーフローヘッドルームを確保 → fxpmath で量子化 → 復元。量子化 SNR を per-stage で表示。\n\n入力（kernel namespace）:\n  S_all, chirp_fft, fir_coefficients, ref_chirp, Na, Nr  ← n32 が生成\n\n出力（kernel namespace）:\n  s_raw  ← n25 (LNA) が消費\n\n排他関係:\n  Route A (n32_Float) / Route C-in (n32_FPGA_Load) と同時 Enable 不可。\n  Route C-out (n32_FPGA_Save) とは併用可（量子化結果を .mat 保存も可能）。\n\n参考: workspace-SAR-SIM/TargetSim_old/target_sim_FFT_FPGA_convert2Image2_375M.ipynb の BadAccuracy モード（int16 直接キャスト）の柔軟版。"
           },
           "enabled": false
-        }
+        },
+        "width": 400
       },
       {
         "id": "n44",
@@ -1249,7 +1316,6 @@
           "x": 3747.7625780489975,
           "y": 323.6689851828143
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -1275,7 +1341,8 @@
           },
           "enabled": false,
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n45",
@@ -1284,7 +1351,6 @@
           "x": 3644.166804692305,
           "y": -53.651592842891034
         },
-        "width": 250,
         "data": {
           "label": "File Picker",
           "category": "gui",
@@ -1308,8 +1374,11 @@
             "accept": "mat",
             "label": "FPGA Save Path",
             "value": "workspace-SAR-SIM/fpga_coeffs.mat"
-          }
-        }
+          },
+          "executionOrder": 2
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n46",
@@ -1318,7 +1387,6 @@
           "x": 3645.3155030473017,
           "y": 70.34840715710897
         },
-        "width": 250,
         "data": {
           "label": "Toggle",
           "category": "gui",
@@ -1343,8 +1411,11 @@
             "label_on": "INCLUDE",
             "label_off": "OMIT",
             "label": "Include golden s_raw"
-          }
-        }
+          },
+          "executionOrder": 8
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n47",
@@ -1353,7 +1424,6 @@
           "x": 3752.460217749903,
           "y": 514.6689851828144
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -1379,7 +1449,8 @@
           },
           "enabled": false,
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n48",
@@ -1388,7 +1459,6 @@
           "x": 3643.8770495334675,
           "y": 200.34840715710897
         },
-        "width": 250,
         "data": {
           "label": "File Picker",
           "category": "gui",
@@ -1412,8 +1482,11 @@
             "accept": "npy",
             "label": "FPGA Load Path",
             "value": ""
-          }
-        }
+          },
+          "executionOrder": 11
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n49",
@@ -1422,7 +1495,6 @@
           "x": 3919.564654732756,
           "y": 128.9320232619578
         },
-        "width": 250,
         "data": {
           "label": "Slider",
           "category": "gui",
@@ -1448,8 +1520,11 @@
             "max": "10000",
             "step": "1",
             "label": "Range adj_pos (samples)"
-          }
-        }
+          },
+          "executionOrder": 10
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n50",
@@ -1458,7 +1533,6 @@
           "x": 3920.7133530877536,
           "y": -1.9042802923278828
         },
-        "width": 250,
         "data": {
           "label": "Toggle",
           "category": "gui",
@@ -1483,17 +1557,19 @@
             "label_on": "SWAP",
             "label_off": "AS-IS",
             "label": "I/Q swap"
-          }
-        }
+          },
+          "executionOrder": 7
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n52",
         "type": "canvasNode",
         "position": {
           "x": -488,
-          "y": 1650.717301627971
+          "y": 1678.6358343928084
         },
-        "width": 250,
         "data": {
           "label": "Slider",
           "category": "gui",
@@ -1519,17 +1595,19 @@
             "max": "30",
             "step": "1",
             "label": "σ°_max (dB)"
-          }
-        }
+          },
+          "executionOrder": 16
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n53",
         "type": "canvasNode",
         "position": {
           "x": -488,
-          "y": 1796.717301627971
+          "y": 1824.6358343928084
         },
-        "width": 250,
         "data": {
           "label": "Slider",
           "category": "gui",
@@ -1555,18 +1633,19 @@
             "max": "180",
             "step": "1",
             "label": "LNA Gain (dB)"
-          }
-        }
+          },
+          "executionOrder": 17
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n54",
         "type": "canvasNode",
         "position": {
-          "x": -600,
-          "y": -50
+          "x": -543.8512877824719,
+          "y": 567.6358343928084
         },
-        "width": 780,
-        "height": 480,
         "data": {
           "label": "SAR Visualizer",
           "category": "processing",
@@ -1585,6 +1664,7 @@
               "portType": "float"
             }
           ],
+          "params": "",
           "defaultParameters": {
             "altitude_km": "514",
             "look_deg": "25",
@@ -1603,7 +1683,63 @@
             "chirp_dir": "up",
             "label": "SAR Observation Geometry",
             "timing_height": "167"
+          },
+          "gui_widget": {
+            "type": "sar_visualizer",
+            "dtype": "sar_params"
+          },
+          "executionOrder": 14
+        },
+        "style": {
+          "width": 780,
+          "minHeight": 480
+        }
+      },
+      {
+        "id": "n55",
+        "type": "canvasNode",
+        "position": {
+          "x": -346.8483203296227,
+          "y": -20.61948507567977
+        },
+        "data": {
+          "label": "Target Config",
+          "category": "source",
+          "blockType": "image_target_config",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "params": "",
+          "defaultParameters": {
+            "target_mode": "point",
+            "n_targets": "1",
+            "invert_image": "false",
+            "range_scale": "1",
+            "view_scale": "40",
+            "noise_level_db": "-60",
+            "clutter_n": "0",
+            "clutter_rcs_db": "-20",
+            "label": "Target Config",
+            "image_path": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\images\\strix.png"
+          },
+          "gui_widget": {
+            "type": "form",
+            "dtype": "gui_form"
           }
+        },
+        "style": {
+          "width": 320
         }
       }
     ],
@@ -1697,7 +1833,8 @@
         "source": "n17",
         "sourceHandle": "out_0",
         "target": "n18",
-        "targetHandle": "in_0"
+        "targetHandle": "in_0",
+        "selected": false
       },
       {
         "id": "e_1779513686551_04g8",
@@ -1810,7 +1947,28 @@
         "sourceHandle": "out_0",
         "target": "n25",
         "targetHandle": "in_0"
+      },
+      {
+        "type": "rateEdge",
+        "source": "n55",
+        "sourceHandle": "out_0",
+        "target": "n31",
+        "targetHandle": "in_0",
+        "id": "xy-edge__n55out_0-n31in_0"
+      },
+      {
+        "type": "rateEdge",
+        "source": "n31",
+        "sourceHandle": "out_0",
+        "target": "n2",
+        "targetHandle": "in_0",
+        "id": "xy-edge__n31out_0-n2in_0"
       }
-    ]
+    ],
+    "viewport": {
+      "x": 1152.296174594272,
+      "y": 564.8690347926251,
+      "zoom": 0.6343750000000005
+    }
   }
 }
