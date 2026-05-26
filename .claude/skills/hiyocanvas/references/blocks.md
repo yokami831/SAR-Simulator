@@ -1,5 +1,33 @@
 # HiyoCanvas Block Reference
 
+## Block Definition System (3-tier)
+
+HiyoCanvas loads block definitions from three locations in this order
+(later tiers override earlier ones for the same id):
+
+1. **Built-in** (`backend/plugins/python_canvas/blocks/_builtin/`) —
+   HiyoCanvas core blocks (python_code, gui_*, comment). Never modified.
+2. **Global library** (`backend/plugins/python_canvas/blocks/user/`) —
+   Cross-project generic blocks (csv_reader, http_request, etc.).
+3. **Workspace-scoped** (`<workspaces_dir>/blocks/*.json`) — Blocks specific
+   to one workspace folder (e.g. `workspace-SAR-SIM/blocks/sar_visualizer.json`).
+   Automatically loaded/unloaded when the workspaces dir changes; the frontend
+   receives a `blocks_changed` WS event and re-fetches `/api/blocks`.
+
+Each block in the `/api/blocks` response carries an internal `_source` field
+(`"builtin"` / `"plugin_user"` / `"workspace"`) so UIs can label workspace
+blocks differently.
+
+**Placement rule:** if a block is only useful inside one workspace, put it
+in `<workspace>/blocks/`. If it's generic enough to reuse across projects,
+put it in the global `user/` library. When unsure, default to workspace.
+
+**Missing blocks:** when a flow uses a `blockType` not in the registry, it
+loads as a "shim" node (dashed red placeholder with `missing: <id>` badge)
+so structure is preserved. The user gets a dialog explaining how to restore
+the block, and `start_execution` refuses up-front rather than running with
+gaps.
+
 ## Block Definition Format
 
 Blocks are defined as JSON files in `blocks/` directory or registered at runtime via `register_block` API.
@@ -85,7 +113,8 @@ Nodes display rich output automatically:
 
 ## Registering Custom Blocks
 
-Use the `register_block` API to add blocks at runtime:
+Use the `register_block` API to add blocks at runtime. The block JSON is
+saved to disk; subsequent restarts pick it up automatically.
 
 ```bash
 canvas_api.py register_block '{
@@ -102,7 +131,26 @@ canvas_api.py register_block '{
 }'
 ```
 
-Registered blocks persist for the current session. To make them permanent, save as JSON in `blocks/user/`.
+### `scope` parameter (where the block is saved)
+
+Add `"scope": "..."` to the JSON to control the destination:
+
+| scope | Destination | When to use |
+|-------|-------------|-------------|
+| `"auto"` *(default)* | active workspace's `blocks/` if a workspace is open, otherwise global `user/` | most cases — Claude usually wants workspace-local |
+| `"workspace"` | `<workspaces_dir>/blocks/<id>.json` (errors if no workspace active) | force workspace-local |
+| `"global"` | `backend/plugins/python_canvas/blocks/user/<id>.json` | generic block usable across projects |
+
+```bash
+# Explicitly workspace-scoped (SAR-only visualizer, HIL-only deploy block, etc.)
+canvas_api.py register_block '{"id": "my_block", "label": "...", "scope": "workspace", ...}'
+
+# Explicitly global (CSV reader, HTTP request, etc.)
+canvas_api.py register_block '{"id": "csv_xyz", "label": "...", "scope": "global", ...}'
+```
+
+After registration, the frontend receives a `blocks_changed` WebSocket
+event and re-fetches the block library automatically — no reload needed.
 
 ## Block Storage
 

@@ -208,9 +208,18 @@ API get_execution_status                             # Check execution result
 | `create_subgraph` | Group nodes |
 | `set_subgraph` | Set subgraph properties |
 | `ungroup_subgraph` | Ungroup nodes |
-| `register_block` | Register custom block type |
+| `register_block` | Register custom block type. Accepts optional `scope` (`auto`/`workspace`/`global`) — see [references/blocks.md](references/blocks.md) |
 | `get_block_schema` | Get block type definition |
 | `search_block_types` | Search registered block types |
+
+> **Block placement:** Blocks load from a 3-tier registry (`_builtin/` →
+> plugin `user/` → `<workspace>/blocks/`). Workspace-specific blocks (like
+> a SAR visualizer) should live in `<workspace>/blocks/`; cross-project
+> generic blocks live in plugin `user/`. Each block in `/api/blocks`
+> carries a `_source` tag for UIs to distinguish. Flows that reference
+> an unknown block load as shim nodes (dashed red placeholder) and the
+> execution is refused — copy the missing JSON into `<workspace>/blocks/`
+> and the frontend will pick it up automatically.
 
 ### Built-in Block Types
 

@@ -66,9 +66,18 @@ async def get_block_schema_post(req: dict) -> JSONResponse:
 @router.post("/register_block")
 async def register_block(req: dict) -> JSONResponse:
     await _require_flow_tab()
+    # Extract scope (not part of the block definition itself)
+    scope = req.pop("scope", "auto")
     try:
-        result = block_registry.register(req)
-        return JSONResponse(content={"success": True, "block": result})
+        result = block_registry.register(req, scope=scope)
+        # Notify connected frontends so the library panel re-fetches /api/blocks
+        await tools._ws_broadcast({
+            "type": "blocks_changed",
+            "source": "register_block",
+            "block_id": result.get("id"),
+            "scope": scope,
+        })
+        return JSONResponse(content={"success": True, "block": result, "scope": scope})
     except ValueError as e:
         raise HTTPException(400, str(e))
 

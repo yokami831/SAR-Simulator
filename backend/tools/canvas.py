@@ -815,12 +815,20 @@ async def get_block_schema(type_id: str) -> dict[str, Any]:
 
 
 async def register_block_v2(block_def: dict) -> dict[str, Any]:
-    """Register a new block definition."""
+    """Register a new block definition.
+
+    The `scope` key inside block_def controls where the block is saved:
+    - "auto" (default): workspace blocks/ if a workspace is active, else global
+    - "workspace": force workspace; error if no active workspace
+    - "global": force backend/plugins/python_canvas/blocks/user/
+    """
+    # Pop scope so it isn't persisted as a block field
+    scope = block_def.pop("scope", "auto") if isinstance(block_def, dict) else "auto"
     try:
-        saved = block_registry.register(block_def)
+        saved = block_registry.register(block_def, scope=scope)
         block_id = saved.get("id", "?")
         label = saved.get("label", "?")
-        return {"success": True, "message": f"Registered: {block_id} ({label})"}
+        return {"success": True, "message": f"Registered: {block_id} ({label}) [scope={scope}]"}
     except Exception as e:
         return {"success": False, "message": f"Error: {e}"}
 

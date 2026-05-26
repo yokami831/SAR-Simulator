@@ -447,12 +447,19 @@ API hide_tooltip '{"node_id":"n100"}'
 
 ### register_block
 
-Register a custom block type. See [blocks.md](blocks.md) for code_template conventions.
+Register a custom block type. See [blocks.md](blocks.md) for the 3-tier
+system, code_template conventions, and the `scope` parameter.
 
-**Parameters:** `id`, `label`, `category`, `parameters`, `inputs`, `outputs`, `code_template`
+**Parameters:** `id`, `label`, `category`, `parameters`, `inputs`, `outputs`,
+`code_template`, optionally `scope` (`"auto"`/`"workspace"`/`"global"`,
+default `"auto"` — saves to active workspace's `blocks/` when one is open,
+otherwise to the global library).
 
 ```bash
 API register_block '{"id":"my_add","label":"Adder","category":"Math","parameters":[{"id":"offset","label":"Offset","dtype":"float","default":"0"}],"inputs":[{"id":"in_0","label":"","dtype":"any"}],"outputs":[{"id":"out_0","label":"","dtype":"any"}],"code_template":"total = x + float(${offset})\nprint(total)"}'
+
+# Force-save to global library (generic, cross-project)
+API register_block '{"id":"csv_xyz","label":"CSV","scope":"global", ...}'
 ```
 
 ### get_block_schema
