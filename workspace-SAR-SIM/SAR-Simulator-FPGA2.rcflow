@@ -1,0 +1,1767 @@
+{
+  "version": 1,
+  "type": "flow",
+  "title": "SAR-Simulator-FPGA2",
+  "description": "",
+  "created": "2026-05-26T07:53:12.642190+00:00",
+  "modified": "2026-05-26T08:10:25.982588+00:00",
+  "canvas": {
+    "name": "flowgraph",
+    "savedAt": "2026-05-26T08:10:25.983Z",
+    "nodes": [
+      {
+        "id": "n1",
+        "type": "canvasNode",
+        "position": {
+          "x": 43.29032258064515,
+          "y": 382.4434996482545
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "import numpy as np\nfrom scipy.constants import c\n\n# ---- Fixed system parameters (PoC scale; B/Fs/Tp reduced for tractability) ----\nfc   = 9.65e9          # X-band carrier [Hz]\nB    = 300e6/4            # chirp bandwidth [Hz]   (real: 600e6)\nTp   = 10e-6           # pulse width [s]        (real: 30e-6)\nFs   = 360e6/4            # range sampling rate [Hz] \nPRF  = 4000.0          # pulse repetition frequency [Hz]\nH    = 514e3           # orbit altitude [m]\nV    = 7600.0          # platform velocity [m/s]\nlook = np.deg2rad(25)  # off-nadir angle [rad]\nLa   = 4.8             # antenna length, azimuth (along-track) [m]\nLr   = 0.8             # antenna length, range (elevation) [m]\n# Range swath half-width [m]. Sets the observed range window (Nr grid). Physical\n# upper bound is the elevation beam footprint theta_rg*R0 ~ +/-11 km (lam/Lr*R0);\n# real SAR narrows it via the receive window. 2 km here: wide enough for image\n# targets, far cheaper than the full 11 km. (Was hardcoded 80 m in n2 — too small.)\nR_half = 4000.0\nprint('params set: fc=%.2fGHz B=%.0fMHz Tp=%.0fus PRF=%.0f La=%.1fm Lr=%.1fm' % (fc/1e9, B/1e6, Tp*1e6, PRF, La, Lr))\n\n# ============================================================================\n# Scene controls (sar-visualizer parity). The focused-image display window is\n# a 0-centred symmetric box of half-extent float(view_scale) [m]; point\n# targets (and later clutter) live inside it. n_targets / view_scale are set\n# by GUI blocks; these fallbacks apply when those haven't run yet.\n# ============================================================================\n# n_targets and view_scale come from GUI blocks that run earlier in the\n# flow. view_scale comes from the GUI dropdown (Crop Area [m]) as a half-extent\n# metres value held as a string, so callers use float(view_scale). No fallbacks\n# here on purpose: if a downstream node sees NameError it\n# means the GUI block is missing or out of order — that must surface as a real\n# error, not be hidden by a default.\n\ndef make_rand(seed):\n    \"\"\"mulberry32 PRNG (exact port). float in [0,1).\"\"\"\n    box = {'a': int(seed) & 0xFFFFFFFF}\n    M = 0xFFFFFFFF\n    def _rand():\n        box['a'] = (box['a'] + 0x6d2b79f5) & M\n        t = box['a']\n        t = (((t ^ (t >> 15)) & M) * ((1 | t) & M)) & M           # Math.imul(t^(t>>>15), 1|t)\n        t = ((t + ((((t ^ (t >> 7)) & M) * ((61 | t) & M)) & M)) & M) ^ t  # +Math.imul(t^(t>>>7),61|t), ^t\n        t &= M\n        return ((t ^ (t >> 14)) & M) / 4294967296.0\n    return _rand\n\ndef make_point_targets(count, half_az_m, half_range_m, seed, R0):\n    \"\"\"Point targets, sar-visualizer parity. T1 is always the centre\n    reference (az 0, slant R0); extras are seeded-random inside +/-0.85*half\n    so they sit clearly within the display window.\"\"\"\n    out = [('T1', 0.0, R0)]\n    rnd = make_rand(seed)\n    az_span = half_az_m * 0.85\n    r_span = half_range_m * 0.85\n    for i in range(1, int(count)):\n        az_m = (rnd() * 2 - 1) * az_span\n        sr_m = R0 + (rnd() * 2 - 1) * r_span\n        out.append(('T%d' % (i + 1), az_m, sr_m))\n    return out\n# Plot helpers (surface3d_gl, surface3d_pair_gl, upsample_complex, upsample_complex_range, ...) are\n# defined in the \"Plot Library\" node (unconnected, runs first) and shared via\n# the kernel namespace. They are workspace-local, NOT HiyoCanvas core. See that\n# node's SPEC and CLAUDE.md (\"common helpers go in a visible Library node\").",
+            "label": "Common Parameters",
+            "spec": "Shared SAR system parameters (TerraSAR-X reference, X-band).\nBound once here and read by every downstream block via the shared kernel namespace.\n\nReal values (full-res spec):\n- fc 9.65 GHz, B 600 MHz, Tp 30 us, Fs 720 MHz (1.2*B), PRF 4 kHz\n- H 514 km, V 7600 m/s, look 25 deg, La 4.8 m\n\nSimulation note: this PoC lowers B/Fs 10x and Tp 3x so the grid stays browser-tractable; geometry params unchanged."
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n2",
+        "type": "canvasNode",
+        "position": {
+          "x": 517.2533573264079,
+          "y": -11.33625912520529
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# ---- Derived quantities ----\nlam     = c / fc                 # wavelength [m]\nKr      = B / Tp                 # chirp rate [Hz/s]\nR0      = H / np.cos(look)       # T1 slant range [m]\ntheta_a = lam / La               # first-null beamwidth [rad]\naz_foot = theta_a * R0           # azimuth footprint [m]\n\n# ---- Range grid ----\nt_r_center = 2 * R0 / c\ndt_r = 1 / Fs\n# Receive window half-width in TIME. Two-way propagation: a target at\n# slant-range offset R_half returns at round-trip delay 2*R_half/c, so the\n# window half-width is 2*R_half/c. (Was R_half/c — one-way — which made the\n# range axis reach only R_half/2 + extras, e.g. R_half=3000 -> +/-2549 m.)\n# A small 5% guard band keeps targets at +/-R_half clear of the NUFFT fold\n# edge. Range axis spans +/- 1.05*R_half (proportional, e.g. 3000 -> 3150).\nRANGE_GUARD = 1.05\nt_r_half_window = 2 * R_half / c * RANGE_GUARD\nNr = int(np.ceil(2 * t_r_half_window / dt_r));  Nr += Nr % 2\nt_r = t_r_center + (np.arange(Nr) - Nr // 2) * dt_r\n\n# ---- Azimuth grid ----\naz_extent = 300.0 + az_foot / 2 + 200.0\nNa = int(np.ceil(2 * az_extent / V * PRF));  Na += Na % 2\neta = (np.arange(Na) - Na // 2) / PRF\naz_pos = V * eta\n\n# ---- Transmit reference chirp (baseband), centered at t=0 ----\nt_ref = (np.arange(Nr) - Nr // 2) * dt_r\nref_chirp = ((np.abs(t_ref) <= Tp/2).astype(np.float32)\n             * np.exp(1j * np.pi * Kr * t_ref**2)).astype(np.complex64)\nprint('Kr=%.3e Hz/s  R0=%.1f km  grid Nr=%d Na=%d' % (Kr, R0/1e3, Nr, Na))",
+            "label": "Generate chirp signal",
+            "spec": "Generate the transmit linear-FM (chirp) pulse and the imaging grid.\n\nParameters (from mindmap):\n- Frequency: min/max  -> chirp sweeps fc-B/2 .. fc+B/2\n- Pulse width: Tp\n- PRF: pulse repetition frequency\n\nPhysics:\n- chirp rate  Kr = B/Tp\n- baseband chirp  s(t) = rect(|t|<=Tp/2) * exp(j*pi*Kr*t^2)\n- wavelength lam = c/fc, ref slant range R0 = H/cos(look)\n\nThis block also designs the range/azimuth sampling grid (Nr,Na,t_r,eta,az_pos) the echo will live on."
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n3",
+        "type": "canvasNode",
+        "position": {
+          "x": 1021.7200005608117,
+          "y": 75.75599801846501
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: up-conversion not modeled; baseband + carrier-phase used downstream)\npass",
+            "label": "UpConvert",
+            "spec": "REAL HW: mixes the baseband chirp up to the RF carrier fc (CenterFrequency).\n\nSimulation: SKIPPED. The simulator works at baseband with R_eta phase carrying the carrier term (-4*pi*R/lam), so explicit up-conversion is not modeled. Placeholder block kept so the structure matches the real transmit chain."
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n4",
+        "type": "canvasNode",
+        "position": {
+          "x": 1024.8599956069743,
+          "y": 326.755998018465
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: ideal amplifier; saturation/NF/flatness not modeled)\npass",
+            "label": "XPA",
+            "spec": "REAL HW: high-power amplifier. Characteristics: saturation, noise floor (NF), frequency flatness.\n\nSimulation: SKIPPED (ideal linear amplification assumed). Placeholder for future refinement (e.g. add AM/AM saturation, NF)."
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n5",
+        "type": "canvasNode",
+        "position": {
+          "x": 1031.1136753535654,
+          "y": 518.755998018465
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: ideal band-pass; filter response not modeled)\npass",
+            "label": "RF-BPF",
+            "spec": "REAL HW: RF band-pass filter. Characteristic: filter response shapes the transmit spectrum.\n\nSimulation: SKIPPED (ideal flat passband assumed). Placeholder for future refinement."
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n6",
+        "type": "canvasNode",
+        "position": {
+          "x": 1591.4481321461037,
+          "y": 66.49078550911027
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# ---- Antenna beamwidths from physical dimensions ----\ntheta_az = lam / La           # azimuth (along-track) beamwidth [rad]\ntheta_rg = lam / Lr           # range (elevation) beamwidth [rad]\n\ndef antenna_pattern(squint):\n    return np.sinc(squint / theta_az) ** 2\n\ndef antenna_pattern_2d(az_ang, rg_ang):\n    return np.sinc(az_ang / theta_az) ** 2 * np.sinc(rg_ang / theta_rg) ** 2\n\nprint('antenna: theta_az=%.4f deg, theta_rg=%.4f deg' % (np.rad2deg(theta_az), np.rad2deg(theta_rg)))\n\n# ---- 2-D radiation pattern as a 3D surface (binary single-renderer path) ----\n# equal angular span on both axes so the narrow azimuth beam vs the wider\n# range beam is read honestly.\nang_max = 3 * max(theta_az, theta_rg)\n_az = np.linspace(-ang_max, ang_max, 240)\n_rg = np.linspace(-ang_max, ang_max, 240)\nAZ, RG = np.meshgrid(_az, _rg)\nG = antenna_pattern_2d(AZ, RG)              # linear power 0..1\n# surface3d_gl takes 20*log10(|field|); pass sqrt(G) so dB = 10*log10(G) (power dB)\nsurface3d_gl(np.sqrt(G), np.rad2deg(_az), np.rad2deg(_rg),\n          'Antenna 2-D radiation pattern',\n          xlabel='azimuth angle [deg]', ylabel='range angle [deg]')",
+            "label": "Antenna",
+            "spec": "REAL HW: antenna pattern shapes the illumination. Characteristics (mindmap): range direction, azimuth direction, gain.\n\nSimulation: azimuth pattern modeled as normalized-sinc^2 with first null at the beamwidth theta_a:\n  pat(squint) = sinc(squint/theta_a)^2\nThis is a first-null beamwidth approximation (NOT 3 dB). Range-direction pattern and absolute gain are not modeled (relative pattern only)."
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n9",
+        "type": "canvasNode",
+        "position": {
+          "x": 113.59353230894135,
+          "y": 1816.0173193183614
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: analog BPF not modeled; raw echo passed through)\npass",
+            "label": "Analog BPF",
+            "spec": "REAL HW (Receive): analog band-pass filter on the received echo before down-conversion. Selects the signal band, rejects out-of-band noise/interference.\n\nSimulation: SKIPPED (ideal — the raw echo is already band-limited). Placeholder so the structure matches the real receive chain."
+          }
+        }
+      },
+      {
+        "id": "n10",
+        "type": "canvasNode",
+        "position": {
+          "x": 116.09595350274219,
+          "y": 2068.0173193183614
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: down-conversion not modeled; baseband echo used directly)\npass",
+            "label": "Downconvert",
+            "spec": "REAL HW (Receive): mixes the received RF signal down to baseband (I/Q demodulation).\n\nSimulation: SKIPPED. The simulator already works at baseband (the echo phase carries -4*pi*R/lam directly), so explicit down-conversion is not modeled. Placeholder."
+          }
+        }
+      },
+      {
+        "id": "n11",
+        "type": "canvasNode",
+        "position": {
+          "x": 116.09595350274219,
+          "y": 2320.0173193183614
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: receive filtering not modeled)\npass",
+            "label": "Filtering",
+            "spec": "REAL HW (Receive): anti-alias / channel filtering after down-conversion.\n\nSimulation: SKIPPED (ideal). Placeholder for future refinement."
+          }
+        }
+      },
+      {
+        "id": "n12",
+        "type": "canvasNode",
+        "position": {
+          "x": 116.09595350274219,
+          "y": 2572.0173193183614
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: down-sampling not modeled; grid already at processing rate)\npass",
+            "label": "Down sample & filter",
+            "spec": "REAL HW (Receive): decimation to the processing sample rate with the matching anti-alias filter.\n\nSimulation: SKIPPED. The grid is already designed at Fs=1.2*B, so no resampling is modeled. Placeholder."
+          }
+        }
+      },
+      {
+        "id": "n13",
+        "type": "canvasNode",
+        "position": {
+          "x": 116.09595350274219,
+          "y": 2824.0173193183614
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: BAQ not modeled; full-precision s_raw kept)\npass",
+            "label": "BAQ compression",
+            "spec": "REAL HW (Receive): Block Adaptive Quantization — onboard lossy compression of the raw echo to save downlink bandwidth. Parameter: number of bits.\n\nSimulation: SKIPPED (full-precision complex64 kept). Placeholder; a future refinement could quantize s_raw to N bits/sample to study BAQ artifacts."
+          }
+        }
+      },
+      {
+        "id": "n14",
+        "type": "canvasNode",
+        "position": {
+          "x": 714.7787165463642,
+          "y": 2096.9510393888813
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Range matched filter from the transmit reference chirp (already built in n2).\nt_ref = (np.arange(Nr) - Nr // 2) * dt_r\n_ref = ((np.abs(t_ref) <= Tp/2).astype(np.float32) * np.exp(1j*np.pi*Kr*t_ref**2)).astype(np.complex64)\nH_range = np.conj(np.fft.fft(np.fft.ifftshift(_ref)))\ns_rc = np.fft.ifft(np.fft.fft(s_raw, axis=1) * H_range[None, :], axis=1).astype(np.complex64)\nprint('range-compressed: shape=%s dtype=%s' % (s_rc.shape, s_rc.dtype))",
+            "label": "Range Compression",
+            "spec": "PROCESSING (RDA step 1): compress each range line by matched filtering with the conjugate of the transmit chirp.\n\nPhysics:\n  H_range = conj( FFT( ifftshift(ref_chirp) ) )\n  s_rc = IFFT( FFT(s_raw, axis=range) * H_range )\nConcentrates each target's chirp smear into a sharp range peak."
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n15",
+        "type": "canvasNode",
+        "position": {
+          "x": 1182.5562840177283,
+          "y": 2477
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "S_rd  = np.fft.fftshift(np.fft.fft(s_rc, axis=0), axes=0).astype(np.complex64)\nf_eta = np.fft.fftshift(np.fft.fftfreq(Na, 1/PRF))\nprint('range-Doppler: shape=%s  f_eta=[%.1f, %.1f] Hz' % (S_rd.shape, f_eta.min(), f_eta.max()))",
+            "label": "Azimuth FFT (Range-Doppler)",
+            "spec": "PROCESSING (RDA step 2): FFT along azimuth (slow-time) to enter the Range-Doppler domain. Range axis is never shifted; azimuth is fftshift-ed so the Doppler axis is centered.\n\n  S_rd  = fftshift( FFT(s_rc, axis=azimuth) )\n  f_eta = fftshift( fftfreq(Na, 1/PRF) )   # Doppler axis"
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n16",
+        "type": "canvasNode",
+        "position": {
+          "x": 1630.9735172615212,
+          "y": 1982.2115243818807
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "delta_R = (lam**2 * R0 * f_eta**2) / (8 * V**2)      # (Na,) m\ndelta_t = 2 * delta_R / c\nf_r = np.fft.fftfreq(Nr, dt_r)                        # range freq (not shifted)\nS_rd_rf = np.fft.fft(S_rd, axis=1)\nshift = np.exp(1j * 2 * np.pi * f_r[None, :] * delta_t[:, None])\nS_rd_rcmc = np.fft.ifft(S_rd_rf * shift, axis=1).astype(np.complex64)\nrange_cell_m = c * dt_r / 2\nprint('RCMC: max RCM = %.3f m = %.1f range cells' % (delta_R.max(), delta_R.max()/range_cell_m))",
+            "label": "RCMC",
+            "spec": "PROCESSING (RDA step 3): Range Cell Migration Correction. In the Range-Doppler domain a target's energy lies on a parabola across range cells; RCMC straightens it via a range-frequency phase shift.\n\n  delta_R = lam^2 * R0 * f_eta^2 / (8 V^2)   (narrow-beam)\n  shift   = exp(j 2pi f_r * 2 delta_R / c)\n  S_rd_rcmc = IFFT( FFT(S_rd, axis=range) * shift )"
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n17",
+        "type": "canvasNode",
+        "position": {
+          "x": 2108.8720974586117,
+          "y": 2089
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Method C: range-DEPENDENT azimuth compression. Each range column gets its own\n# azimuth FM rate Ka(r) from its own slant range, instead of one Ka fixed at R0.\n# Needed once the swath is wide (verified: from ~+-1 km the range-independent\n# filter mis-places far targets by 1-2 azimuth cells; Ka(r) corrects it). At\n# narrow swath it is identical to the old single-Ka filter, so this is a safe\n# always-on upgrade. RCMC (n16) stays parabolic: verified that the exact\n# hyperbolic dR makes NO difference even at B=600 MHz / +-2 km, so azimuth Ka(r)\n# is the only fix that matters for wide-swath focusing.\nR_col  = R0 + (t_r - t_r_center) * c / 2              # slant range per range column [m]\nKa_col = 2 * V**2 / (lam * R_col)                     # azimuth FM rate per column (Nr,)\nH_az   = np.exp(-1j * np.pi * (f_eta[:, None]**2) / Ka_col[None, :])   # (Na, Nr)\nimg    = np.fft.ifft(np.fft.ifftshift(S_rd_rcmc * H_az, axes=0), axis=0).astype(np.complex64)\nprint('focused image: shape=%s  Ka(R0)=%.1f Hz/s  Ka range=[%.1f, %.1f]  peak=%.1f'\n      % (img.shape, 2*V**2/(lam*R0), Ka_col.min(), Ka_col.max(), np.abs(img).max()))\n",
+            "label": "Azimuth Compression",
+            "spec": "PROCESSING (RDA step 4): focus in azimuth with the conjugate azimuth matched filter, then inverse azimuth FFT -> focused complex image.\n\nMETHOD C (range-dependent azimuth FM rate). Each range column uses its own slant range R_col = R0 + range_offset, so its own Ka(r):\n  Ka(r) = 2 V^2 / (lam * R_col)            # per range column (Nr,)\n  H_az  = exp(-j pi f_eta^2 / Ka(r))       # 2-D (Na, Nr), conjugate, focuses at az=0\n  img   = IFFT( ifftshift( S_rd_rcmc * H_az ) )\n\nWhy: a single Ka fixed at R0 mis-focuses far-range targets once the swath is wide. Verified (verify_rcmc_swath_sweep.py): the range-independent filter mis-places corner targets by 1-2 azimuth cells from ~+-1 km swath; Ka(r) brings them back to 0. At narrow swath Ka(r) == single-Ka, so this is a safe always-on upgrade.\n\nNote on RCMC (n16): kept parabolic on purpose. The exact-hyperbolic dR was verified to make NO measurable difference even at B=600 MHz / +-2 km (R0 ~ 567 km geometry), so azimuth Ka(r) is the ONLY focusing fix that matters for wide swath; do not 'fix' the RCMC unless geometry changes drastically.\n\nResult: each point target collapses to its impulse response (IRF), correctly placed across the full swath."
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n18",
+        "type": "canvasNode",
+        "position": {
+          "x": 2449.935979575324,
+          "y": 1087.3884101664069
+        },
+        "width": 832,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 6: Focused image — full view + adaptive-x crop in ONE block, faithful\n# (binary single-renderer pair path, surface3d_pair_gl).\n#   A (Full) = whole focused scene at full resolution (NO max-pool).\n#   B (Crop) = 0-centred +/-W window (W = float(view_scale) m), complex-\n#              upsampled by F to reveal IRF sidelobes. The crop is upsampled\n#              (NOT pooled) so the detail is preserved; its title/status note\n#              the upsample factor.\n# surface3d_pair_gl shares one WebGLRenderer; toggle Full/Crop in the plot.\nrg_axis = (t_r - t_r_center) * c / 2\n\nW = float(view_scale)\n_rc = np.where((rg_axis >= -W) & (rg_axis <= W))[0]\n_ac = np.where((az_pos  >= -W) & (az_pos  <= W))[0]\n_sub = img[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\nF = crop_upsample_factor(len(_azx), len(_rgx))\n_mag = upsample_complex(_sub, F)\n_rgu = upsample_axis(_rgx, F); _azu = upsample_axis(_azx, F)\n\nsurface3d_pair_gl(\n    img, rg_axis, az_pos, 'Step 6: Focused image (full view)',\n    _mag, _rgu, _azu, 'Step 6: Focused image (x%d, 0-centred +/-%dm)' % (F, int(W)),\n    status_b='upsample x%d' % F)",
+            "label": "Plot Focused Image",
+            "spec": "Display-only: 3-D surface of the focused image |img| in dB (the final RDA output). Each point target should appear as a sharp peak (its impulse response / IRF). Interactive; Expand opens a large copy. Does not modify any physical array."
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n19",
+        "type": "canvasNode",
+        "position": {
+          "x": 681.0182097102215,
+          "y": 1088.6531130425055
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 3: Range-compressed — full view + adaptive-x crop in ONE block, faithful\n# (surface3d_pair_gl, NO max-pool). The crop is complex-upsampled by F so the\n# range sinc sidelobes are smooth; the crop title/status note the upsample factor.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = float(view_scale)\n\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_ac = np.where((az_pos  >= -_W) & (az_pos  <= _W))[0]\n_sub = s_rc[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\nF = crop_upsample_factor(len(_azx), len(_rgx))\n_mag = upsample_complex(_sub, F)\n_rgu = upsample_axis(_rgx, F); _azu = upsample_axis(_azx, F)\n\nsurface3d_pair_gl(\n    s_rc, rg_axis, az_pos, 'Step 3: Range-compressed (full view)',\n    _mag, _rgu, _azu, 'Step 3: Range-compressed (x%d crop)' % F,\n    status_b='upsample x%d' % F)",
+            "label": "Plot: Range-compressed",
+            "spec": "Display-only: 3-D dB surface of |s_rc| after range compression. Targets are now sharp in range (thin ridges) but still spread in azimuth. Full resolution (no downsampling); the Crop view is complex-upsampled to reveal range sidelobes. Toggle Full/Crop; Expand for a large copy."
+          },
+          "enabled": false,
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n20",
+        "type": "canvasNode",
+        "position": {
+          "x": 1126.4063171965938,
+          "y": 1091.411949684278
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 4: Range-Doppler — full view + range-only adaptive-x crop in ONE block,\n# faithful (surface3d_pair_gl, NO max-pool). Vertical axis is Doppler [Hz] (not\n# metres): only the range axis is cropped AND complex-upsampled by F to maximize\n# range detail. The crop title/status note the (range) upsample factor. Toggle\n# Full/Crop.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = float(view_scale)\n\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_sub = S_rd[:, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]\nF = crop_upsample_factor(S_rd.shape[0], len(_rgx), range_only=True)\n_mag = upsample_complex_range(_sub, F)\n_rgu = upsample_axis(_rgx, F)\n\nsurface3d_pair_gl(\n    S_rd, rg_axis, f_eta, 'Step 4: Range-Doppler (full view)',\n    _mag, _rgu, f_eta, 'Step 4: Range-Doppler (range x%d crop)' % F,\n    ylabel_a='Doppler [Hz]', ylabel_b='Doppler [Hz]',\n    status_b='upsample x%d (range)' % F)",
+            "label": "Plot: Range-Doppler",
+            "spec": "Display-only: 3-D dB surface of |S_rd| in the Range-Doppler domain. A target's energy lies on the RCM parabola (curved ridge across range vs Doppler) — this is why RCMC is needed. Axes: range [m] x Doppler [Hz]. Full resolution (no downsampling); the Crop view is range-upsampled. Toggle Full/Crop."
+          },
+          "enabled": false,
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n21",
+        "type": "canvasNode",
+        "position": {
+          "x": 1645.3812868104822,
+          "y": 1066.9135980355052
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 5: After RCMC — full view + range-only adaptive-x crop in ONE block,\n# faithful (surface3d_pair_gl, NO max-pool). Vertical axis is Doppler [Hz]: only\n# the range axis is cropped AND complex-upsampled by F to maximize range detail.\n# The crop title/status note the (range) upsample factor. Toggle Full/Crop.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = float(view_scale)\n\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_sub = S_rd_rcmc[:, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]\nF = crop_upsample_factor(S_rd_rcmc.shape[0], len(_rgx), range_only=True)\n_mag = upsample_complex_range(_sub, F)\n_rgu = upsample_axis(_rgx, F)\n\nsurface3d_pair_gl(\n    S_rd_rcmc, rg_axis, f_eta, 'Step 5: After RCMC (full view)',\n    _mag, _rgu, f_eta, 'Step 5: After RCMC (range x%d crop)' % F,\n    ylabel_a='Doppler [Hz]', ylabel_b='Doppler [Hz]',\n    status_b='upsample x%d (range)' % F)",
+            "label": "Plot: RCMC",
+            "spec": "Display-only: 3-D dB surface of |S_rd_rcmc| after Range Cell Migration Correction. The curved RCM ridge from the previous step is now straightened (energy aligned to one range cell across Doppler). Axes: range [m] x Doppler [Hz]. Full resolution (no downsampling); the Crop view is range-upsampled. Toggle Full/Crop."
+          },
+          "enabled": false,
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n23",
+        "type": "canvasNode",
+        "position": {
+          "x": 2061.0352370935925,
+          "y": -39.37473848662674
+        },
+        "width": 250,
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "n_targets",
+            "value": "1",
+            "min": "1",
+            "max": "10",
+            "step": "1",
+            "label": "Targets (count)"
+          }
+        }
+      },
+      {
+        "id": "n24",
+        "type": "canvasNode",
+        "position": {
+          "x": 41.44746240299202,
+          "y": -7.5565003517455125
+        },
+        "width": 250,
+        "data": {
+          "label": "Dropdown",
+          "category": "gui",
+          "blockType": "gui_dropdown",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "view_scale",
+            "options_csv": "5,10,20,40,100,200,500",
+            "label": "Crop Area (m)",
+            "value": "40"
+          }
+        }
+      },
+      {
+        "id": "n25",
+        "type": "canvasNode",
+        "position": {
+          "x": -488.98322183952496,
+          "y": 1258.717301627971
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === LNA (Level 2 RF Front-End): signal level normalization + thermal noise ===\n# Two steps performed here:\n#  1) Normalize the simulated s_raw so its peak lands at signal_peak_dbfs (relative\n#     to ADC full-scale = 1.0). This represents the cumulative analog gain (Tx\n#     power × G² × range loss × receiver gain) that determines where the signal\n#     lives in the ADC's dynamic range.\n#  2) Add receiver thermal noise modelled by the LNA's Noise Figure (Friis-dominant\n#     stage). Power = k×T×B×F, voltage = sqrt(P × R_load). Reference: ADC FS = 1.0 V\n#     into R_load = 50 Ω. Complex AWGN with per-component std = σ/√2.\n#\n# Connection to other nodes:\n#   nf_db            ← gui_slider n26 (Noise Figure)\n#   signal_peak_dbfs ← gui_slider n53 (Signal peak dBFS)\n#   B                ← n1 (Common Parameters, chirp bandwidth)\n#\n# After this stage, s_raw is in ADC-FS-relative units (peak ≈ 10^(signal_peak_dbfs/20))\n# and ready for ADC quantization (Route B Stage A in fixed mode) or ideal floating\n# point processing (Route A pass-through).\nimport numpy as np\nimport time as _time\n_t0 = _time.monotonic()\n\n# --- Constants ---\nk_boltz = 1.380649e-23   # Boltzmann constant [J/K]\nT_K     = 290.0           # Standard system noise temperature [K]\nR_load  = 50.0            # ADC / receiver input impedance [Ω]\nADC_FS_V = 1.0            # Convention: ADC full-scale = ±1.0 V (= +10 dBm peak @ 50 Ω)\n\n# --- Parameters from GUI sliders ---\nnf_db            = float(globals().get('nf_db',           3.0))\nsignal_peak_dbfs = float(globals().get('signal_peak_dbfs', -10.0))\n\n# --- Step 1: scale signal so peak = 10^(signal_peak_dbfs/20) × ADC_FS_V ---\nsig_peak_target = (10.0 ** (signal_peak_dbfs / 20.0)) * ADC_FS_V\ncurrent_peak = float(np.abs(s_raw).max())\nif current_peak > 0:\n    gain_factor = sig_peak_target / current_peak\n    s_raw = (s_raw * gain_factor).astype(np.complex64)\nelse:\n    gain_factor = 0.0\n\n# --- Step 2: thermal noise (kTBF) ---\nF_lin = 10.0 ** (nf_db / 10.0)\nthermal_power_W = k_boltz * T_K * B * F_lin       # noise power at receiver input [W]\nthermal_voltage_V = float(np.sqrt(thermal_power_W * R_load))  # RMS voltage [V]\n# In ADC-FS-relative units (FS = ADC_FS_V):\nnoise_std = thermal_voltage_V / ADC_FS_V\nnoise_floor_dbfs = 20.0 * np.log10(noise_std + 1e-30)\n\n# --- Add complex AWGN: E[|n|²] = noise_std², per-component std = noise_std/√2 ---\nNOISE_SEED = 1\nrng = np.random.RandomState(int(NOISE_SEED) & 0xFFFFFFFF)\nnoise = (noise_std / np.sqrt(2.0)) * (\n    rng.standard_normal(s_raw.shape) + 1j * rng.standard_normal(s_raw.shape)\n)\ns_raw = (s_raw + noise).astype(np.complex64)\n\n# --- Diagnostics ---\nsnr_db = signal_peak_dbfs - noise_floor_dbfs   # peak SNR\nprint('LNA Level 2: NF=%.1f dB  B=%.1f MHz  T=%.0f K' % (nf_db, B / 1e6, T_K))\nprint('  Signal peak:  %+.1f dBFS  (gain=%.2e applied; achieved peak=%.4f V_FS)'\n      % (signal_peak_dbfs, gain_factor, float(np.abs(s_raw).max())))\nprint('  Thermal noise floor:  %+.1f dBFS  (σ=%.3g V at FS=%.1f V)' % (\n      noise_floor_dbfs, noise_std, ADC_FS_V))\nprint('  Peak SNR (per-sample):  %.1f dB    (%.2fs)' % (snr_db, _time.monotonic() - _t0))\n",
+            "label": "LNA (Level 2)",
+            "spec": "【LNA (Level 2 RF Front-End)】\n\n2段の処理を行う:\n1. 信号スケーリング — s_raw のピークを signal_peak_dbfs (ADC FS=1.0V 相対) に揃える。これは Tx パワー × アンテナ利得² × レンジ損失 × 受信 RF chain ゲインの累積を一括で表すゲイン\n2. 熱雑音注入 — Noise Figure ベースの kTBF モデル。LNA が Friis 支配段なのでここで足す\n   noise_power = k × T × B × F  (Watts, 受信機入力換算)\n   noise_voltage = sqrt(P × R_load)  (RMS Volts, R_load=50Ω)\n   noise_std_FS = noise_voltage / ADC_FS_V  (ADC FS=1V 単位)\n   complex AWGN: E[|n|²]=σ²、I/Q 各成分の std = σ/√2\n\n入力（kernel namespace）:\n  s_raw  ← Route A/B/C-in が出力\n  B      ← n1 (chirp bandwidth)\n\nGUI 入力:\n  nf_db             ← n26 (Noise Figure dB)\n  signal_peak_dbfs  ← n53 (Signal peak dBFS)\n\n出力（kernel namespace）:\n  s_raw  ← 後段 (n9 BPF 〜 n18 SLC) が消費。peak = 10^(signal_peak_dbfs/20)、熱雑音床は NF と B から決まる絶対値\n\nLevel 1 (旧 SNR_dB) との違い:\n- SNR を直接指定 → NF と帯域から物理的に決まる\n- 信号レベルが ADC FS 相対の絶対値を持つ → Route B Stage A の fixed 量子化で飽和・underflow が観測できる\n- 「画像でレンジが変動する」現象が直接見える: σ°_max を上げると signal_peak_dbfs を超えて飽和する"
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n26",
+        "type": "canvasNode",
+        "position": {
+          "x": -398.3485967175327,
+          "y": 1117.4087821824053
+        },
+        "width": 250,
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "nf_db",
+            "value": "3",
+            "min": "-10",
+            "max": "20",
+            "step": "1",
+            "label": "Noise Figure (dB)"
+          }
+        }
+      },
+      {
+        "id": "n27",
+        "type": "canvasNode",
+        "position": {
+          "x": 122.95939438515097,
+          "y": 1086.468504618489
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 2: Raw echo with noise (after LNA) — full view + adaptive-x crop in ONE\n# block, faithful (surface3d_pair_gl, NO max-pool). The crop is complex-upsampled\n# by F; its title/status note the upsample factor. Toggle Full/Crop in the plot.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = float(view_scale)\n\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_ac = np.where((az_pos  >= -_W) & (az_pos  <= _W))[0]\n_sub = s_raw[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\nF = crop_upsample_factor(len(_azx), len(_rgx))\n_mag = upsample_complex(_sub, F)\n_rgu = upsample_axis(_rgx, F); _azu = upsample_axis(_azx, F)\n\nsurface3d_pair_gl(\n    s_raw, rg_axis, az_pos, 'Step 2: Raw echo with noise (full view)',\n    _mag, _rgu, _azu, 'Step 2: Raw echo with noise (x%d crop)' % F,\n    status_b='upsample x%d' % F)",
+            "label": "Plot Raw Echo with noise",
+            "spec": "Display-only: show |s_raw| (raw echo amplitude) over (range, azimuth). Does not modify any physical array."
+          },
+          "enabled": false,
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n28",
+        "type": "canvasNode",
+        "position": {
+          "x": 2330.901408088625,
+          "y": -163.69839282637565
+        },
+        "width": 250,
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "clutter_n",
+            "value": "0",
+            "min": "0",
+            "max": "400",
+            "step": "10",
+            "label": "Clutter N"
+          }
+        }
+      },
+      {
+        "id": "n29",
+        "type": "canvasNode",
+        "position": {
+          "x": 2332.69992816726,
+          "y": -17.698392826375652
+        },
+        "width": 250,
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "clutter_rcs_db",
+            "value": "-20",
+            "min": "-40",
+            "max": "0",
+            "step": "1",
+            "label": "Clutter level (dB)"
+          }
+        }
+      },
+      {
+        "id": "n30",
+        "type": "canvasNode",
+        "position": {
+          "x": 495.79938052923285,
+          "y": 265.13453431833346
+        },
+        "width": 485,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Fixed Parameters — display-only summary table of the SAR system parameters\n# and the resolutions/grid they imply (mirrors the sar-visualizer panel).\n# Reads kernel variables defined upstream (n1 params, n2 derived); modifies\n# nothing. range res = c/(2B), azimuth res = La/2.\nfrom IPython.display import display as _display, HTML as _HTML\n\n_rows = [\n    (\"Carrier fc\",          \"%.2f GHz (&lambda;&approx;%.0f mm)\" % (fc / 1e9, lam * 1e3)),\n    (\"Bandwidth B\",         \"%.0f MHz\" % (B / 1e6)),\n    (\"Sampling rate Fs\",    \"%.0f MHz (Fs/B = %.2f, cell = c/(2Fs) = %.2f m)\"\n                            % (Fs / 1e6, Fs / B, c / (2 * Fs))),\n    (\"Pulse width Tp\",      \"%.0f &micro;s\" % (Tp * 1e6)),\n    (\"PRF\",                 \"%.0f Hz\" % PRF),\n    (\"Altitude H\",          \"%.0f km\" % (H / 1e3)),\n    (\"Velocity V\",          \"%.0f m/s\" % V),\n    (\"Look angle\",          \"%.0f&deg;\" % np.rad2deg(look)),\n    (\"Antenna La\",          \"%.1f m (&theta;a = &lambda;/La)\" % La),\n    (\"Range res (slant)\",   \"c/(2B) = %.2f m\" % (c / (2 * B))),\n    (\"Azimuth res\",         \"La/2 = %.2f m\" % (La / 2)),\n    (\"Target T1\",           \"az 0 m, slant range R0 &approx; %.1f km\" % (R0 / 1e3)),\n    (\"Samples (range &times; azimuth)\", \"%d &times; %d\" % (Nr, Na)),\n]\n\n_html = [\n    '<div style=\"display:inline-block;background:#0e1422;border:1px solid #2a3142;'\n    'border-radius:8px;padding:10px 14px;font:13px system-ui,sans-serif;color:#cfd6e6\">',\n    '<div style=\"color:#9aa4ba;font-size:11px;letter-spacing:1px;margin-bottom:8px\">FIXED PARAMETERS</div>',\n    '<table style=\"border-collapse:collapse\">',\n]\nfor _label, _val in _rows:\n    _html.append(\n        '<tr>'\n        '<td style=\"color:#7f8aa3;padding:2px 18px 2px 0;white-space:nowrap\">%s</td>'\n        '<td style=\"color:#cfd6e6;text-align:right;white-space:nowrap\">%s</td>'\n        '</tr>' % (_label, _val)\n    )\n_html.append('</table></div>')\n_display(_HTML(''.join(_html)))\nprint('fixed parameters displayed')",
+            "label": "Fixed Parameters"
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n31",
+        "type": "canvasNode",
+        "position": {
+          "x": 42.607394574897626,
+          "y": 138.4434996482545
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === Plot library (workspace-local) ===\n# Display/interpolation helpers for this SAR workspace. Defined here as a\n# visible first node (not hidden in app code) so they are easy to find and\n# edit, and shared with every downstream node via the kernel namespace.\n# See this block's SPEC for what each function does.\n\nimport json as _json\nfrom IPython.display import display as _display, HTML as _HTML\n\n# Display vertex cap used by crop_upsample_factor to bound the upsampled-crop\n# vertex count so a complex-upsampled crop stays under the 4GB-capped renderer\n# heap. (The _gl display path is full resolution / no max-pool.)\nMAX_VERTS = 250000  # ~500x500\n\ndef crop_upsample_factor(n_rows, n_cols, cap=MAX_VERTS, fmax=6, range_only=False):\n    \"\"\"Largest integer upsample factor F in [1..fmax] keeping the upsampled crop\n    under `cap` vertices, so a crop can be x-upsampled WITHOUT being max-pooled\n    afterwards (pooling a deliberate upsample is self-defeating).\n      2D  (upsample_complex, both axes): verts ~= ((R-1)*F+1)*((C-1)*F+1)\n          -> F ~= floor(sqrt(cap/(R*C)))\n      range-only (upsample_complex_range, only last axis; rows stay full):\n          verts ~= R*((C-1)*F+1) -> F ~= floor((cap/R - 1)/(C-1))\n          (If R alone already nears cap, F clamps to 1 and the caller should pool\n           the ROW axis only via pool='rows' to fit — that keeps range detail.)\n    n_rows/n_cols are the crop's sample counts BEFORE upsampling.\"\"\"\n    import math as _math\n    R = max(1, int(n_rows)); C = max(1, int(n_cols))\n    if range_only:\n        if C <= 1:\n            return max(1, min(fmax, int(cap // R)))\n        F = int((cap / R - 1) // (C - 1))\n    else:\n        F = int(_math.floor(_math.sqrt(cap / (R * C))))\n    return max(1, min(fmax, F))\n\n\ndef _catmull(p0,p1,p2,p3,t):\n    t2=t*t; t3=t2*t\n    return 0.5*(2*p1+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3)\ndef _interp_axis(a, f):\n    import numpy as _np\n    N=a.shape[-1]; outN=(N-1)*f+1; oc=_np.arange(outN); fc=oc/f\n    c1=_np.minimum(N-2,_np.floor(fc).astype(int)); tc=fc-c1\n    cm1=_np.clip(c1-1,0,N-1); c0=_np.clip(c1,0,N-1); cp1=_np.clip(c1+1,0,N-1); cp2=_np.clip(c1+2,0,N-1)\n    return _catmull(a[...,cm1],a[...,c0],a[...,cp1],a[...,cp2],tc)\ndef upsample_complex(field, factor):\n    import numpy as _np\n    f=int(factor)\n    if f<=1: return _np.abs(field)\n    re=field.real; im=field.imag\n    re=_interp_axis(re,f); im=_interp_axis(im,f)\n    re=_np.moveaxis(_interp_axis(_np.moveaxis(re,0,-1),f),-1,0)\n    im=_np.moveaxis(_interp_axis(_np.moveaxis(im,0,-1),f),-1,0)\n    return _np.hypot(re,im)\ndef upsample_axis(ax, f):\n    import numpy as _np\n    f=int(f); return _np.linspace(float(ax[0]), float(ax[-1]), (len(ax)-1)*f+1) if f>1 else _np.asarray(ax)\n\ndef upsample_complex_range(field, factor):\n    \"\"\"Complex upsample along the LAST axis (range) only — re/im interpolated\n    separately, then magnitude. Use for Range-Doppler/RCMC crops where only the\n    range axis is cropped and the Doppler axis must stay as-is.\"\"\"\n    import numpy as _np\n    f = int(factor)\n    if f <= 1:\n        return _np.abs(field)\n    re = _interp_axis(field.real, f)\n    im = _interp_axis(field.imag, f)\n    return _np.hypot(re, im)\n\ndef _emit_surface_gl(tv, xa, ya, title, xlabel, ylabel, status, H=0.35):\n    \"\"\"Emit the surface as the new binary single-renderer mime.\n    tv: float32 0..1 dB-normalised grid (same definition as _surf_db_payload).\n    Vertices go out as base64(Float32Array) — emitted ONCE (no double-embed).\"\"\"\n    import numpy as _np, base64 as _b64, json as _json2\n    tvf = _np.ascontiguousarray(tv, dtype=_np.float32)\n    nr, nc = tvf.shape\n    meta = {'kind':'single','title':title,'status':status,\n        'nrows':int(nr),'ncols':int(nc),'H':float(H),\n        'xr':[float(_np.min(xa)),float(_np.max(xa))],\n        'yr':[float(_np.min(ya)),float(_np.max(ya))],\n        'xlabel':xlabel,'ylabel':ylabel,'dtype':'float32',\n        'field_b64':_b64.b64encode(tvf.tobytes()).decode('ascii')}\n    _display({'application/x-hiyocanvas-surface3d': _json2.dumps(meta)}, raw=True)\n    print('surface3d_gl: %d x %d = %d cells, payload %.1f MB (binary path)' %\n          (nr, nc, nr*nc, len(meta['field_b64'])/1e6))\n\ndef surface3d_gl(field, x_axis, y_axis, title, xlabel='range [m]', ylabel='azimuth [m]',\n                 x_range=None, y_range=None, status=None):\n    \"\"\"Binary single-renderer twin of surface3d (NO max-pool, NO string double-embed).\n    dB-normalisation identical to surface3d so old/new pixel comparison is valid.\"\"\"\n    import numpy as _np\n    A = _np.abs(field) if _np.iscomplexobj(field) else _np.asarray(field)\n    xa = _np.asarray(x_axis); ya = _np.asarray(y_axis)\n    if x_range is not None:\n        sel=_np.where((xa>=x_range[0])&(xa<=x_range[1]))[0]; j0,j1=int(sel[0]),int(sel[-1]); A=A[:,j0:j1+1]; xa=xa[j0:j1+1]\n    if y_range is not None:\n        sel=_np.where((ya>=y_range[0])&(ya<=y_range[1]))[0]; i0,i1=int(sel[0]),int(sel[-1]); A=A[i0:i1+1,:]; ya=ya[i0:i1+1]\n    dbv = 20*_np.log10(A/A.max()+1e-12); dbv=_np.clip(dbv,-40,0)\n    tv = ((dbv+40)/40).astype(_np.float32)\n    _emit_surface_gl(tv, xa, ya, title, xlabel, ylabel, status)\n\n\ndef _surf_gl_sub(field, x_axis, y_axis, title, xlabel, ylabel, status, H=0.35):\n    \"\"\"Build one sub-payload dict (a or b) for surface3d_pair_gl. dB-normalisation\n    identical to _emit_surface_gl / _surf_db_payload (load-bearing for old/new compare).\"\"\"\n    import numpy as _np, base64 as _b64\n    A = _np.abs(field) if _np.iscomplexobj(field) else _np.asarray(field)\n    xa = _np.asarray(x_axis); ya = _np.asarray(y_axis)\n    dbv = 20*_np.log10(A/A.max()+1e-12); dbv=_np.clip(dbv,-40,0)\n    tv = ((dbv+40)/40).astype(_np.float32); tvf=_np.ascontiguousarray(tv,dtype=_np.float32)\n    nr,nc = tvf.shape\n    return {'title':title,'status':status,'nrows':int(nr),'ncols':int(nc),'H':float(H),\n        'xr':[float(_np.min(xa)),float(_np.max(xa))],'yr':[float(_np.min(ya)),float(_np.max(ya))],\n        'xlabel':xlabel,'ylabel':ylabel,'dtype':'float32',\n        'field_b64':_b64.b64encode(tvf.tobytes()).decode('ascii')}\n\ndef surface3d_pair_gl(field_a, xa, ya, title_a, field_b, xb, yb, title_b,\n                      xlabel_a='range [m]', ylabel_a='azimuth [m]', xlabel_b=None, ylabel_b=None,\n                      status_a=None, status_b=None):\n    \"\"\"Binary single-renderer twin of surface3d_pair (Full=a / Crop=b toggle).\n    NO max-pool, NO string double-embed. dB-norm identical to surface3d_pair_gl single.\"\"\"\n    import json as _json2\n    if xlabel_b is None: xlabel_b = xlabel_a\n    if ylabel_b is None: ylabel_b = ylabel_a\n    a = _surf_gl_sub(field_a, xa, ya, title_a, xlabel_a, ylabel_a, status_a)\n    b = _surf_gl_sub(field_b, xb, yb, title_b, xlabel_b, ylabel_b, status_b)\n    meta = {'kind':'pair','a':a,'b':b}\n    _display({'application/x-hiyocanvas-surface3d': _json2.dumps(meta)}, raw=True)\n    print('surface3d_pair_gl: A %dx%d / B %dx%d, payload %.1f MB (binary path)' %\n          (a['nrows'],a['ncols'],b['nrows'],b['ncols'],(len(a['field_b64'])+len(b['field_b64']))/1e6))\n\nprint('plot library ready: crop_upsample_factor, upsample_complex, upsample_complex_range, upsample_axis, surface3d_gl, surface3d_pair_gl')",
+            "label": "Plot Library",
+            "spec": "Plot library for this SAR workspace (workspace-local, not app code). Defined as an unconnected first node so it runs before everything (input-unconnected nodes execute first) and shares its functions with all downstream nodes via the kernel namespace.\n\nFunctions:\n- surface3d(field, x_axis, y_axis, title, xlabel, ylabel, x_range, y_range, status): interactive Three.js 3D dB surface (inferno, -40..0 dB). x_range/y_range crop range/azimuth. On-demand render; left-drag rotate, right-drag pan, wheel zoom; Expand opens a new window.\n- upsample_complex(field, factor): 2-axis complex Catmull-Rom upsample (re/im then |z|) for smooth sidelobes on cropped views.\n- upsample_complex_range(field, factor): complex upsample along the range axis only (Range-Doppler/RCMC crops; Doppler stays as-is).\n- upsample_axis(ax, factor): matching linear upsample of an axis vector.\n- _catmull/_interp_axis: internal Catmull-Rom helpers."
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n32",
+        "type": "canvasNode",
+        "position": {
+          "x": 2160.7966858033133,
+          "y": 280.8485750918655
+        },
+        "width": 503,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === Reflection Coefficients (NUFFT) — Common stage for all FPGA routes ===\n# Self-contained NUFFT forward model. Builds frequency-domain reflection\n# coefficients S_all (Na,Nr) complex64 from POINT targets or an IMAGE target\n# (2D reflectivity), using finufft type-1. Uses GPU cufinufft when available\n# (no GPU<->CPU transfer, no CPU spreading); falls back to parallel CPU\n# finufft otherwise.\n#\n# This node STOPS at coefficient generation — it does NOT compute s_raw.\n# The downstream \"FPGA Route X\" nodes (Float / Fixed / FPGA-Save / FPGA-Load)\n# consume S_all + chirp_fft (+ fir_coefficients) and produce s_raw.\n#\n# Variables left in the kernel namespace for the route nodes:\n#   S_all            (Na, Nr) complex64  — frequency-domain reflection coeffs\n#   chirp_fft        (Nr,)    complex64  — fft(ref_chirp), NOT conjugated\n#   fir_coefficients (Na, Nr) complex64  — time-domain FIR taps per pulse\n#                                          = ifftshift(ifft(S_all, axis=1))\n#                                          (same form as the FPGA Notebook)\nimport numpy as np\nimport finufft               # CPU fallback\nimport cupy as cp           # MUST import before cufinufft: cupy registers the\n                            # CUDA runtime DLL directory (os.add_dll_directory),\n                            # without which cufinufft's native lib fails to load\n                            # (\"Could not find cufinufft library in system path\").\ntry:\n    import cufinufft         # GPU NUFFT (type-1). ~194s -> ~70s when present.\n    _HAVE_CUFINUFFT = True\nexcept Exception as _e:\n    _HAVE_CUFINUFFT = False\n    _CUFINUFFT_ERR = repr(_e)\nimport concurrent.futures\nimport time as _time\n\nNUFFT_EPS = 1e-6      # accuracy floor (~120 dB). Lower to 1e-9 for higher.\nN_WORKERS = 8         # outer parallelism; finufft inner nthreads=1\n_t0 = _time.monotonic()\n\n# ---- 0. Self-contained clutter helper (was defined in the removed n7) ----\ndef make_clutter_scatterers(count, rcs_db, half_az_m, half_range_m, seed, R0):\n    rnd = make_rand(seed)\n    sigma = (10.0 ** (rcs_db / 20.0)) / np.sqrt(2.0)\n    out = []\n    for i in range(int(count)):\n        az_m = (rnd() * 2 - 1) * half_az_m\n        sr_m = R0 + (rnd() * 2 - 1) * half_range_m\n        u1 = max(rnd(), 1e-12); u2 = rnd()\n        mag = sigma * np.sqrt(-2.0 * np.log(u1))\n        out.append(('clutter%d' % i, az_m, sr_m, mag * np.cos(2*np.pi*u2), mag * np.sin(2*np.pi*u2)))\n    return out\n\n# ---- 1. Build the source list: point targets, clutter, OR an image ----\n_mode = str(globals().get('target_mode', 'point')).strip().lower()\nTARGET_SEED  = 42\nCLUTTER_SEED = 2\nhalf = float(view_scale)\n\n# Level 2 RF physics: σ°_max sets the *amplitude scale* of the brightest scatterer\n# (in voltage units relative to \"1.0 = reference white pixel / unit point target\").\n# σ° is power (m²/m²) so amplitude scales as 10^(σ°_dB / 20). For image targets,\n# the per-pixel image_amp ∈ [0,1] additionally weights this. For point targets,\n# each point gets the full σ°_max amplitude.\nsigma0_max_db = float(globals().get('sigma0_max_db', 0.0))\nsigma0_amp = 10.0 ** (sigma0_max_db / 20.0)\n\nif _mode == 'image':\n    from PIL import Image\n    _path = str(globals().get('image_path', '')).strip()\n    if not _path:\n        raise ValueError(\"target_mode='image' but image_path is empty — pick a file in the Image File block\")\n    _invert = str(globals().get('invert_image', 'true')).strip().lower() in ('1', 'true', 'on', 'yes')\n    _img = Image.open(_path).convert('L')\n    _gray = np.asarray(_img, dtype=np.float32)\n    if _invert:\n        _gray = 255.0 - _gray\n    _rscale = float(globals().get('range_scale', 1.0))\n    _sp_rg = (c / (2 * B)) * _rscale\n    _sp_az = La / 2.0\n    _H, _W = _gray.shape\n    _cell_rg = c / (2 * Fs)\n    _max_cols = int(np.floor(Nr * _cell_rg / max(_sp_rg, 1e-12)))\n    _az_span = float(az_pos.max() - az_pos.min())\n    _max_rows = int(np.floor(_az_span / _sp_az)) + 1\n    _cropped = False\n    if _W > _max_cols:\n        print('!! IMAGE TOO WIDE (range): %d px * range_scale %.2f > Nr %d. Cropping range to %d px (top-left). Lower range_scale or raise Nr to see it all.' % (_W, _rscale, Nr, _max_cols))\n        _gray = _gray[:, :_max_cols]; _cropped = True\n    if _H > _max_rows:\n        print('!! IMAGE TOO TALL (azimuth): %d px > az grid %d px. Cropping azimuth to %d px (top-left).' % (_H, _max_rows, _max_rows))\n        _gray = _gray[:_max_rows, :]; _cropped = True\n    _H, _W = _gray.shape\n    _rows, _cols = np.where(_gray > 0)\n    if len(_rows) == 0:\n        raise ValueError(\"image has no non-zero pixels after invert=%s / crop\" % _invert)\n    az_arr = (_rows - _H / 2.0) * _sp_az\n    sr_arr = R0 + (_cols - _W / 2.0) * _sp_rg\n    amp_arr = (_gray[_rows, _cols] / 255.0).astype(np.float64)\n    src_az = az_arr.astype(np.float64)\n    src_sr = sr_arr.astype(np.float64)\n    src_re = (amp_arr * sigma0_amp).astype(np.float64)   # image_amp × σ°_max amplitude\n    src_im = np.zeros_like(src_re)\n    NT = len(src_az)\n    print('IMAGE target: %s  %dx%d  %d scatterers (invert=%s)  σ°_max=%+.1f dB  spacing %.2f x %.2f m  window +/-%.0f m'\n          % (_path.split('/')[-1].split('\\\\')[-1], _H, _W, NT, _invert, sigma0_max_db, _sp_rg, _sp_az, half))\nelse:\n    sources = [(n, a, s, sigma0_amp, 0.0) for (n, a, s) in\n               make_point_targets(n_targets, half, half, TARGET_SEED, R0)]\n    n_clutter = int(clutter_n)\n    if n_clutter > 0:\n        sources += make_clutter_scatterers(n_clutter, clutter_rcs_db, half, half, CLUTTER_SEED, R0)\n    src_az = np.array([s[1] for s in sources], dtype=np.float64)\n    src_sr = np.array([s[2] for s in sources], dtype=np.float64)\n    src_re = np.array([s[3] for s in sources], dtype=np.float64)\n    src_im = np.array([s[4] for s in sources], dtype=np.float64)\n    NT = len(sources)\n    print('POINT sources: %d point + %d clutter  σ°_max=%+.1f dB  window=+/-%.0f m' % (n_targets, n_clutter, sigma0_max_db, half))\n\n# ---- 2. Forward chirp spectrum: fft(ref_chirp), NOT conjugated, NO ifftshift ----\nchirp_fft = np.fft.fft(ref_chirp).astype(np.complex64)\n\n# ---- 3. GPU precompute weights + NUFFT coords; CPU parallel finufft ----\naz_t = cp.asarray(src_az, dtype=cp.float64)\nsr_t = cp.asarray(src_sr, dtype=cp.float64)\nrefl = cp.asarray((src_re + 1j * src_im).astype(np.complex64), dtype=cp.complex64)\naz_g = cp.asarray(az_pos, dtype=cp.float64)\nt_r_center = float(2 * R0 / c)\ninv_lam = 1.0 / float(lam)\n\n_xb_chk = -2.0 * np.pi * Fs * (2.0 * src_sr / c - t_r_center) / Nr\n_xb_max = float(np.abs(_xb_chk).max())\nif _xb_max > np.pi:\n    _fold_pct = 100.0 * float((np.abs(_xb_chk) > np.pi).mean())\n    _ext_cells = (src_sr.max() - src_sr.min()) / (c / (2 * Fs))\n    print((\"!! NUFFT FOLD WARNING: x_b reaches %.2f*pi (>1). %.0f%% of scatterers \"\n           \"fold (alias) -> spurious range banding. Image range extent = %.0f cells \"\n           \"but grid Nr = %d. Fix: lower range_scale, use a smaller image, or raise \"\n           \"Nr. Result is NOT physically correct.\") % (_xb_max/np.pi, _fold_pct, _ext_cells, Nr))\n\n\nS_all = np.zeros((Na, Nr), dtype=np.complex64)\n\nif _HAVE_CUFINUFFT:\n    gpu_pb = max(4, min(512, int(2e9 / max(1, NT) / 32)))\n    print('GPU NUFFT (cufinufft): gpu_pb=%d  n_batches=%d  NT=%d' % (gpu_pb, (Na+gpu_pb-1)//gpu_pb, NT))\n    _cuplan = cufinufft.Plan(1, (Nr,), eps=NUFFT_EPS, isign=1, dtype='complex64')\n    S_gpu_acc = cp.empty((Na, Nr), dtype=cp.complex64)\n    for pstart in range(0, Na, gpu_pb):\n        pend = min(pstart + gpu_pb, Na)\n        azb = az_g[pstart:pend]\n        daz = azb[:, None] - az_t[None, :]\n        R_eta = cp.sqrt(sr_t[None, :]**2 + daz**2)\n        squint = cp.arctan2(daz, sr_t[None, :])\n        pat = cp.sinc(squint / theta_az) ** 2\n        tau = 2.0 * R_eta / c\n        x_b = (-2.0 * np.pi * Fs * (tau - t_r_center) / Nr).astype(cp.float32)\n        carrier = cp.exp(-4j * np.pi * R_eta * inv_lam).astype(cp.complex64)\n        # Level 2: 1/R² range-loss amplitude factor per scatterer per pulse.\n        # Normalized by R0 so the magnitude stays ~1 (R_eta ≈ R0 ± 100m for SAR\n        # swaths). Captures the *relative* range loss within a swath; absolute\n        # link-budget scaling is applied later in n25 (signal_peak_dBFS).\n        range_loss = ((R0 / R_eta) ** 2).astype(cp.complex64)\n        w_b = (refl[None, :] * pat.astype(cp.complex64) * carrier * range_loss).astype(cp.complex64)\n        del daz, R_eta, squint, pat, tau, carrier, range_loss\n        for i in range(pend - pstart):\n            _cuplan.setpts(cp.ascontiguousarray(x_b[i]))\n            S_gpu_acc[pstart + i] = cp.fft.ifftshift(_cuplan.execute(cp.ascontiguousarray(w_b[i])))\n        del x_b, w_b\n        cp.get_default_memory_pool().free_all_blocks()\n        print('\\r  pulses %d/%d (%.0f%%)' % (pend, Na, 100*pend/Na), end='')\n    S_all = cp.asnumpy(S_gpu_acc)\n    del S_gpu_acc\n    cp.get_default_memory_pool().free_all_blocks()\nelse:\n    print('GPU cufinufft unavailable (%s) -> CPU finufft fallback' % _CUFINUFFT_ERR)\n    gpu_pb = max(4, min(512, int(2e9 / max(1, NT) / 32)))\n\n    def _nufft_chunk(x_chunk, w_chunk, row_start):\n        plan = finufft.Plan(1, (Nr,), eps=NUFFT_EPS, isign=1,\n                            dtype='complex64', nthreads=1)\n        out = np.empty((len(x_chunk), Nr), dtype=np.complex64)\n        for i in range(len(x_chunk)):\n            plan.setpts(x_chunk[i])\n            out[i] = np.fft.ifftshift(plan.execute(w_chunk[i]))\n        return row_start, out\n\n    for pstart in range(0, Na, gpu_pb):\n        pend = min(pstart + gpu_pb, Na)\n        azb = az_g[pstart:pend]\n        daz = azb[:, None] - az_t[None, :]\n        R_eta = cp.sqrt(sr_t[None, :]**2 + daz**2)\n        squint = cp.arctan2(daz, sr_t[None, :])\n        pat = cp.sinc(squint / theta_az) ** 2\n        tau = 2.0 * R_eta / c\n        x_b = cp.asnumpy((-2.0 * np.pi * Fs * (tau - t_r_center) / Nr).astype(cp.float32))\n        carrier = cp.exp(-4j * np.pi * R_eta * inv_lam).astype(cp.complex64)\n        # Level 2: 1/R² range-loss (same as GPU path above).\n        range_loss = ((R0 / R_eta) ** 2).astype(cp.complex64)\n        w_b = cp.asnumpy((refl[None, :] * pat.astype(cp.complex64) * carrier * range_loss).astype(cp.complex64))\n        del daz, R_eta, squint, pat, tau, carrier, range_loss\n        cp.get_default_memory_pool().free_all_blocks()\n        nb = pend - pstart\n        sub = max(1, nb // N_WORKERS)\n        chunks = [(x_b[i:i+sub], w_b[i:i+sub], i) for i in range(0, nb, sub)]\n        with concurrent.futures.ThreadPoolExecutor(max_workers=N_WORKERS) as ex:\n            for fut in concurrent.futures.as_completed(\n                    [ex.submit(_nufft_chunk, xc, wc, st) for xc, wc, st in chunks]):\n                st, res = fut.result()\n                S_all[pstart + st: pstart + st + len(res)] = res\n        print('\\r  pulses %d/%d (%.0f%%)' % (pend, Na, 100*pend/Na), end='')\n\n# ---- 4. Time-domain FIR taps for FPGA / Route B (fixed-point) ----\n# fir_coefficients[i, :] = ifft(S_all[i, :])  — NO fftshift.\n# Why no shift: Route B simulates FPGA's FFT-multiply-IFFT path, so\n# fft(fir_coefficients) must equal S_all exactly. A fftshift would inject\n# a (-1)^k factor in frequency domain and Route B's s_raw would be circularly\n# shifted by Nr/2 relative to Route A. Route C-out (.mat save) saves this\n# unshifted form; external HDL viewers can fftshift on display if desired.\nfir_coefficients = np.fft.ifft(S_all, axis=1).astype(np.complex64)\n\nprint('\\nNUFFT coeffs ready: mode=%s S_all=%s chirp_fft=%s fir_coeffs=%s NT=%d  (%.2fs)'\n      % (_mode, S_all.shape, chirp_fft.shape, fir_coefficients.shape, NT, _time.monotonic() - _t0))\n",
+            "label": "Reflection Coefficients (NUFFT, common)",
+            "spec": "【共通ステージ】NUFFTで反射係数を生成するだけのノード。s_raw は計算しない。\n\n出力（kernel namespace 経由で下流の FPGA ルートノードへ）:\n- S_all (Na, Nr) complex64  — 周波数領域反射係数（NUFFT 直出力）\n- chirp_fft (Nr,) complex64 — fft(ref_chirp)、共役なし・ifftshift なし\n- fir_coefficients (Na, Nr) complex64 — 時間領域FIRタップ = ifftshift(ifft(S_all, axis=1))。FPGA Notebook（target_sim_FFT_FPGA_convert2Image2_375M.ipynb）と同じ形式\n\n3つのFPGAルート（Float / Fixed-point / 外部FPGA）はすべてこのノードの出力を共有する。下記ルートノードのいずれかを Enabled にして s_raw を生成する:\n- n32_Float       : Route A — 浮動小数点理想 IFFT（デフォルト Enabled）\n- n32_Fixed       : Route B — fxpmath 固定小数点（3ステージ Q-format）\n- n32_FPGA_Save   : Route C-out — 係数を .mat に書き出し（HDL シミュ用）\n- n32_FPGA_Load   : Route C-in  — FPGA出力の .npy を取り込み s_raw として使用\n\n性能: NUFFT本体（~84s on RTX 5080）は旧 n32 と同じ。末尾の IFFT（~1秒）だけ各ルートノードへ移動した。"
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n33",
+        "type": "canvasNode",
+        "position": {
+          "x": -490,
+          "y": -40
+        },
+        "width": 250,
+        "data": {
+          "label": "Dropdown",
+          "category": "gui",
+          "blockType": "gui_dropdown",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "target_mode",
+            "options_csv": "point,image",
+            "label": "Target Mode",
+            "value": "image"
+          }
+        }
+      },
+      {
+        "id": "n37",
+        "type": "canvasNode",
+        "position": {
+          "x": -490,
+          "y": 88
+        },
+        "width": 250,
+        "data": {
+          "label": "File Picker",
+          "category": "gui",
+          "blockType": "gui_file_picker",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "image_path",
+            "accept": "png,jpg,jpeg,bmp",
+            "label": "Image File",
+            "value": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\images\\strix.png"
+          }
+        }
+      },
+      {
+        "id": "n39",
+        "type": "canvasNode",
+        "position": {
+          "x": -490,
+          "y": 212
+        },
+        "width": 250,
+        "data": {
+          "label": "Toggle",
+          "category": "gui",
+          "blockType": "gui_toggle",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "invert_image",
+            "value": "false",
+            "label_on": "invert ON",
+            "label_off": "invert OFF",
+            "label": "Invert B/W"
+          }
+        }
+      },
+      {
+        "id": "n40",
+        "type": "canvasNode",
+        "position": {
+          "x": -491.05004938365784,
+          "y": 344.7199113370001
+        },
+        "width": 250,
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "range_scale",
+            "value": "1",
+            "min": "1",
+            "max": "10",
+            "step": "0.5",
+            "label": "Range scale (image)"
+          }
+        }
+      },
+      {
+        "id": "n41",
+        "type": "canvasNode",
+        "position": {
+          "x": 2606.207951414265,
+          "y": 1986
+        },
+        "width": 687,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 6 (2-D): top-down view of the focused image [img] in dB. The 3-D surface\n# (n18) shows valleys between azimuth ridges that, seen at an angle, can read as\n# features the image does not actually contain. This flat 2-D imshow is the\n# faithful top-down picture for judging the real focused image.\n#\n# Emits TWO separate PNGs (Full, then Crop). The frontend shows a Full/Crop\n# toggle + Expand for any node that emits multiple images. Display-only:\n# dB-normalised exactly like the 3-D path (20*log10(|img|/max), clipped -40..0),\n# inferno. Full is max-pooled to a display cap (peak-preserving, display only);\n# Crop is the view window at full resolution. The physical img is never modified.\n# Orientation: origin='upper' + y extent (max..min) so azimuth increases\n# DOWNWARD, matching the 3-D plot (n18) and keeping the image upright.\n# Aspect: aspect='equal' so range and azimuth share the same metric scale\n# (1 km in range = 1 km in azimuth on screen). The figure shape is driven by\n# the data extent, not stretched to fill the axes.\nimport numpy as np\nimport matplotlib\nmatplotlib.use('Agg')\nimport matplotlib.pyplot as plt\nimport io, base64\nfrom IPython.display import display\n\ndef _db(a):\n    A = np.abs(a)\n    d = 20.0 * np.log10(A / (A.max() + 1e-12) + 1e-12)\n    return np.clip(d, -40.0, 0.0)\n\ndef _pool_to(a, cap=1200):\n    R, C = a.shape\n    fr = max(1, int(np.ceil(R / cap))); fc = max(1, int(np.ceil(C / cap)))\n    if fr == 1 and fc == 1:\n        return a\n    Rt = (R // fr) * fr; Ct = (C // fc) * fc\n    return a[:Rt, :Ct].reshape(Rt // fr, fr, Ct // fc, fc).max(axis=(1, 3))\n\ndef _emit_png(field_db, x0, x1, y0, y1, title):\n    # Figure size sized to data extent so aspect='equal' fits without huge margins.\n    dx = abs(x1 - x0); dy = abs(y1 - y0)\n    base_h = 4.5  # inches reserved for image height\n    img_w = base_h * (dx / dy) if dy > 0 else base_h\n    img_w = max(3.0, min(12.0, img_w))  # clamp to a sensible range\n    fig_w = img_w + 1.8  # extra room for colorbar + labels\n    fig, ax = plt.subplots(figsize=(fig_w, base_h + 0.6))\n    im = ax.imshow(field_db, origin='upper', cmap='inferno', vmin=-40, vmax=0,\n                   aspect='equal', extent=[x0, x1, y0, y1])\n    ax.set_title(title); ax.set_xlabel('range [m]'); ax.set_ylabel('azimuth [m]')\n    fig.colorbar(im, ax=ax, label='[dB]', shrink=0.85)\n    buf = io.BytesIO(); fig.savefig(buf, format='png', dpi=110, bbox_inches='tight')\n    plt.close(fig)\n    display({'image/png': base64.b64encode(buf.getvalue()).decode('ascii')}, raw=True)\n\nrg_axis = (t_r - t_r_center) * c / 2\n_W = float(view_scale)\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_ac = np.where((az_pos >= -_W) & (az_pos <= _W))[0]\n_crop = np.abs(img[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1])\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\n\n# 1) FULL (max-pooled for display)\nfull_db = _db(_pool_to(np.abs(img)))\n_emit_png(full_db, rg_axis.min(), rg_axis.max(), az_pos.max(), az_pos.min(),\n          'Focused image FULL (2-D, dB)')\n# 2) CROP (view window, full resolution — no pool)\ncrop_db = _db(_crop)\n_emit_png(crop_db, _rgx.min(), _rgx.max(), _azx.max(), _azx.min(),\n          'Focused image CROP (2-D, +/-%dm)' % int(_W))\nprint('2-D focused: full', img.shape, 'pooled', full_db.shape, '| crop', _crop.shape)\n",
+            "label": "Plot Focused Image (2-D)"
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n42",
+        "type": "canvasNode",
+        "position": {
+          "x": 3038.881677049793,
+          "y": -117.76567202830034
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === FPGA Route A: Float Ideal (IFFT) ===\n# 浮動小数点理想ルート。S_all と chirp_fft を周波数領域で乗算して IFFT 戻し、\n# raw echo s_raw を生成する。旧 n32 末尾と完全等価（complex64、GPU 1バッチ）。\n#\n# Enable してこのノードを動かすと s_raw が kernel に出て、下流 n25 (LNA) に\n# 流れる。Route B (n32_Fixed) / Route C-in (n32_FPGA_Load) と同時 Enable しない\n# こと（s_raw が衝突する）。Route C-out (n32_FPGA_Save) とは併用可。\nimport numpy as np\nimport cupy as cp\nimport time as _time\n_t0 = _time.monotonic()\n\nS_gpu = cp.asarray(S_all)\nchirp_gpu = cp.asarray(chirp_fft)\ns_raw = cp.asnumpy(cp.fft.ifft(S_gpu * chirp_gpu[None, :], axis=1)).astype(np.complex64)\ndel S_gpu, chirp_gpu\ncp.get_default_memory_pool().free_all_blocks()\n\nprint('Float route: s_raw=%s peak|s|=%.3f  (%.2fs)'\n      % (s_raw.shape, float(np.abs(s_raw).max()), _time.monotonic() - _t0))\n",
+            "label": "FPGA Route A: Float Ideal (IFFT)",
+            "spec": "【Route A: 浮動小数点理想ルート】\n\nこのノードを Enable にすると S_all × chirp_fft → IFFT を浮動小数点 (complex64) で計算し、理想的な s_raw を生成する。デフォルトで有効。\n\n入力（kernel namespace 経由）:\n  S_all      (Na, Nr) complex64  — n32 (NUFFT共通) が生成\n  chirp_fft  (Nr,)    complex64  — n32 が生成\n\n出力（kernel namespace）:\n  s_raw      (Na, Nr) complex64  — n25 (LNA) が消費\n\n排他関係:\n  Route B (n32_Fixed) / Route C-in (n32_FPGA_Load) と同時 Enable 不可\n  （s_raw が衝突する）。Route C-out (n32_FPGA_Save) とは併用可。"
+          },
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n43",
+        "type": "canvasNode",
+        "position": {
+          "x": 3034.942793772455,
+          "y": 111.48279160102358
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === FPGA Route B: Fixed-point (Q-format 3-stage, GPU) ===\n# FPGA で必然となるビット幅制限が SAR 画像品質にどう効くかを Python で評価する\n# ルート。FPGA でよくある FFT × 周波数乗算 × IFFT のパイプラインを cupy GPU で\n# 量子化しながら模擬する。3 ステージ独立 Q-format:\n#   Stage A : 入力時間領域 (FIR taps + chirp)  --> ADC ビット幅 (Q_IN_*)\n#   Stage B : FFT 後の周波数領域 + 乗算後      --> FPGA 内部演算 (Q_FFT_*)\n#   Stage C : IFFT 後の時間領域 (最終 s_raw)   --> DAC ビット幅 (Q_OUT_*)\n# 各ステージで auto-scale (peak->full-scale*0.95) → round-half-to-even +\n# saturate で量子化 → 復元。量子化 SNR を per-stage に GPU 上で計算して表示。\n#\n# 同時 Enable 排他: Route A (n42) / Route C-in (n47) と同時 Enable 不可\n# (s_raw が衝突する)。Route C-out (n44) とは併用可。\nimport numpy as np\nimport cupy as cp\nimport math\nimport time as _time\n_t0 = _time.monotonic()\n\n# --- Q-format parameters (このノード code を編集してチューニング) ----------\n# Stage A: 入力時間領域 = ADC ビット幅。10bit ADC は Q1.9 (1bit符号 + 9bit小数、\n# range ~[-1, 1))。chirp / FIR taps は概ね O(1) なのでこれで足りる\nQ_IN_W,  Q_IN_F  = 8, 7\n# Stage B: FFT 後周波数領域 (FPGA 内部演算)。N=Nr で log2(Nr) のビット成長を\n# 吸収するため広めに取る。Xilinx 7 系 DSP の 18bit に合わせて Q8.10\n# (整数 8bit + 小数 10bit、dynamic range ~256、分解能 ~0.001)\nQ_FFT_W, Q_FFT_F = 14, 4\n# Stage C: IFFT 後時間領域 = DAC ビット幅。10bit DAC は Q1.9\nQ_OUT_W, Q_OUT_F = 8, 7\n# -------------------------------------------------------------------------\n\n# fxpmath の signed Q(n_word-n_frac).n_frac 定義と等価の量子化を cupy で実装。\n# round-half-to-even (cp.rint と等価) + saturate (cp.clip)。numpy 版から1行\n# 単位で対応する形なので、結果はビット同一。\ndef _qaxis(v, n_word, n_frac, scale):\n    step = 2.0 ** (-n_frac)\n    iv_max =  (1 << (n_word - 1)) - 1\n    iv_min = -(1 << (n_word - 1))\n    return cp.clip(cp.round(v * scale / step), iv_min, iv_max) * step / scale\n\ndef qz(x, n_word, n_frac, name='', mode='auto'):\n    \"\"\"Quantize cupy complex array to Q(n_word-n_frac).n_frac signed.\n\n    mode='auto'  : Block Floating Point - auto-scale by peak so |x|_max -> FS*0.95.\n                   Output is rescaled back to original magnitude (peak preserved).\n                   Used for Stage B (FFT internal datapath) and Stage C.\n    mode='fixed' : Fixed Q-format at FS=2^(n_word-1-n_frac). NO auto-scale.\n                   Input must already be in [-FS, +FS] range (clipped if not).\n                   Used for Stage A (ADC quantize): the analog gain decided in\n                   n25 determines where the signal lands relative to FS.\n\n    Reports SNR and (for fixed) clip percentage.\"\"\"\n    import math\n    if x.size == 0:\n        return x.astype(cp.complex64)\n\n    if mode == 'fixed':\n        full_scale = float(2 ** (n_word - 1 - n_frac))\n        step = 2.0 ** (-n_frac)\n        iv_max =  (1 << (n_word - 1)) - 1\n        iv_min = -(1 << (n_word - 1))\n        # Direct fixed quantize: clip first to full-scale, then round.\n        r_q = cp.clip(cp.round(x.real / step), iv_min, iv_max) * step\n        i_q = cp.clip(cp.round(x.imag / step), iv_min, iv_max) * step\n        peak = float(cp.maximum(cp.abs(x.real).max(), cp.abs(x.imag).max()))\n        clip_frac = float(((cp.abs(x.real) >= full_scale) | (cp.abs(x.imag) >= full_scale)).mean())\n        err2 = (x.real - r_q) ** 2 + (x.imag - i_q) ** 2\n        sig2 = (cp.abs(x) ** 2).mean()\n        snr_db = 10.0 * float(cp.log10(sig2 / (err2.mean() + 1e-30)))\n        headroom_db = 20.0 * math.log10(full_scale / peak) if peak > 0 else float('inf')\n        print('  qz[%-9s fixed] Q%d.%d  FS=%.3g  peak=%.3g  headroom=%+5.1f dB  clip=%5.2f%%  SNR=%.1f dB'\n              % (name, n_word - n_frac, n_frac, full_scale, peak, headroom_db, 100*clip_frac, snr_db))\n        return (r_q + 1j * i_q).astype(cp.complex64)\n\n    # mode == 'auto' (BFP)\n    peak = float(cp.maximum(cp.abs(x.real).max(), cp.abs(x.imag).max()))\n    if peak == 0:\n        return x.astype(cp.complex64)\n    full_scale = float(2 ** (n_word - 1 - n_frac))\n    s = 0.95 * full_scale / peak\n    r_q = _qaxis(x.real, n_word, n_frac, s)\n    i_q = _qaxis(x.imag, n_word, n_frac, s)\n    err2 = (x.real - r_q) ** 2 + (x.imag - i_q) ** 2\n    sig2 = (cp.abs(x) ** 2).mean()\n    snr_db = 10.0 * float(cp.log10(sig2 / (err2.mean() + 1e-30)))\n    shift_bits = math.log2(s) if s > 0 else 0.0\n    print('  qz[%-9s auto ] Q%d.%d  peak=%.3g  shift=%+6.2f bits  SNR=%.1f dB'\n          % (name, n_word - n_frac, n_frac, peak, shift_bits, snr_db))\n    return (r_q + 1j * i_q).astype(cp.complex64)\n\nprint('Fixed route start (GPU): Q_IN=Q%d.%d  Q_FFT=Q%d.%d  Q_OUT=Q%d.%d' % (\n    Q_IN_W - Q_IN_F, Q_IN_F,\n    Q_FFT_W - Q_FFT_F, Q_FFT_F,\n    Q_OUT_W - Q_OUT_F, Q_OUT_F))\n\n# --- CPU -> GPU 転送 -----------------------------------------------------\n_t_xfer = _time.monotonic()\nfir_gpu   = cp.asarray(fir_coefficients)\nchirp_gpu = cp.asarray(ref_chirp.astype(np.complex64))\ncp.cuda.Stream.null.synchronize()\nprint('  H2D: fir %s + chirp %s  (%.2fs)' % (\n    fir_gpu.shape, chirp_gpu.shape, _time.monotonic() - _t_xfer))\n\n# --- Stage A: 入力時間領域 (fixed Q-format = ADC ビット幅) ----------------\n# Level 2 model: Stage A is an ADC-like fixed quantizer. The analog gain decided\n# in n25 (signal_peak_dbfs) determines where signals land relative to FS=1.0.\n# Out-of-range samples are clipped (real ADC saturation). The chirp template\n# (ref_chirp peak = 1) lands at signal_peak_dbfs. fir_coefficients is a stored\n# coefficient table — its peak depends on the scene (image vs point); in real\n# FPGA the BRAM scaling factor is computed offline, so we similarly bring fir\n# to FS-comparable range by pre-scaling to its own peak (= per-frame block\n# scaling factor, an \"offline\" decision). Apply the inverse scale after Stage A\n# so downstream code sees natural magnitudes (BFP-style block exponent).\nfir_peak = float(cp.maximum(cp.abs(fir_gpu.real).max(), cp.abs(fir_gpu.imag).max()))\nfir_pre_scale = 0.95 / fir_peak if fir_peak > 0 else 1.0\nprint('  fir_in BRAM pre-scale: 1/%.3g   (block-scale shift = %+.2f bits)' % (\n    1.0 / fir_pre_scale, math.log2(fir_pre_scale)))\nfir_q   = qz(fir_gpu * fir_pre_scale, Q_IN_W, Q_IN_F, 'fir_in',   mode='fixed') / fir_pre_scale\nchirp_q = qz(chirp_gpu,               Q_IN_W, Q_IN_F, 'chirp_in', mode='fixed')\ndel fir_gpu, chirp_gpu\n\n# --- Stage B: FFT 後周波数領域 (乗算ステップ含む) -------------------------\nF    = qz(cp.fft.fft(fir_q, axis=1), Q_FFT_W, Q_FFT_F, 'fir_fft')\nC    = qz(cp.fft.fft(chirp_q),       Q_FFT_W, Q_FFT_F, 'chirp_fft')\nprod = qz(F * C[None, :],            Q_FFT_W, Q_FFT_F, 'prod')\ndel fir_q, chirp_q, F, C\n\n# --- Stage C: IFFT 後時間領域 -------------------------------------------\ns_raw_gpu = qz(cp.fft.ifft(prod, axis=1), Q_OUT_W, Q_OUT_F, 'out')\ndel prod\n\n# --- GPU -> CPU 転送 -----------------------------------------------------\n_t_xfer = _time.monotonic()\ns_raw = cp.asnumpy(s_raw_gpu).astype(np.complex64)\ndel s_raw_gpu\ncp.get_default_memory_pool().free_all_blocks()\nprint('  D2H: s_raw %s  (%.2fs)' % (s_raw.shape, _time.monotonic() - _t_xfer))\n\nprint('Fixed route: s_raw=%s peak|s|=%.3f  (%.2fs total)'\n      % (s_raw.shape, float(np.abs(s_raw).max()), _time.monotonic() - _t0))\n",
+            "label": "FPGA Route B: Fixed-point (Q-format 3-stage)",
+            "spec": "【Route B: 固定小数点評価ルート (fxpmath)】\n\nFPGA で必然となるビット幅制限が SAR 画像品質にどう効くかを Python 側で評価するルート。FPGA でよくある FFT × 周波数乗算 × IFFT のパイプラインを fxpmath で量子化しながら模擬する。\n\n3ステージ独立 Q-format（ノードコード冒頭の定数を編集してチューニング）:\n\nStage A — 入力時間領域 (= ADC ビット幅):\n  Q_IN_W=10, Q_IN_F=9  (Q1.9, range ~ [-1, 1))\n  10bit ADC を想定。対象: fir_coefficients, ref_chirp\n\nStage B — FFT 後周波数領域 + 乗算後 (FPGA 内部演算):\n  Q_FFT_W=18, Q_FFT_F=10  (整数8bit + 小数10bit、Xilinx 7系 DSP 18bit に整合)\n  FFT 長 Nr で log2(Nr) のビット成長を吸収するため整数部に余裕を持たせる\n  対象: fft(fir_coefficients), fft(chirp), F × C[None,:]\n\nStage C — IFFT 後時間領域 (= DAC ビット幅):\n  Q_OUT_W=10, Q_OUT_F=9  (Q1.9)\n  10bit DAC を想定。対象: 最終 s_raw\n\n各ステージは auto-scale: peak を Q full-scale × 0.95 にマップして 5% のオーバーフローヘッドルームを確保 → fxpmath で量子化 → 復元。量子化 SNR を per-stage で表示。\n\n入力（kernel namespace）:\n  S_all, chirp_fft, fir_coefficients, ref_chirp, Na, Nr  ← n32 が生成\n\n出力（kernel namespace）:\n  s_raw  ← n25 (LNA) が消費\n\n排他関係:\n  Route A (n32_Float) / Route C-in (n32_FPGA_Load) と同時 Enable 不可。\n  Route C-out (n32_FPGA_Save) とは併用可（量子化結果を .mat 保存も可能）。\n\n参考: workspace-SAR-SIM/TargetSim_old/target_sim_FFT_FPGA_convert2Image2_375M.ipynb の BadAccuracy モード（int16 直接キャスト）の柔軟版。"
+          },
+          "enabled": false
+        }
+      },
+      {
+        "id": "n44",
+        "type": "canvasNode",
+        "position": {
+          "x": 3747.7625780489975,
+          "y": 323.6689851828143
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === FPGA Route C-out: Save Coefficients (.mat) ===\n# 外部 FPGA / HDL シミュレータ向けのテストベンチ入力を .mat ファイルに保存。\n# Notebook target_sim_FFT_FPGA_convert2Image2_375M.ipynb の\n# `scipy.io.savemat('conv_cal_data.mat', ...)` と互換 (4 配列 + optional golden)。\n#\n# 保存内容:\n#   chirp_replica          (Nr,)    complex64 - n2 が生成したベースバンドチャープ\n#   chirp_replica_extended (Nr,)    complex64 - 同じ (ref_chirp は既に Nr 長なので\n#                                                Notebook 互換のため別名で同梱)\n#   fir_coefficients       (Na, Nr) complex64 - n32 が生成した時間領域FIRタップ\n#                                                (= ifft(S_all, axis=1))\n#   S_all                  (Na, Nr) complex64 - 周波数領域反射係数 (オリジナル)\n#   golden_iq_data         (Na, Nr) complex64 - include_golden=True 時のみ\n#                                                Route A の s_raw を golden として同梱\n#   meta_*                 (scalars)         - Fs, Nr, Na, R0, lam 等\n#\n# このノードは副作用のみ (kernel に s_raw を出さない)。Route A/B/C-in のどれかと\n# 併用すること (Route A 推奨 - golden_iq_data の出処)。\nimport numpy as np\nimport scipy.io\nimport os\nimport time as _time\n_t0 = _time.monotonic()\n\n# save_path は gui_file_picker (n_save_path) から、include_golden は gui_toggle から\n_path = str(globals().get('save_path', '')).strip()\nif not _path:\n    raise ValueError(\"save_path is empty - set it in the file picker block (var_name='save_path')\")\n\n_inc_golden_str = str(globals().get('include_golden', 'true')).strip().lower()\n_inc_golden = _inc_golden_str in ('1', 'true', 'on', 'yes')\n\n_payload = {\n    'chirp_replica':          ref_chirp.astype(np.complex64),\n    'chirp_replica_extended': ref_chirp.astype(np.complex64),  # already Nr-length\n    'fir_coefficients':       fir_coefficients.astype(np.complex64),\n    'S_all':                  S_all.astype(np.complex64),\n    'meta_Fs':                np.float64(Fs),\n    'meta_Nr':                np.int64(Nr),\n    'meta_Na':                np.int64(Na),\n    'meta_R0':                np.float64(R0),\n    'meta_lam':               np.float64(lam),\n    'meta_t_r_center':        np.float64(t_r_center),\n}\n\nif _inc_golden:\n    if 's_raw' in globals():\n        _payload['golden_iq_data'] = s_raw.astype(np.complex64)\n        print('  including golden s_raw (peak|s|=%.3f) from earlier route'\n              % float(np.abs(s_raw).max()))\n    else:\n        print('  include_golden=true but s_raw not in kernel; enable Route A first')\n\n# ensure parent directory exists\n_dir = os.path.dirname(_path)\nif _dir and not os.path.isdir(_dir):\n    os.makedirs(_dir, exist_ok=True)\n\nscipy.io.savemat(_path, _payload, do_compression=False)\n_size_mb = os.path.getsize(_path) / 1e6\nprint('Saved FPGA coefficients to %s  (%.1f MB, %d keys, %.2fs)'\n      % (_path, _size_mb, len(_payload), _time.monotonic() - _t0))\n",
+            "label": "FPGA Route C-out: Save Coefficients (.mat)",
+            "spec": "【Route C-out: FPGA向け係数を .mat に保存】\n\n外部 FPGA / HDL シミュレータ向けのテストベンチ入力を保存する副作用ノード。Notebook target_sim_FFT_FPGA_convert2Image2_375M.ipynb の scipy.io.savemat 部分と互換。\n\n入力（kernel namespace）:\n  ref_chirp        (Nr,)    complex64 ← n2\n  fir_coefficients (Na, Nr) complex64 ← n32 (時間領域FIRタップ、unshifted)\n  S_all            (Na, Nr) complex64 ← n32 (周波数領域反射係数)\n  s_raw            (Na, Nr) complex64 ← Route A/B/C-in（include_golden=True 時に同梱）\n  Fs, Nr, Na, R0, lam, t_r_center (scalars) ← n1/n2\n\nGUI 入力:\n  save_path     (gui_file_picker) — 保存先 .mat パス\n  include_golden (gui_toggle)    — True で Route A 等の s_raw を同梱\n\n出力: なし (副作用のみ)。s_raw は変更しないので、Route A と併用して golden を生成・保存するのが標準ワークフロー。\n\n保存内容（.mat キー）:\n  chirp_replica, chirp_replica_extended, fir_coefficients, S_all\n  golden_iq_data (optional)\n  meta_Fs, meta_Nr, meta_Na, meta_R0, meta_lam, meta_t_r_center\n\n外部 HDL での使い方: MATLAB / Simulink で load() し、testbench 入力として chirp と fir_coefficients を流し込む。golden_iq_data と FPGA 出力 (Route C-in が読む .npy) を比較して量子化誤差・実装誤差を検証。"
+          },
+          "enabled": false,
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n45",
+        "type": "canvasNode",
+        "position": {
+          "x": 3644.166804692305,
+          "y": -53.651592842891034
+        },
+        "width": 250,
+        "data": {
+          "label": "File Picker",
+          "category": "gui",
+          "blockType": "gui_file_picker",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "save_path",
+            "accept": "mat",
+            "label": "FPGA Save Path",
+            "value": "workspace-SAR-SIM/fpga_coeffs.mat"
+          }
+        }
+      },
+      {
+        "id": "n46",
+        "type": "canvasNode",
+        "position": {
+          "x": 3645.3155030473017,
+          "y": 70.34840715710897
+        },
+        "width": 250,
+        "data": {
+          "label": "Toggle",
+          "category": "gui",
+          "blockType": "gui_toggle",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "include_golden",
+            "value": "true",
+            "label_on": "INCLUDE",
+            "label_off": "OMIT",
+            "label": "Include golden s_raw"
+          }
+        }
+      },
+      {
+        "id": "n47",
+        "type": "canvasNode",
+        "position": {
+          "x": 3752.460217749903,
+          "y": 514.6689851828144
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === FPGA Route C-in: Load FPGA IQ (.npy) ===\n# 実 FPGA / HDL シミュレータで取得した IQ データ (.npy) を読み込んで s_raw に\n# セットする。Notebook target_sim_FFT_FPGA_convert2Image2_375M.ipynb の\n# DataFromFileMode=True 経路の移植。Route A/B との同時 Enable 不可（s_raw 衝突）。\n#\n# 期待入力 (.npy): complex64 / complex128 で shape ~ (Na, Nr) または近い。\n# 短い場合は adj_pos でゼロパディングして位置合わせ、長い場合は (Na, Nr) に切詰め。\nimport numpy as np\nimport os\nimport time as _time\n_t0 = _time.monotonic()\n\n_path = str(globals().get('load_path', '')).strip()\nif not _path:\n    raise ValueError(\"load_path is empty - set it in the file picker block (var_name='load_path')\")\nif not os.path.isfile(_path):\n    raise FileNotFoundError(\"FPGA IQ file not found: %s\" % _path)\n\n_adj = int(float(globals().get('adj_pos', 0)))\n_swap_str = str(globals().get('iq_swap', 'false')).strip().lower()\n_swap = _swap_str in ('1', 'true', 'on', 'yes')\n\n# Load\nfpga = np.load(_path)\nprint('  loaded shape=%s dtype=%s  (expected (Na=%d, Nr=%d))'\n      % (fpga.shape, fpga.dtype, Na, Nr))\n\nif fpga.ndim != 2:\n    raise ValueError(\"FPGA IQ must be 2-D (pulses x samples); got ndim=%d\" % fpga.ndim)\n\n# Zero-pad range (axis=1) at the start by adj_pos samples (Notebook adj_pos behaviour)\nif _adj > 0:\n    fpga = np.pad(fpga, ((0, 0), (_adj, 0)), mode='constant', constant_values=0)\n    print('  adj_pos: padded %d zeros at range start -> shape=%s' % (_adj, fpga.shape))\n\n# Optional I/Q swap (FPGA convention may differ)\nif _swap:\n    fpga = (fpga.imag + 1j * fpga.real).astype(np.complex64)\n    print('  iq_swap: applied real/imag swap')\n\n# Fit to simulation grid (Na, Nr): pad/truncate as needed\nout = np.zeros((Na, Nr), dtype=np.complex64)\n_h = min(Na, fpga.shape[0])\n_w = min(Nr, fpga.shape[1])\nout[:_h, :_w] = fpga[:_h, :_w].astype(np.complex64)\n\nif fpga.shape != (Na, Nr):\n    print('  reshape: %s -> (%d, %d) (copy region %dx%d)'\n          % (fpga.shape, Na, Nr, _h, _w))\n\ns_raw = out\nprint('Loaded FPGA IQ -> s_raw=%s peak|s|=%.3f  adj_pos=%d swap=%s  (%.2fs)'\n      % (s_raw.shape, float(np.abs(s_raw).max()), _adj, _swap, _time.monotonic() - _t0))\n",
+            "label": "FPGA Route C-in: Load FPGA IQ (.npy)",
+            "spec": "【Route C-in: FPGA出力 .npy を s_raw として取り込み】\n\n実 FPGA / HDL シミュレータで処理されたIQデータを .npy で読み込み、s_raw として kernel に出すルート。Notebook target_sim_FFT_FPGA_convert2Image2_375M.ipynb の DataFromFileMode=True 経路の移植。\n\n期待ファイル: complex64/complex128, shape (パルス数, レンジサンプル数)。シミュ側の (Na, Nr) と一致しなくてもパッド・切詰めで吸収。\n\n入力（kernel namespace）:\n  Na, Nr ← n2 が生成（出力 shape の参照）\n\nGUI 入力:\n  load_path (gui_file_picker) — 入力 .npy パス\n  adj_pos   (gui_slider)      — 先頭にゼロパディングする range サンプル数。FPGA とシミュの時間原点ずれを補正（Notebook デフォルト 3500）\n  iq_swap   (gui_toggle)      — True で実部・虚部を入れ替え（FPGA の I/Q チャネル規約調整）\n\n出力（kernel namespace）:\n  s_raw (Na, Nr) complex64 ← n25 (LNA) が消費\n\n排他関係:\n  Route A (n32_Float) / Route B (n32_Fixed) と同時 Enable 不可。\n  Route C-out (n32_FPGA_Save) との併用は意味なし（既に保存済の係数を使うはず）。\n\n典型ワークフロー:\n  1. Route A + Route C-out を Enable して係数 .mat と golden_iq_data を生成\n  2. 外部 FPGA / HDL シミュレータで処理 → IQ.npy を取得\n  3. Route A/B を Disable、このノードを Enable → IQ.npy のパスを指定\n  4. 実行 → s_raw が後段 SAR 処理 (range comp -> az comp) に流れて SLC 画像化"
+          },
+          "enabled": false,
+          "codeCollapsed": true
+        }
+      },
+      {
+        "id": "n48",
+        "type": "canvasNode",
+        "position": {
+          "x": 3643.8770495334675,
+          "y": 200.34840715710897
+        },
+        "width": 250,
+        "data": {
+          "label": "File Picker",
+          "category": "gui",
+          "blockType": "gui_file_picker",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "load_path",
+            "accept": "npy",
+            "label": "FPGA Load Path",
+            "value": ""
+          }
+        }
+      },
+      {
+        "id": "n49",
+        "type": "canvasNode",
+        "position": {
+          "x": 3919.564654732756,
+          "y": 128.9320232619578
+        },
+        "width": 250,
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "adj_pos",
+            "value": "3500",
+            "min": "0",
+            "max": "10000",
+            "step": "1",
+            "label": "Range adj_pos (samples)"
+          }
+        }
+      },
+      {
+        "id": "n50",
+        "type": "canvasNode",
+        "position": {
+          "x": 3920.7133530877536,
+          "y": -1.9042802923278828
+        },
+        "width": 250,
+        "data": {
+          "label": "Toggle",
+          "category": "gui",
+          "blockType": "gui_toggle",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "iq_swap",
+            "value": "false",
+            "label_on": "SWAP",
+            "label_off": "AS-IS",
+            "label": "I/Q swap"
+          }
+        }
+      },
+      {
+        "id": "n52",
+        "type": "canvasNode",
+        "position": {
+          "x": -488,
+          "y": 1620
+        },
+        "width": 250,
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "sigma0_max_db",
+            "value": "0",
+            "min": "-30",
+            "max": "30",
+            "step": "1",
+            "label": "σ°_max (dB)"
+          }
+        }
+      },
+      {
+        "id": "n53",
+        "type": "canvasNode",
+        "position": {
+          "x": -488,
+          "y": 1780
+        },
+        "width": 250,
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "signal_peak_dbfs",
+            "value": "-10",
+            "min": "-60",
+            "max": "6",
+            "step": "1",
+            "label": "Signal peak (dBFS)"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_1779506139427_j3ag",
+        "source": "n2",
+        "sourceHandle": "out_0",
+        "target": "n3",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779506139474_tzv6",
+        "source": "n3",
+        "sourceHandle": "out_0",
+        "target": "n4",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779506139520_v2sv",
+        "source": "n4",
+        "sourceHandle": "out_0",
+        "target": "n5",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779506139583_ldd5",
+        "source": "n5",
+        "sourceHandle": "out_0",
+        "target": "n6",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316521_k9d7",
+        "source": "n9",
+        "sourceHandle": "out_0",
+        "target": "n10",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316608_ai23",
+        "source": "n10",
+        "sourceHandle": "out_0",
+        "target": "n11",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316655_6x55",
+        "source": "n11",
+        "sourceHandle": "out_0",
+        "target": "n12",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316725_vt1z",
+        "source": "n12",
+        "sourceHandle": "out_0",
+        "target": "n13",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316795_ec09",
+        "source": "n13",
+        "sourceHandle": "out_0",
+        "target": "n14",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316860_kn1t",
+        "source": "n14",
+        "sourceHandle": "out_0",
+        "target": "n15",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316912_is88",
+        "source": "n15",
+        "sourceHandle": "out_0",
+        "target": "n16",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316976_a6k2",
+        "source": "n16",
+        "sourceHandle": "out_0",
+        "target": "n17",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513317048_lu2b",
+        "source": "n17",
+        "sourceHandle": "out_0",
+        "target": "n18",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513686551_04g8",
+        "source": "n14",
+        "sourceHandle": "out_0",
+        "target": "n19",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513686626_akbo",
+        "source": "n15",
+        "sourceHandle": "out_0",
+        "target": "n20",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513686688_jhu9",
+        "source": "n16",
+        "sourceHandle": "out_0",
+        "target": "n21",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779537023441_4xwo",
+        "source": "n1",
+        "sourceHandle": "out_0",
+        "target": "n2",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779538044735_2z3e",
+        "source": "n25",
+        "sourceHandle": "out_0",
+        "target": "n9",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "xy-edge__n25out_0-n27in_0",
+        "source": "n25",
+        "sourceHandle": "out_0",
+        "target": "n27",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779542656908_c4d3",
+        "source": "n2",
+        "sourceHandle": "out_0",
+        "target": "n30",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779550720208_ta7j",
+        "source": "n6",
+        "sourceHandle": "out_0",
+        "target": "n32",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779593852381_8gyl",
+        "source": "n17",
+        "sourceHandle": "out_0",
+        "target": "n41",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779776133653_egez",
+        "source": "n32",
+        "sourceHandle": "out_0",
+        "target": "n42",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779776134036_0vkz",
+        "source": "n32",
+        "sourceHandle": "out_0",
+        "target": "n43",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779776134401_gx7a",
+        "source": "n32",
+        "sourceHandle": "out_0",
+        "target": "n44",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779776134765_8qmc",
+        "source": "n32",
+        "sourceHandle": "out_0",
+        "target": "n47",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779776135119_q8hp",
+        "source": "n42",
+        "sourceHandle": "out_0",
+        "target": "n25",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779776135446_t1lo",
+        "source": "n43",
+        "sourceHandle": "out_0",
+        "target": "n25",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779776135801_7m73",
+        "source": "n47",
+        "sourceHandle": "out_0",
+        "target": "n25",
+        "targetHandle": "in_0"
+      }
+    ]
+  }
+}
