@@ -2,13 +2,39 @@
   "id": "comment",
   "label": "Comment",
   "category": "Utility",
-  "description": "Text note or comment (not executed)",
+  "description": "Text note or comment (not executed). Use for documentation, section labels, and visual annotation on the canvas.",
   "parameters": [
     {
       "id": "text",
       "label": "Text",
       "dtype": "code",
       "default": ""
+    },
+    {
+      "id": "font_size",
+      "label": "Font Size",
+      "dtype": "enum",
+      "options": ["12", "14", "16", "20", "24", "32", "48"],
+      "default": "14"
+    },
+    {
+      "id": "font_weight",
+      "label": "Weight",
+      "dtype": "enum",
+      "options": ["normal", "bold"],
+      "default": "normal"
+    },
+    {
+      "id": "text_color",
+      "label": "Text Color",
+      "dtype": "color",
+      "default": "#e0e0e0"
+    },
+    {
+      "id": "bg_color",
+      "label": "Background",
+      "dtype": "color",
+      "default": "transparent"
     }
   ],
   "inputs": [],

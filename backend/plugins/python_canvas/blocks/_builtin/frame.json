@@ -1,0 +1,39 @@
+{
+  "id": "frame",
+  "label": "Frame",
+  "category": "Utility",
+  "description": "Decorative frame for grouping nodes visually. Sits behind other nodes (low z-index) so any blocks placed on top appear inside the frame. Frame itself does not execute and does not move children.",
+  "parameters": [
+    {
+      "id": "bg_color",
+      "label": "Background",
+      "dtype": "color",
+      "default": "rgba(80, 120, 200, 0.08)"
+    },
+    {
+      "id": "border_color",
+      "label": "Border Color",
+      "dtype": "color",
+      "default": "#5078c8"
+    },
+    {
+      "id": "border_style",
+      "label": "Border Style",
+      "dtype": "enum",
+      "options": ["solid", "dashed", "dotted"],
+      "default": "dashed"
+    },
+    {
+      "id": "border_width",
+      "label": "Border Width",
+      "dtype": "enum",
+      "options": ["1", "2", "3", "4"],
+      "default": "2"
+    }
+  ],
+  "inputs": [],
+  "outputs": [],
+  "code_template": "",
+  "default_width": 400,
+  "default_height": 240
+}

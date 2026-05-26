@@ -163,6 +163,36 @@ function InlineParamRow({ paramDef, value, onChange }: {
         ))}
       </select>
     );
+  } else if (paramDef.dtype === 'color') {
+    // Color picker: native <input type="color"> requires #rrggbb. The text
+    // field accepts arbitrary CSS strings (rgba(...), transparent, named
+    // colors). The two stay in sync only when the user types a #rrggbb
+    // value — that's by design, since the picker can't represent rgba/alpha.
+    const isHex = /^#[0-9a-fA-F]{6}$/.test(value.trim());
+    inputElement = (
+      <div className="grc-param-color-row">
+        <input
+          type="color"
+          className="grc-param-color-swatch nodrag nopan"
+          value={isHex ? value.trim() : '#000000'}
+          onChange={handleChange}
+          data-role="param-color"
+          data-param-id={paramDef.id}
+        />
+        <input
+          type="text"
+          className="grc-param-input nodrag nopan"
+          value={value}
+          onChange={handleChange}
+          onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+          onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
+          autoComplete="off"
+          placeholder="#rrggbb / rgba(...) / transparent"
+          data-role="param-input"
+          data-param-id={paramDef.id}
+        />
+      </div>
+    );
   } else {
     inputElement = (
       <input
@@ -710,7 +740,50 @@ function ImageGroup({ images }: { images: DisplayItem[] }) {
 // ===== CanvasNode Component =====
 
 export function CanvasNode(props: { id: string; data: BlockNodeData; selected?: boolean }) {
+  // Decoration: frame is a low-z-index colored rectangle, not a real block.
+  if (props.data?.blockType === 'frame') {
+    return <FrameNode {...props} />;
+  }
   return <RegularBlockNode {...props} />;
+}
+
+/**
+ * Decorative frame: low-z-index colored rectangle for visually grouping nodes.
+ * No ports, no execution, no header — just a resizable backdrop. Children
+ * are NOT linked to it (user explicitly chose "frame moves alone"), so any
+ * blocks placed on top stay where they are when the frame is dragged.
+ */
+function FrameNode({ id, data, selected }: { id: string; data: BlockNodeData; selected?: boolean }) {
+  const params = (data.defaultParameters || {}) as Record<string, string>;
+  const bgColor = params.bg_color || 'rgba(80, 120, 200, 0.08)';
+  const borderColor = params.border_color || '#5078c8';
+  const borderStyle = params.border_style || 'dashed';
+  const borderWidth = params.border_width || '2';
+
+  return (
+    <div
+      className="grc-frame"
+      data-role="canvas-node"
+      data-node-id={id}
+      data-block-type="frame"
+      style={{
+        background: bgColor,
+        border: `${borderWidth}px ${borderStyle} ${borderColor}`,
+        borderRadius: 6,
+        width: '100%',
+        height: '100%',
+        boxSizing: 'border-box',
+        position: 'relative',
+      }}
+    >
+      <NodeResizer
+        minWidth={80}
+        minHeight={60}
+        isVisible={selected}
+        color={NODE_RESIZER_COLOR}
+      />
+    </div>
+  );
 }
 
 function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeData; selected?: boolean }) {
@@ -847,13 +920,26 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
   // Documentation-only blocks (comment, group_spec): no execution → hide
   // enable checkbox + run button.
   const isNonExecutable = blockTypeStr === 'comment' || blockTypeStr === 'group_spec';
+  // Comment nodes carry decorative styling (bg/text color, font size/weight)
+  // that overrides the default block chrome so they can serve as Simulink-
+  // style annotations. We read the params here and apply both to the outer
+  // block container and to the code textarea.
+  const isComment = blockTypeStr === 'comment';
+  const commentBg = isComment ? (currentParams.bg_color || 'transparent') : undefined;
+  const commentTextColor = isComment ? (currentParams.text_color || '#e0e0e0') : undefined;
+  const commentFontSize = isComment ? (currentParams.font_size || '14') : undefined;
+  const commentFontWeight = isComment ? (currentParams.font_weight || 'normal') : undefined;
+  const blockStyle: React.CSSProperties | undefined = isComment
+    ? { background: commentBg, color: commentTextColor }
+    : undefined;
 
   return (
     <div
-      className={`grc-block ${category || ''}${!isEnabled ? ' disabled' : ''}${executionStatus ? ` exec-${executionStatus}` : ''}${isShim ? ' shim' : ''}`}
+      className={`grc-block ${category || ''}${!isEnabled ? ' disabled' : ''}${executionStatus ? ` exec-${executionStatus}` : ''}${isShim ? ' shim' : ''}${isComment ? ' comment-styled' : ''}`}
       data-role="canvas-node"
       data-node-id={id}
       data-block-type={blockTypeStr}
+      style={blockStyle}
       title={isShim ? `Missing block definition: ${blockType}. Copy ${blockType}.json into <workspace>/blocks/ and reload.` : undefined}
     >
       <NodeResizer minWidth={NODE_MIN_WIDTH} minHeight={NODE_COMPACT_HEIGHT} isVisible={selected} color={NODE_RESIZER_COLOR} />
@@ -1044,7 +1130,7 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
             />
           ) : (
             <textarea
-              className="grc-code-area nodrag nopan nowheel"
+              className={`grc-code-area nodrag nopan nowheel${isComment ? ' grc-comment-text' : ''}`}
               value={currentParams[codeParam.id] !== undefined ? currentParams[codeParam.id] : (codeParam.default || '')}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onParamChange(codeParam.id, e.target.value)}
               onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
@@ -1052,6 +1138,14 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
               spellCheck={false}
               data-role="param-input"
               data-param-id={codeParam.id}
+              style={isComment ? {
+                color: commentTextColor,
+                background: 'transparent',
+                fontSize: `${commentFontSize}px`,
+                fontWeight: commentFontWeight,
+                fontFamily: 'system-ui, sans-serif',
+                border: 'none',
+              } : undefined}
             />
           )
         )}

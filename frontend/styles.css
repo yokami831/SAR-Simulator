@@ -550,6 +550,48 @@ button, a, [role="button"] { cursor: pointer; }
   position: absolute !important;
 }
 
+/* Frame: decorative rectangle that sits behind other nodes.
+   React Flow honors per-node zIndex on the outer wrapper, but we also force
+   pointer-events on the inner div so the frame stays grabbable/resizable
+   even when other nodes overlap it. */
+.react-flow__node[data-block-type="frame"] {
+  z-index: -1 !important;
+}
+.grc-frame {
+  pointer-events: all;
+}
+
+/* Param row: color picker (swatch + text input side by side) */
+.grc-param-color-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex: 1;
+}
+.grc-param-color-swatch {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #2a3142;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Comment node: hide the heavy chrome so it reads as an annotation, not a
+   block. Header is dimmed; ports are already absent on comment blocks. */
+.grc-block.comment-styled {
+  box-shadow: none;
+}
+.grc-block.comment-styled .grc-block-header {
+  background: transparent;
+  opacity: 0.55;
+}
+.grc-comment-text {
+  resize: none;
+  outline: none;
+}
+
 /* Shim node: block definition is missing from the registry */
 .grc-block.shim {
   background: #4a3a3a;
