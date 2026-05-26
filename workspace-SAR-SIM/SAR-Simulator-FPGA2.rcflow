@@ -4,7 +4,7 @@
   "title": "SAR-Simulator-FPGA2",
   "description": "",
   "created": "2026-05-26T07:53:12.642190+00:00",
-  "modified": "2026-05-26T14:12:04.722971+00:00",
+  "modified": "2026-05-26T14:17:38.832911+00:00",
   "canvas": {
     "nodes": [
       {
@@ -1281,6 +1281,37 @@
         },
         "width": 320,
         "style": {}
+      },
+      {
+        "id": "n60",
+        "type": "canvasNode",
+        "position": {
+          "x": 3078.6706583806526,
+          "y": 2565.7504324456377
+        },
+        "data": {
+          "label": "Comment",
+          "category": "utility",
+          "blockType": "comment",
+          "inputs": [],
+          "outputs": [],
+          "params": "",
+          "defaultParameters": {
+            "font_size": "48",
+            "font_weight": "normal",
+            "text_color": "#e0e0e0",
+            "bg_color": "#000000",
+            "border_color": "#5078c8",
+            "border_style": "dashed",
+            "border_width": "0",
+            "text": "test"
+          }
+        },
+        "width": 473,
+        "height": 262,
+        "style": {
+          "width": 400
+        }
       }
     ],
     "edges": [
@@ -1510,9 +1541,9 @@
       }
     ],
     "viewport": {
-      "x": 490.72027680255667,
-      "y": 160.4089577074827,
-      "zoom": 0.22735748497655967
+      "x": -1198.313824233709,
+      "y": -1099.1428810197508,
+      "zoom": 0.6280670247910298
     }
   }
 }
