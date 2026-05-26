@@ -302,7 +302,10 @@ export function rcStyleEditor(
       const value = initial[f.id] !== undefined ? initial[f.id] : (f.default || '');
 
       if (f.dtype === 'color') {
-        // swatch + text (text accepts rgba/transparent that swatch can't represent)
+        // swatch + text + "Clear" button. The text input accepts CSS values
+        // a native picker can't (rgba(), transparent, named colors). The
+        // Clear button is the discoverable way to wipe to transparent, since
+        // typing "transparent" isn't obvious to first-time users.
         const wrap = document.createElement('div');
         wrap.className = 'rc-style-color';
         const sw = document.createElement('input');
@@ -313,12 +316,19 @@ export function rcStyleEditor(
         txt.type = 'text';
         txt.className = 'rc-style-input';
         txt.value = value;
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'rc-style-clear';
+        clearBtn.textContent = 'Transparent';
+        clearBtn.title = 'Clear color (set to transparent)';
         sw.addEventListener('input', () => { txt.value = sw.value; });
         txt.addEventListener('input', () => {
           if (/^#[0-9a-fA-F]{6}$/.test(txt.value.trim())) sw.value = txt.value.trim();
         });
+        clearBtn.addEventListener('click', () => { txt.value = 'transparent'; });
         wrap.appendChild(sw);
         wrap.appendChild(txt);
+        wrap.appendChild(clearBtn);
         row.appendChild(wrap);
         inputs[f.id] = txt;
         swatches[f.id] = sw;

@@ -166,9 +166,11 @@ function InlineParamRow({ paramDef, value, onChange }: {
   } else if (paramDef.dtype === 'color') {
     // Color picker: native <input type="color"> requires #rrggbb. The text
     // field accepts arbitrary CSS strings (rgba(...), transparent, named
-    // colors). The two stay in sync only when the user types a #rrggbb
-    // value — that's by design, since the picker can't represent rgba/alpha.
+    // colors). The "Transparent" button is the discoverable way to wipe to
+    // transparent — typing the literal word isn't obvious to first-time
+    // users, and the native picker can't represent it.
     const isHex = /^#[0-9a-fA-F]{6}$/.test(value.trim());
+    const clearColor = () => onChange(paramDef.id, 'transparent');
     inputElement = (
       <div className="grc-param-color-row">
         <input
@@ -191,6 +193,12 @@ function InlineParamRow({ paramDef, value, onChange }: {
           data-role="param-input"
           data-param-id={paramDef.id}
         />
+        <button
+          type="button"
+          className="grc-param-color-clear nodrag nopan"
+          onClick={clearColor}
+          title="Clear color (set to transparent)"
+        >Transparent</button>
       </div>
     );
   } else {
@@ -818,7 +826,9 @@ function CommentNode({ id, data, selected }: { id: string; data: BlockNodeData; 
     outline: selected ? '1px dashed #888' : 'none',
   };
 
-  const textStyle: React.CSSProperties = {
+  // Display mode: text sits at the top-left and only takes as much room as
+  // it needs (so a frame stays visually empty below the title).
+  const displayStyle: React.CSSProperties = {
     position: 'absolute',
     top: 4,
     left: 8,
@@ -834,6 +844,16 @@ function CommentNode({ id, data, selected }: { id: string; data: BlockNodeData; 
     overflow: 'hidden',
     lineHeight: 1.3,
     pointerEvents: 'auto',
+  };
+  // Edit mode: textarea fills the node so the visible editing area matches
+  // the wrapper (matches the green resize handles). Without inset:4 the
+  // textarea hugs only the top-left and looks like a different-size box.
+  const editStyle: React.CSSProperties = {
+    ...displayStyle,
+    top: 4, left: 4, right: 4, bottom: 4,
+    maxHeight: undefined,
+    width: 'auto',
+    height: 'auto',
   };
 
   return (
@@ -860,12 +880,12 @@ function CommentNode({ id, data, selected }: { id: string; data: BlockNodeData; 
           }}
           onMouseDown={(e) => e.stopPropagation()}
           spellCheck={false}
-          style={{ ...textStyle, background: 'rgba(0,0,0,0.4)', border: '1px solid #888', resize: 'none', outline: 'none' }}
+          style={{ ...editStyle, background: 'rgba(0,0,0,0.4)', border: '1px solid #888', resize: 'none', outline: 'none' }}
         />
       ) : text ? (
-        <div style={textStyle}>{text}</div>
+        <div style={displayStyle}>{text}</div>
       ) : (
-        <div style={{ ...textStyle, opacity: 0.4 }}>(double-click to edit)</div>
+        <div style={{ ...displayStyle, opacity: 0.4 }}>(double-click to edit)</div>
       )}
     </div>
   );

@@ -508,6 +508,14 @@ button, a, [role="button"] { cursor: pointer; }
   width: 32px; height: 28px; padding: 0; border: 1px solid var(--border-light);
   border-radius: 4px; background: transparent; cursor: pointer; flex-shrink: 0;
 }
+.rc-style-clear {
+  padding: 4px 10px; font-size: 11px;
+  background: var(--bg-tertiary); border: 1px solid var(--border-light);
+  border-radius: 4px; color: var(--text-primary); cursor: pointer;
+  flex-shrink: 0; white-space: nowrap;
+  transition: background 0.15s;
+}
+.rc-style-clear:hover { background: var(--border-light); }
 .rc-modal-buttons button.danger:hover { background: var(--modal-danger-hover); }
 
 /* ===== Flow Canvas ===== */
@@ -599,6 +607,17 @@ button, a, [role="button"] { cursor: pointer; }
   background: transparent;
   cursor: pointer;
 }
+.grc-param-color-clear {
+  padding: 2px 6px;
+  font-size: 10px;
+  background: #1b2740;
+  border: 1px solid #2a3142;
+  border-radius: 3px;
+  color: #cfd6e6;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.grc-param-color-clear:hover { background: #2a3142; }
 
 /* Comment node: hide the heavy chrome so it reads as an annotation, not a
    block. Header is dimmed; ports are already absent on comment blocks. */
