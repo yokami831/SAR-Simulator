@@ -355,6 +355,17 @@ complex AWGN: per-component σ = noise_std_FS / √2
 - 「scene による絶対レベル変動」がそのまま ADC で観測される
 - 強反射体 (corner reflector 等) には受信ゲイン低減が必要、という運用がそのまま再現される
 
+#### SAR 処理チェイン正規化（n14 range comp, n17 az comp）
+旧実装は NumPy の unnormalized FFT で matched filter を作っていたため、点標的の総処理ゲインが +90 dB 近く（非現実的）になっていた。Cumming/Wong 標準の matched filter L2 ノルム正規化を導入:
+- **n14 (range)**: `H_range /= sqrt(sum(|ref_chirp|²))` → 範囲圧縮ゲイン = sqrt(Tp·B) ≈ +29 dB
+- **n17 (azimuth)**: 既存実装が偶然 sqrt(Na) 相当のゲインを生んでいる（NumPy の 1/N IFFT + LFM 帯域分散の組合せ）ので**変更不要**
+- 合計処理ゲイン ≈ sqrt(Tp·B · Na) ≈ +60 dB voltage（実測一致）。教科書値。
+
+検証: 点標的で focused = ADC + 60 dB ≈ -50+60 = +10 dBFS（軽い飽和、displayable）。
+
+#### Level 2 の物理モデル限界（将来拡張）
+**距離減衰 vs LNA バランス**: 厳密物理では (1) n32 に絶対 1/R²（R=R0=690 km で voltage -234 dB）、(2) Tx 側 (P_t × G² × λ²/(4π)³) で +200 dB 程度、(3) LNA を真の正のゲイン (10–50 dB) として再定義、が筋。現状は (1)(2)(3) を全部 `K_lna` 一個に押し込んだ「抽象化」モデル。FPGA ビット幅検証目的では問題ないが、絶対 SNR・受信機ノイズ Figure とのバランス検証が必要になったら full link budget モデルへ拡張予定。
+
 #### 標準実験軸（Level 2）
 ```
 [σ°_max_dB] × [signal_peak_dbfs] × [NF_dB] × [Stage A Q-format] × [Stage B/C Q-format]
