@@ -26,8 +26,12 @@ livekit-protocol==1.1.2
 # system path" (see CLAUDE.md, n32 SPEC). GPU pkgs are optional: n32 falls back
 # to CPU finufft when cufinufft is absent.
 finufft>=2.5.0
-cupy-cuda12x>=14.0.0    # optional (GPU); pick the wheel matching your CUDA
+cupy-cuda12x>=13,<14    # pinned to 13.x so sdfcad (numpy<2) and cupy can coexist
 cufinufft>=2.5.0        # optional (GPU NUFFT); import cupy first
+
+# Fixed-point evaluation route for FPGA emulation (Route B / Q-format).
+# Used by workspace-SAR-SIM SAR-Simulator-NUFFT3 n32_Fixed node.
+fxpmath>=0.4.9
 
 # Testing
 pytest>=7.0.0
