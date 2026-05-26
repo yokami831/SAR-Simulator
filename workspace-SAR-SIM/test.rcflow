@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "type": "flow",
+  "title": "test",
+  "description": "",
+  "created": "2026-05-23T02:28:51.856168+00:00",
+  "modified": "2026-05-23T03:48:20.776503+00:00",
+  "canvas": {
+    "nodes": [
+      {
+        "id": "n7",
+        "type": "subgraph",
+        "position": {
+          "x": 70,
+          "y": -10
+        },
+        "data": {
+          "label": "Generate chirp signal",
+          "collapsed": false,
+          "childNodeIds": [
+            "n2",
+            "n3",
+            "n4",
+            "n5"
+          ],
+          "externalInputs": [],
+          "externalOutputs": [],
+          "description": ""
+        },
+        "style": {
+          "width": 1420,
+          "height": 487
+        }
+      },
+      {
+        "id": "n2",
+        "type": "canvasNode",
+        "position": {
+          "x": 50,
+          "y": 90
+        },
+        "data": {
+          "label": "Group Spec",
+          "category": "processing",
+          "blockType": "group_spec",
+          "inputs": [],
+          "outputs": [],
+          "params": "",
+          "defaultParameters": {
+            "text": "## Generate chirp signal\n\n- Frequency: min/max\n- Pulse width\n- PRF",
+            "label": "Generate chirp signal ? Spec"
+          }
+        },
+        "style": {
+          "width": 400
+        }
+      },
+      {
+        "id": "n3",
+        "type": "canvasNode",
+        "position": {
+          "x": 50,
+          "y": 263
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "params": "",
+          "defaultParameters": {
+            "code": "# DDS\nphase = 0",
+            "label": "DDS",
+            "spec": "Direct digital synthesizer\nphase accumulator -> sine LUT"
+          }
+        },
+        "style": {
+          "width": 400
+        }
+      },
+      {
+        "id": "n4",
+        "type": "canvasNode",
+        "position": {
+          "x": 510,
+          "y": 263
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "params": "",
+          "defaultParameters": {
+            "code": "# window\nw = taylor(N)",
+            "label": "Window",
+            "spec": "Taylor / Hamming weighting\nfor sidelobe control"
+          }
+        },
+        "style": {
+          "width": 400
+        }
+      },
+      {
+        "id": "n5",
+        "type": "canvasNode",
+        "position": {
+          "x": 970,
+          "y": 263
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "params": "",
+          "defaultParameters": {
+            "code": "# iq\niq = i + 1j*q",
+            "label": "I/Q format",
+            "spec": "complex baseband output\nI + jQ"
+          }
+        },
+        "style": {
+          "width": 400
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_1779505165789_50b7",
+        "source": "n3",
+        "sourceHandle": "out_0",
+        "target": "n4",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779505165840_p0sv",
+        "source": "n4",
+        "sourceHandle": "out_0",
+        "target": "n5",
+        "targetHandle": "in_0"
+      }
+    ],
+    "viewport": {
+      "x": 204.72613360773397,
+      "y": 320.7128597845007,
+      "zoom": 0.608243406292386
+    }
+  }
+}

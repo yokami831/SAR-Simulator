@@ -1,0 +1,433 @@
+{
+  "version": 1,
+  "type": "flow",
+  "title": "Plot Speed Test",
+  "description": "",
+  "created": "2026-03-20T06:19:27.137402+00:00",
+  "modified": "2026-03-20T12:55:03.187314+00:00",
+  "canvas": {
+    "name": "flowgraph",
+    "savedAt": "2026-03-20T12:55:03.185Z",
+    "nodes": [
+      {
+        "id": "n1",
+        "type": "canvasNode",
+        "position": {
+          "x": 50,
+          "y": -422.5
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "import numpy as np\nimport matplotlib.pyplot as plt\nimport time\n\n# Create test data with visible SAR-like features\nrows, cols = 5400, 10966\ntest_data = np.random.randn(rows, cols).astype(np.complex64) * 0.01\n\n# Add point targets with gaussian-like PSF spread\ntargets = [\n    (2700, 5483, 1.0),\n    (1350, 2741, 0.8),\n    (4050, 8224, 0.6),\n    (2700, 3000, 0.7),\n    (2700, 8000, 0.9),\n]\nfor r, c, amp in targets:\n    for dr in range(-20, 21):\n        for dc in range(-20, 21):\n            dist = (dr**2 + dc**2)**0.5\n            val = amp * np.exp(-dist**2 / 50)\n            if r+dr >= 0 and r+dr < rows and c+dc >= 0 and c+dc < cols:\n                test_data[r+dr, c+dc] += val\n\nprint(f'Test data: {test_data.shape}, targets: {len(targets)}')",
+            "label": "Test Data"
+          },
+          "enabled": false
+        }
+      },
+      {
+        "id": "n2",
+        "type": "canvasNode",
+        "position": {
+          "x": 510,
+          "y": -712
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Original image_plot_dB\ndef image_plot_dB_orig(data):\n    plot_size_az = 20000\n    plot_size_rg = 20000\n    if len(data) > plot_size_az:\n        az_l = len(data) // 2 - plot_size_az // 2\n        az_u = len(data) // 2 + plot_size_az // 2\n    else:\n        az_l = 0\n        az_u = len(data)\n    if len(data[0]) > plot_size_rg:\n        rg_l = len(data[0]) // 2 - plot_size_rg // 2\n        rg_u = len(data[0]) // 2 + plot_size_rg // 2\n    else:\n        rg_l = 0\n        rg_u = len(data[0])\n    plot_data = np.abs(data[az_l:az_u, rg_l:rg_u])\n    norm_factor = np.max(plot_data)\n    plot_data = plot_data / norm_factor\n    threshould_dB = 60\n    plot_data = np.ceil(plot_data * 10 ** (threshould_dB / 20)) / 10 ** (\n        threshould_dB / 20\n    )\n    plt.imshow(20 * np.log10(plot_data), cmap=\"gray\")\n    plt.colorbar()\n    plt.show()\n    return\n\nt0 = time.monotonic()\nimage_plot_dB_orig(test_data)\nprint(f'Original: {time.monotonic()-t0:.2f}s')",
+            "label": "Original Plot"
+          },
+          "enabled": false
+        }
+      },
+      {
+        "id": "n3",
+        "type": "canvasNode",
+        "position": {
+          "x": 970,
+          "y": -250.5
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Optimized image_plot_dB\ndef image_plot_dB_opt(data):\n    plot_size_az = 20000\n    plot_size_rg = 20000\n    if len(data) > plot_size_az:\n        az_l = len(data) // 2 - plot_size_az // 2\n        az_u = len(data) // 2 + plot_size_az // 2\n    else:\n        az_l = 0\n        az_u = len(data)\n    if len(data[0]) > plot_size_rg:\n        rg_l = len(data[0]) // 2 - plot_size_rg // 2\n        rg_u = len(data[0]) // 2 + plot_size_rg // 2\n    else:\n        rg_l = 0\n        rg_u = len(data[0])\n    plot_data = np.abs(data[az_l:az_u, rg_l:rg_u])\n    norm_factor = np.max(plot_data)\n    plot_data = plot_data / norm_factor\n    threshould_dB = 60\n    plot_data = np.ceil(plot_data * 10 ** (threshould_dB / 20)) / 10 ** (\n        threshould_dB / 20\n    )\n    plt.figure(figsize=(8, 6), dpi=72)\n    plt.imshow(20 * np.log10(plot_data), cmap=\"gray\",\n               interpolation='nearest', aspect='auto')\n    plt.colorbar()\n    plt.show()\n    return\n\nt0 = time.monotonic()\nimage_plot_dB_opt(test_data)\nprint(f'Optimized: {time.monotonic()-t0:.2f}s')",
+            "label": "Optimized Plot"
+          },
+          "enabled": false
+        }
+      },
+      {
+        "id": "n4",
+        "type": "canvasNode",
+        "position": {
+          "x": 1430,
+          "y": 55.5
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Pillow-based image_plot_dB\nfrom PIL import Image\nfrom IPython.display import display\nimport io, base64\n\ndef image_plot_dB_pil(data):\n    plot_size_az = 20000\n    plot_size_rg = 20000\n    if len(data) > plot_size_az:\n        az_l = len(data) // 2 - plot_size_az // 2\n        az_u = len(data) // 2 + plot_size_az // 2\n    else:\n        az_l = 0\n        az_u = len(data)\n    if len(data[0]) > plot_size_rg:\n        rg_l = len(data[0]) // 2 - plot_size_rg // 2\n        rg_u = len(data[0]) // 2 + plot_size_rg // 2\n    else:\n        rg_l = 0\n        rg_u = len(data[0])\n    plot_data = np.abs(data[az_l:az_u, rg_l:rg_u])\n    norm_factor = np.max(plot_data)\n    plot_data = plot_data / norm_factor\n    threshould_dB = 60\n    plot_data = np.ceil(plot_data * 10 ** (threshould_dB / 20)) / 10 ** (\n        threshould_dB / 20\n    )\n    db_data = 20 * np.log10(plot_data)\n    # Normalize to 0-255 grayscale\n    db_min = db_data.min()\n    db_max = db_data.max()\n    if db_max > db_min:\n        img_data = ((db_data - db_min) / (db_max - db_min) * 255).astype(np.uint8)\n    else:\n        img_data = np.zeros_like(db_data, dtype=np.uint8)\n    img = Image.fromarray(img_data, mode='L')\n    # Resize for display (max 800px wide)\n    max_w = 800\n    if img.width > max_w:\n        ratio = max_w / img.width\n        img = img.resize((max_w, int(img.height * ratio)), Image.NEAREST)\n    display(img)\n\nt0 = time.monotonic()\nimage_plot_dB_pil(test_data)\nprint(f'Pillow: {time.monotonic()-t0:.2f}s')",
+            "label": "Pillow Plot"
+          },
+          "enabled": false
+        }
+      },
+      {
+        "id": "n5",
+        "type": "canvasNode",
+        "position": {
+          "x": 1890,
+          "y": 55.5
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Pillow-based image_plot_dB with axes, gridlines and colorbar\nfrom PIL import Image, ImageDraw, ImageFont\nfrom IPython.display import display\n\ndef image_plot_dB_pil2(data):\n    plot_size_az = 20000\n    plot_size_rg = 20000\n    if len(data) > plot_size_az:\n        az_l = len(data) // 2 - plot_size_az // 2\n        az_u = len(data) // 2 + plot_size_az // 2\n    else:\n        az_l = 0\n        az_u = len(data)\n    if len(data[0]) > plot_size_rg:\n        rg_l = len(data[0]) // 2 - plot_size_rg // 2\n        rg_u = len(data[0]) // 2 + plot_size_rg // 2\n    else:\n        rg_l = 0\n        rg_u = len(data[0])\n    plot_data = np.abs(data[az_l:az_u, rg_l:rg_u])\n    norm_factor = np.max(plot_data)\n    plot_data = plot_data / norm_factor\n    threshould_dB = 60\n    plot_data = np.ceil(plot_data * 10 ** (threshould_dB / 20)) / 10 ** (\n        threshould_dB / 20\n    )\n    db_data = 20 * np.log10(plot_data)\n    db_min = float(db_data.min())\n    db_max = float(db_data.max())\n\n    # Normalize to 0-255 grayscale\n    if db_max > db_min:\n        img_data = ((db_data - db_min) / (db_max - db_min) * 255).astype(np.uint8)\n    else:\n        img_data = np.zeros_like(db_data, dtype=np.uint8)\n\n    # Resize image for display\n    data_h, data_w = img_data.shape\n    disp_w = 600\n    disp_h = int(data_h / data_w * disp_w)\n    if disp_h < 100:\n        disp_h = 100\n    img = Image.fromarray(img_data, mode='L').resize((disp_w, disp_h), Image.NEAREST)\n\n    # Layout\n    margin_left = 55\n    margin_bottom = 35\n    margin_top = 10\n    margin_right = 70\n    cb_width = 15\n    cb_gap = 8\n\n    canvas_w = margin_left + disp_w + margin_right\n    canvas_h = margin_top + disp_h + margin_bottom\n    canvas = Image.new('RGB', (canvas_w, canvas_h), (255, 255, 255))\n    img_rgb = img.convert('RGB')\n    canvas.paste(img_rgb, (margin_left, margin_top))\n\n    draw = ImageDraw.Draw(canvas)\n\n    # Border\n    draw.rectangle([margin_left, margin_top, margin_left + disp_w, margin_top + disp_h], outline=(0, 0, 0))\n\n    # --- Helper: nice tick values at interval (e.g. 1000) ---\n    def nice_ticks(vmin, vmax, max_ticks=8):\n        span = vmax - vmin\n        if span <= 0:\n            return [vmin]\n        raw_step = span / max_ticks\n        # Round to nice step: 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, ...\n        mag = 10 ** int(np.floor(np.log10(raw_step)))\n        for s in [1, 2, 5, 10]:\n            if mag * s >= raw_step:\n                step = mag * s\n                break\n        start = int(np.ceil(vmin / step)) * step\n        ticks = []\n        v = start\n        while v <= vmax:\n            ticks.append(int(v))\n            v += step\n        return ticks\n\n    # --- X axis (range pixels) ---\n    x_ticks = nice_ticks(rg_l, rg_u)\n    grid_color = (80, 80, 80)\n    for val in x_ticks:\n        frac = (val - rg_l) / (rg_u - rg_l)\n        x_pos = margin_left + int(frac * disp_w)\n        if 0 <= frac <= 1:\n            # Grid line\n            for y in range(margin_top, margin_top + disp_h):\n                px = canvas.getpixel((x_pos, y))\n                blended = tuple(min(255, c + 40) for c in px)\n                canvas.putpixel((x_pos, y), blended)\n            # Tick\n            draw.line([(x_pos, margin_top + disp_h), (x_pos, margin_top + disp_h + 4)], fill=(0, 0, 0))\n            draw.text((x_pos - 15, margin_top + disp_h + 6), str(val), fill=(0, 0, 0))\n\n    # --- Y axis (azimuth pixels) ---\n    y_ticks = nice_ticks(az_l, az_u)\n    for val in y_ticks:\n        frac = (val - az_l) / (az_u - az_l)\n        y_pos = margin_top + int(frac * disp_h)\n        if 0 <= frac <= 1:\n            # Grid line\n            for x in range(margin_left, margin_left + disp_w):\n                px = canvas.getpixel((x, y_pos))\n                blended = tuple(min(255, c + 40) for c in px)\n                canvas.putpixel((x, y_pos), blended)\n            # Tick\n            draw.line([(margin_left - 4, y_pos), (margin_left, y_pos)], fill=(0, 0, 0))\n            draw.text((2, y_pos - 5), str(val), fill=(0, 0, 0))\n\n    # --- Axis labels ---\n    draw.text((margin_left + disp_w // 2 - 20, margin_top + disp_h + 20), \"Range\", fill=(0, 0, 0))\n    # Y label (simple horizontal text)\n    draw.text((2, margin_top - 2), \"Az\", fill=(0, 0, 0))\n\n    # --- Colorbar ---\n    cb_x = margin_left + disp_w + cb_gap\n    for y in range(disp_h):\n        val = int(255 * (1 - y / disp_h))\n        draw.line([(cb_x, margin_top + y), (cb_x + cb_width, margin_top + y)], fill=(val, val, val))\n    draw.rectangle([cb_x, margin_top, cb_x + cb_width, margin_top + disp_h], outline=(0, 0, 0))\n\n    # Colorbar labels\n    cb_ticks = nice_ticks(db_min, db_max, max_ticks=5)\n    for val in cb_ticks:\n        frac = (db_max - val) / (db_max - db_min) if db_max > db_min else 0\n        y_pos = margin_top + int(frac * disp_h)\n        draw.text((cb_x + cb_width + 3, y_pos - 5), f'{val:.0f}', fill=(0, 0, 0))\n\n    draw.text((cb_x, margin_top - 10), \"dB\", fill=(0, 0, 0))\n\n    display(canvas)\n\nt0 = time.monotonic()\nimage_plot_dB_pil2(test_data)\nprint(f'Pillow v2: {time.monotonic()-t0:.2f}s')",
+            "label": "Pillow v2 (axes+cb)"
+          },
+          "enabled": false
+        }
+      },
+      {
+        "id": "n6",
+        "type": "canvasNode",
+        "position": {
+          "x": 510,
+          "y": -122
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# matplotlib with max-pooling downscale (preserves point targets)\ndef image_plot_dB_maxpool(data):\n    plot_size_az = 20000\n    plot_size_rg = 20000\n    if len(data) > plot_size_az:\n        az_l = len(data) // 2 - plot_size_az // 2\n        az_u = len(data) // 2 + plot_size_az // 2\n    else:\n        az_l = 0\n        az_u = len(data)\n    if len(data[0]) > plot_size_rg:\n        rg_l = len(data[0]) // 2 - plot_size_rg // 2\n        rg_u = len(data[0]) // 2 + plot_size_rg // 2\n    else:\n        rg_l = 0\n        rg_u = len(data[0])\n    plot_data = np.abs(data[az_l:az_u, rg_l:rg_u])\n    norm_factor = np.max(plot_data)\n    plot_data = plot_data / norm_factor\n    threshould_dB = 60\n    plot_data = np.ceil(plot_data * 10 ** (threshould_dB / 20)) / 10 ** (\n        threshould_dB / 20\n    )\n    db_data = 20 * np.log10(plot_data)\n\n    # Max-pooling to reduce size for display (target ~800x600)\n    target_h, target_w = 600, 800\n    h, w = db_data.shape\n    if h > target_h or w > target_w:\n        bh = max(1, h // target_h)\n        bw = max(1, w // target_w)\n        # Trim to multiple of block size\n        th = (h // bh) * bh\n        tw = (w // bw) * bw\n        trimmed = db_data[:th, :tw]\n        # Reshape and take max per block (preserves bright targets)\n        db_data = trimmed.reshape(th // bh, bh, tw // bw, bw).max(axis=(1, 3))\n\n    plt.imshow(db_data, cmap=\"gray\",\n               extent=[rg_l, rg_u, az_u, az_l])\n    plt.colorbar()\n    plt.show()\n    return\n\nt0 = time.monotonic()\nimage_plot_dB_maxpool(test_data)\nprint(f'MaxPool: {time.monotonic()-t0:.2f}s')",
+            "label": "MaxPool Plot"
+          },
+          "enabled": false
+        }
+      },
+      {
+        "id": "n7",
+        "type": "canvasNode",
+        "position": {
+          "x": 50,
+          "y": 75.5
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "import numpy as np\nfrom scipy import interpolate\nfrom scipy.ndimage import map_coordinates\nimport time\n\n# Simulate data matching TargetSim dimensions\ndata_len = 5400\nnsamples = 10966\n\n# Fake parameters (matching TargetSim)\nc = 299792456\nfs = 100e6\nprf = 4000\nwl = c / 9.65e9\nveff = 7410\nr_sc = 690e3\ndoppler_centroid = 0.0\nd_rg = c / 2 / fs\n\n# Create test RD domain data\niq_data_rd = (np.random.randn(data_len, nsamples) + 1j * np.random.randn(data_len, nsamples)).astype(np.complex64) * 0.01\niq_data_rd[2700, 5483] = 1.0 + 0j\n\n# Pre-compute freq and R (shared by both methods)\nsample_points = np.arange(-(data_len) // 2, data_len // 2)\nfreq = sample_points * (prf / data_len) + doppler_centroid\nfreq = np.roll(freq, np.round(doppler_centroid / (prf / data_len)).astype(int))\nR = r_sc + np.arange(0, nsamples) * d_rg\n\nprint(f'Setup done: iq_data_rd={iq_data_rd.shape}')",
+            "label": "RCMC Setup"
+          },
+          "enabled": false
+        }
+      },
+      {
+        "id": "n8",
+        "type": "canvasNode",
+        "position": {
+          "x": 510,
+          "y": 506
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Original RCMC\nt0 = time.monotonic()\n\nrcm = np.zeros(iq_data_rd.shape, np.float64)\nfor i in range(iq_data_rd.shape[1]):\n    rcm[:, i] = (1 / np.sqrt(1 - (wl * freq / (2 * veff)) ** 2) - 1) * (r_sc + d_rg * i)\n\nR_new = np.tile(R, (rcm.shape[0], 1)) + rcm\n\niq_data_rcmc_orig = np.zeros_like(iq_data_rd)\nfor i in range(iq_data_rd.shape[0]):\n    f = interpolate.interp1d(R, iq_data_rd[i], kind=\"cubic\", fill_value=\"extrapolate\")\n    iq_data_rcmc_orig[i] = f(R_new[i])\n\nprint(f'Original RCMC: {time.monotonic()-t0:.2f}s')",
+            "label": "RCMC Original"
+          },
+          "enabled": false
+        }
+      },
+      {
+        "id": "n9",
+        "type": "canvasNode",
+        "position": {
+          "x": 970,
+          "y": 370.5
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# GPU RCMC - same cubic interpolation on GPU\nimport cupy as cp\nfrom cupyx.scipy.ndimage import map_coordinates as gpu_map_coordinates\n\nt0 = time.monotonic()\n\n# Vectorized rcm (CPU)\nmigration_factor = 1 / np.sqrt(1 - (wl * freq / (2 * veff)) ** 2) - 1\nrange_offsets = r_sc + d_rg * np.arange(iq_data_rd.shape[1])\nrcm_opt = migration_factor[:, np.newaxis] * range_offsets[np.newaxis, :]\nR_new_opt = np.tile(R, (iq_data_rd.shape[0], 1)) + rcm_opt\n\n# Fractional pixel indices\ncol_coords = (R_new_opt - R[0]) / d_rg\nrow_coords = np.broadcast_to(np.arange(iq_data_rd.shape[0])[:, np.newaxis], col_coords.shape).copy().astype(np.float64)\n\n# Stack into (2, H, W) coordinates array\ncoords = np.stack([row_coords, col_coords], axis=0)\n\n# Transfer to GPU\ncoords_gpu = cp.asarray(coords)\niq_real_gpu = cp.asarray(iq_data_rd.real.astype(np.float64))\niq_imag_gpu = cp.asarray(iq_data_rd.imag.astype(np.float64))\n\n# GPU cubic interpolation\nout_real = gpu_map_coordinates(iq_real_gpu, coords_gpu, order=3, mode='constant', cval=0.0)\nout_imag = gpu_map_coordinates(iq_imag_gpu, coords_gpu, order=3, mode='constant', cval=0.0)\n\n# Transfer back to CPU\niq_data_rcmc_gpu = (cp.asnumpy(out_real) + 1j * cp.asnumpy(out_imag)).astype(np.complex64)\n\ncp.cuda.Stream.null.synchronize()\nprint(f'GPU RCMC (cubic): {time.monotonic()-t0:.2f}s')\n\n# Verify\ndiff = np.max(np.abs(iq_data_rcmc_orig - iq_data_rcmc_gpu))\nrms = np.sqrt(np.mean(np.abs(iq_data_rcmc_orig - iq_data_rcmc_gpu)**2))\nprint(f'Max diff: {diff:.6e}, RMS diff: {rms:.6e}')",
+            "label": "RCMC Optimized"
+          },
+          "enabled": false
+        }
+      },
+      {
+        "id": "n10",
+        "type": "canvasNode",
+        "position": {
+          "x": 1663.5,
+          "y": 780.5
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "import numpy as np\nfrom scipy import interpolate\n\nc = 299792456\nchirp_bw = 75e6; fc = 9.6e9; wl = c/fc; fs = 3000e6/16\nprf = 4000; pri = 1/prf; duty = 0.25; chirp_len = pri*duty\nchirp_rate = chirp_bw/chirp_len; chirp_mode = \"down\"\nl_a = 4.9; w_a = 0.7; r_sc = 690e3; veff = 7410\nsquint = 0.0/180*np.pi; doppler_centroid = 2*veff*np.sin(squint)/wl\ntheta_l_a = 0.886*wl/l_a; theta_w_a = 0.886*wl/w_a\n\ntd = chirp_len*fs\nt = np.arange(-td/2, td/2, 1)/fs\nchirp_replica_u = np.exp(1j*np.pi*chirp_rate*t**2)\nchirp_replica_d = np.exp(-1j*np.pi*chirp_rate*t**2)\n\nrange_swath = 10e3; azimuth_swath = 10e3\ntd2 = (range_swath**2+azimuth_swath**2)**0.5/c\nnsamples = np.ceil(td2*fs).astype(int) + len(chirp_replica_u)\nfast_time = np.arange(0, nsamples, 1)/fs + 2*r_sc/c\ntd3 = azimuth_swath/veff\nnpulses = np.ceil(td3*prf).astype(int)\nslow_time = np.arange(-npulses//2, npulses//2, 1)/prf\naz_array = veff*slow_time + r_sc*np.tan(squint)\n\npoints = [(r_sc+range_swath/2, 0)]\nprint(f'Setup done: ({npulses}, {nsamples}), target at {points[0][0]:.0f}m')",
+            "label": "Debug Setup"
+          }
+        }
+      },
+      {
+        "id": "n11",
+        "type": "canvasNode",
+        "position": {
+          "x": 2109.7272943109037,
+          "y": 722.9562973669103
+        },
+        "width": 579,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Image target timing - differential phase method (best approach)\nfrom PIL import Image\nimport cupy as cp\nimport time as _time\n\nimg_full = Image.open('D:/yoshitaka/TargetSimulator2/ImageTest/ya.png').convert('L')\ngray_full = np.array(img_full, dtype=np.float32)\n\ntest_cases = [\n    (\"26x26 diff\", np.array(img_full.resize((26, 26)), dtype=np.float32)),\n]\n\nnfast = len(fast_time)\nnpulses = len(slow_time)\nfreqs_gpu = cp.asarray(np.fft.fftfreq(nfast, 1/fs), dtype=cp.float32)\nchirp_padded = np.zeros(nfast, dtype=np.complex64)\nchirp_padded[:len(chirp_replica_d)] = chirp_replica_d\nchirp_fft_gpu = cp.asarray(np.fft.fft(chirp_padded), dtype=cp.complex64)\naz_array_gpu = cp.asarray(az_array, dtype=cp.float32)\nft0 = np.float32(fast_time[0])\nd_rg_val = c / 2 / fs\nd_az_val = veff / prf\nwl_f32 = np.float32(wl)\nsquint_f32 = np.float32(squint)\ntheta_l_a_f32 = np.float32(theta_l_a)\nc_f32 = np.float32(c)\npi_f32 = np.float32(np.pi)\nphase_r_coeff = np.float32(-4 * np.pi / wl)\n\ndef process_image(gray, label):\n    rows, cols = np.where(gray > 0)\n    nt = len(rows)\n    if nt == 0:\n        return 0, 0\n\n    tr_gpu = cp.asarray((r_sc + cols * d_rg_val).astype(np.float32))\n    ta_gpu = cp.asarray(((rows - gray.shape[0]/2) * d_az_val).astype(np.float32))\n    tamp_gpu = cp.asarray((gray[rows, cols] / 255.0).astype(np.float32))\n\n    t0 = _time.monotonic()\n    echo_fft_all = cp.zeros((npulses, nfast), dtype=cp.complex64)\n\n    tb = min(80, nt)\n    reset_interval = 100\n\n    print(f'{label}: {nt} tgts, tb={tb}, reset={reset_interval}')\n\n    for tstart in range(0, nt, tb):\n        tend = min(tstart + tb, nt)\n        nb_t = tend - tstart\n        tr_b = tr_gpu[tstart:tend]\n        ta_b = ta_gpu[tstart:tend]\n        tamp_b = tamp_gpu[tstart:tend]\n\n        prev_delay_phase = None\n        prev_delay = None\n\n        for p in range(npulses):\n            az = az_array_gpu[p]\n\n            r_vec = cp.sqrt(tr_b**2 + (ta_b - az)**2)\n            angle = cp.arctan((az - ta_b) / tr_b)\n            s_az = cp.sinc((angle - squint_f32) / theta_l_a_f32)**2\n            delay = 2 * r_vec / c_f32 - ft0\n            phase_r = cp.exp(1j * phase_r_coeff * r_vec).astype(cp.complex64)\n            weights = (tamp_b * s_az * phase_r).astype(cp.complex64)\n\n            if prev_delay_phase is None or p % reset_interval == 0:\n                cur_delay_phase = cp.exp(-2j * pi_f32 * delay[:, None] * freqs_gpu[None, :]).astype(cp.complex64)\n            else:\n                d_delay = delay - prev_delay\n                delta_phase = cp.exp(-2j * pi_f32 * d_delay[:, None] * freqs_gpu[None, :]).astype(cp.complex64)\n                cur_delay_phase = prev_delay_phase * delta_phase\n\n            prev_delay_phase = cur_delay_phase\n            prev_delay = delay\n\n            contrib = cp.sum(weights[:, None] * cur_delay_phase, axis=0)\n            echo_fft_all[p, :] += chirp_fft_gpu * contrib\n\n        del prev_delay_phase, prev_delay\n        cp.get_default_memory_pool().free_all_blocks()\n\n        elapsed = _time.monotonic() - t0\n        progress = tend / nt\n        remaining = elapsed / progress - elapsed if progress > 0 else 0\n        print(f'{label}: {tend}/{nt} ({progress*100:.0f}%) {elapsed:.1f}s ~{remaining:.0f}s left')\n\n    iq_result = cp.asnumpy(cp.fft.ifft(echo_fft_all, axis=1)).astype(np.complex64)\n    cp.cuda.Stream.null.synchronize()\n    tt = _time.monotonic() - t0\n    del echo_fft_all\n    cp.get_default_memory_pool().free_all_blocks()\n    return nt, tt\n\nprint(f'{\"Size\":<20} {\"Tgts\":>6} {\"Time\":>7} {\"/tgt\":>7} {\"Est ya\":>10}')\nprint('-' * 55)\n\nn_full = np.count_nonzero(gray_full)\nfor name, gray in test_cases:\n    nt, t = process_image(gray, name)\n    if nt > 0:\n        est = t / nt * n_full\n        print(f'{name:<20} {nt:>6} {t:>6.1f}s {t/nt:>6.3f}s {est:>7.0f}s ({est/60:.0f}m)')\n\nprint(f'\\nFull ya.png: {n_full} non-zero pixels')",
+            "label": "Image Target Timing"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_1773987613122_lup4",
+        "source": "n1",
+        "sourceHandle": "out_0",
+        "target": "n2",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773987613215_5e4h",
+        "source": "n2",
+        "sourceHandle": "out_0",
+        "target": "n3",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773987702138_byg9",
+        "source": "n3",
+        "sourceHandle": "out_0",
+        "target": "n4",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773987851538_ns79",
+        "source": "n4",
+        "sourceHandle": "out_0",
+        "target": "n5",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773988155514_kocu",
+        "source": "n1",
+        "sourceHandle": "out_0",
+        "target": "n6",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773988493536_fal2",
+        "source": "n7",
+        "sourceHandle": "out_0",
+        "target": "n8",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773988493639_qis3",
+        "source": "n8",
+        "sourceHandle": "out_0",
+        "target": "n9",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1774001185159_7y4e",
+        "source": "n10",
+        "sourceHandle": "out_0",
+        "target": "n11",
+        "targetHandle": "in_0"
+      }
+    ]
+  }
+}

@@ -1,0 +1,991 @@
+{
+  "version": 1,
+  "type": "flow",
+  "title": "TargetSim_GPU_TimeDomain",
+  "description": "まずは初めての移植",
+  "created": "2026-03-20T05:35:03.914005+00:00",
+  "modified": "2026-04-11T09:36:55.843442+00:00",
+  "canvas": {
+    "nodes": [
+      {
+        "id": "n1",
+        "type": "canvasNode",
+        "position": {
+          "x": 50,
+          "y": 55.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "import numpy as np\nimport matplotlib.pyplot as plt\nfrom scipy import interpolate\n\ndef peak_find(input,interval=10,num=3):\n    idx = []\n    data = np.abs(input)\n\n    for i in range(num):\n        idx_i=list(zip(*np.where(data==np.max(data))))\n        idx.append(idx_i[0])\n        data[idx_i[0][0]-interval//2:idx_i[0][0]+interval//2,idx_i[0][1]-interval//2:idx_i[0][1]+interval//2]=0\n\n    return idx\n\n# plot the data in dB scale (max-pooling for fast display)\ndef image_plot_dB(data, extent=None, xlabel='Range (km)', ylabel='Azimuth (km)'):\n    plot_size_az = 20000\n    plot_size_rg = 20000\n    if len(data) > plot_size_az:\n        az_l = len(data) // 2 - plot_size_az // 2\n        az_u = len(data) // 2 + plot_size_az // 2\n    else:\n        az_l = 0\n        az_u = len(data)\n    if len(data[0]) > plot_size_rg:\n        rg_l = len(data[0]) // 2 - plot_size_rg // 2\n        rg_u = len(data[0]) // 2 + plot_size_rg // 2\n    else:\n        rg_l = 0\n        rg_u = len(data[0])\n    plot_data = np.abs(data[az_l:az_u, rg_l:rg_u])\n    norm_factor = np.max(plot_data)\n    plot_data = plot_data / norm_factor\n    threshould_dB = 60\n    plot_data = np.ceil(plot_data * 10 ** (threshould_dB / 20)) / 10 ** (\n        threshould_dB / 20\n    )\n    db_data = 20 * np.log10(plot_data)\n\n    # Max-pooling to reduce array size for faster rendering\n    target_h, target_w = 600, 800\n    h, w = db_data.shape\n    if h > target_h or w > target_w:\n        bh = max(1, h // target_h)\n        bw = max(1, w // target_w)\n        th = (h // bh) * bh\n        tw = (w // bw) * bw\n        db_data = db_data[:th, :tw].reshape(th // bh, bh, tw // bw, bw).max(axis=(1, 3))\n\n    imshow_kwargs = dict(cmap=\"gray\", aspect='auto')\n    if extent is not None:\n        imshow_kwargs['extent'] = extent\n    plt.imshow(db_data, **imshow_kwargs)\n    plt.xlabel(xlabel)\n    plt.ylabel(ylabel)\n    plt.colorbar(label='dB')\n    plt.tight_layout()\n    plt.show()\n\n    return\n\nprint('Imports & Utils loaded OK')",
+            "label": "Imports & Utils"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n3",
+        "type": "canvasNode",
+        "position": {
+          "x": 510,
+          "y": 182
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# constants\nc = 299792456\nprint(f'c = {c}')\n\n# radar parameters\nchirp_bw = 75e6\nfc = 9.6e9\nwl = c/fc\nfs = 3000e6/16\nprf = 4000\npri = 1/prf\nduty = 0.25\nchirp_len = pri*duty\nchirp_rate = chirp_bw/chirp_len\n\nchirp_mode = \"down\" # up, down, ud\nprint(f'wl={wl:.4f}, fs={fs:.0f}, prf={prf}, chirp_rate={chirp_rate:.2e}')",
+            "label": "Radar Params"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n4",
+        "type": "canvasNode",
+        "position": {
+          "x": 970,
+          "y": 106
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# platform parameters\nl_a = 4.9\nw_a = 0.7\ntheta_l = 30 * np.pi/180\nheight = 550e3\nr_sc = 690e3\nveff = 7410\nsquint = 0.0/180*np.pi\ndoppler_centroid = 2*veff*np.sin(squint)/wl\nprint(f'r_sc={r_sc:.0f}, veff={veff}, doppler_centroid={doppler_centroid:.2f}')\n\n# antenna pattern\ntheta_l_a = 0.886*wl/l_a\ntheta_w_a = 0.886*wl/w_a\nprint(f'theta_l_a={theta_l_a:.6f}, theta_w_a={theta_w_a:.6f}')\n",
+            "label": "Platform Params"
+          }
+        },
+        "width": 427,
+        "style": {}
+      },
+      {
+        "id": "n6",
+        "type": "canvasNode",
+        "position": {
+          "x": 1457,
+          "y": 267.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# transmitted chirp pulse\ntime_duration = chirp_len*fs\nt = np.arange(-time_duration/2,time_duration/2,1)/fs\nphase = np.pi*chirp_rate*t**2\nchirp_replica_u = np.exp(1j*phase) # up chirp\nchirp_replica_d = np.exp(-1j*phase) # down chirp\nprint(f'chirp samples: {len(chirp_replica_u)}')",
+            "label": "Chirp Pulse"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n7",
+        "type": "canvasNode",
+        "position": {
+          "x": 1917,
+          "y": 190
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# simulation swath\nrange_swath = 10e3\nazimuth_swath = 10e3\n\n# range time (fast time)\ntime_duration = (range_swath**2+azimuth_swath**2)**0.5/c\nnsamples = np.ceil(time_duration*fs).astype(int) + len(chirp_replica_u)\nfast_time = np.arange(0,nsamples,1)/fs + 2*r_sc/c\nrg_array = c*fast_time+r_sc\n\n# azimuth time\ntime_duration = azimuth_swath/veff\nnpulses = np.ceil(time_duration*prf).astype(int)\nslow_time = np.arange(-npulses//2,npulses//2,1)/prf\naz_array = veff*slow_time+r_sc*np.tan(squint)\nprint(f'nsamples={nsamples}, npulses={npulses}')",
+            "label": "Swath & Time Axes"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n8",
+        "type": "canvasNode",
+        "position": {
+          "x": 2377,
+          "y": 295.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# point target\npoints = [(r_sc+range_swath/2,0)]\nprint(f'targets: {points}')",
+            "label": "Point Target"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n9",
+        "type": "canvasNode",
+        "position": {
+          "x": 2837,
+          "y": 55.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# response from point target\nimport time as _time\n_t0 = _time.monotonic()\niq_data = np.zeros((len(slow_time),len(fast_time)),dtype=np.complex64)\nt_chirp = np.zeros(len(fast_time),dtype=np.complex64)\nchirp_l = len(chirp_replica_u)\nt_chirp[:len(chirp_replica_u)] = chirp_replica_u\nt_chirp_f = np.fft.fft(t_chirp)\n\nphi_offset = np.pi*0\nsample_delay = 0\n\nrg_freq = np.arange(-0.5,0.5,1/len(fast_time))*fs\nrg_freq -=rg_freq[len(rg_freq)//2]\nif chirp_mode == \"up\" or chirp_mode == \"ud\":\n    ss = 1\nelse:\n    ss = -1\n\nfor i in range(len(slow_time)):\n    if chirp_mode == \"ud\":\n        ss *= -1\n\n    for j in range(len(points)):\n        az = az_array[i]\n        r = (points[j][0]**2+(points[j][1]-az)**2)**0.5\n        angle_to_target = np.arctan((az-points[j][1])/points[j][0])\n        s_az = np.sinc((angle_to_target-squint)/theta_l_a)**2\n\n        rect = np.zeros(len(fast_time))\n        rect[int(2*(r-r_sc)/c*fs):int(2*(r-r_sc)/c*fs+chirp_l)] = 1\n\n        iq_data[i,:] += rect*np.exp(ss*1j*np.pi*chirp_rate*(fast_time-2*(r)/c-chirp_len/2)**2)*np.exp(-4j*np.pi*r/wl)*s_az+1e-10\n\nprint(f'IQ data generated: {iq_data.shape}, elapsed: {_time.monotonic()-_t0:.1f}s')",
+            "label": "IQ Data Generation"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n10",
+        "type": "canvasNode",
+        "position": {
+          "x": 3297,
+          "y": 167
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "slant_range = c * fast_time / 2 / 1e3  # km\naz_km = az_array / 1e3  # km\nextent = [slant_range[0], slant_range[-1], az_km[-1], az_km[0]]\nimage_plot_dB(iq_data, extent=extent, xlabel='Range (km)', ylabel='Azimuth (km)')",
+            "label": "IQ Data Plot"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n11",
+        "type": "canvasNode",
+        "position": {
+          "x": 3297,
+          "y": 633
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# preparation of range reference function\nt_chirp_u = np.zeros(len(iq_data[0]),dtype=np.complex64)\nt_chirp_d = np.zeros(len(iq_data[0]),dtype=np.complex64)\nchirp_l = len(chirp_replica_u)\nt_chirp_u[:len(chirp_replica_u)] = chirp_replica_u\nt_chirp_d[:len(chirp_replica_d)] = chirp_replica_d\n\n# convert to frequency domain\nt_chirp_u_f = np.fft.fft(t_chirp_u)\nt_chirp_d_f = np.fft.fft(t_chirp_d)\nprint('Range reference ready')",
+            "label": "Range Reference"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n12",
+        "type": "canvasNode",
+        "position": {
+          "x": 3757,
+          "y": 243.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# range compression (GPU)\nimport cupy as cp\n\niq_data_gpu = cp.asarray(iq_data)\niq_data_f = cp.fft.fft(iq_data_gpu, axis=1)\ndel iq_data_gpu\n\nif chirp_mode == \"down\":\n    ref_f = cp.conj(cp.asarray(t_chirp_d_f))\n    iq_rg_cmp_gpu = cp.fft.ifft(iq_data_f * ref_f[cp.newaxis, :], axis=1)\nelif chirp_mode == \"up\":\n    ref_f = cp.conj(cp.asarray(t_chirp_u_f))\n    iq_rg_cmp_gpu = cp.fft.ifft(iq_data_f * ref_f[cp.newaxis, :], axis=1)\nelse:\n    ref_u_f = cp.conj(cp.asarray(t_chirp_u_f))\n    ref_d_f = cp.conj(cp.asarray(t_chirp_d_f))\n    iq_rg_cmp_gpu = cp.zeros_like(iq_data_f)\n    iq_rg_cmp_gpu[1::2, :] = cp.fft.ifft(iq_data_f[1::2, :] * ref_u_f[cp.newaxis, :], axis=1)\n    iq_rg_cmp_gpu[0::2, :] = cp.fft.ifft(iq_data_f[0::2, :] * ref_d_f[cp.newaxis, :], axis=1)\n\ndel iq_data_f\niq_rg_cmp = cp.asnumpy(iq_rg_cmp_gpu).astype(np.complex64)\ndel iq_rg_cmp_gpu\ncp.get_default_memory_pool().free_all_blocks()\nprint(f'Range compression done (GPU): {iq_rg_cmp.shape}')",
+            "label": "Range Compression"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n13",
+        "type": "canvasNode",
+        "position": {
+          "x": 4217,
+          "y": 153.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "slant_range = c * fast_time / 2 / 1e3\naz_km = az_array / 1e3\nextent = [slant_range[0], slant_range[-1], az_km[-1], az_km[0]]\nimage_plot_dB(iq_rg_cmp, extent=extent, xlabel='Range (km)', ylabel='Azimuth (km)')",
+            "label": "RC Plot"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n14",
+        "type": "canvasNode",
+        "position": {
+          "x": 4218,
+          "y": 619.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# azimuth fft (GPU, with memory management)\nimport cupy as cp\n\niq_gpu = cp.asarray(iq_rg_cmp)\niq_data_rd = cp.asnumpy(cp.fft.fftshift(cp.fft.fft(iq_gpu, axis=0), axes=0)).astype(np.complex64)\ndel iq_gpu\ncp.get_default_memory_pool().free_all_blocks()\nprint(f'RD domain (GPU): {iq_data_rd.shape}')",
+            "label": "Azimuth FFT"
+          }
+        },
+        "width": 398,
+        "style": {}
+      },
+      {
+        "id": "n15",
+        "type": "canvasNode",
+        "position": {
+          "x": 4677,
+          "y": 89.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "slant_range = c * fast_time / 2 / 1e3\ndoppler_axis = np.arange(-npulses//2, npulses//2) * (prf / npulses) + doppler_centroid\nextent = [slant_range[0], slant_range[-1], doppler_axis[-1], doppler_axis[0]]\nimage_plot_dB(iq_data_rd, extent=extent, xlabel='Range (km)', ylabel='Doppler (Hz)')",
+            "label": "RD Plot"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n16",
+        "type": "canvasNode",
+        "position": {
+          "x": 4677,
+          "y": 738.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# RCMC (GPU - staged float32 cubic interpolation)\n# Note: float32 gives ~1.3% range resolution diff vs CPU float64 interp1d.\n#       float64 matches CPU exactly but is ~2x slower due to VRAM limits (8GB).\n#       Peak position is identical in both modes.\nimport cupy as cp\nfrom cupyx.scipy.ndimage import map_coordinates as gpu_map_coordinates\nimport time as _time\n_t0 = _time.monotonic()\n\ndata_len = iq_data_rd.shape[0]\nncols = iq_data_rd.shape[1]\n\nsample_points = np.arange(-(data_len) // 2, data_len // 2)\nfreq = sample_points * (prf / data_len) + doppler_centroid\nfreq = np.roll(freq, np.round(doppler_centroid / (prf / data_len)).astype(int))\nd_rg = c / 2 / fs\n\n# GPU coordinates (float32)\nfreq_gpu = cp.asarray(freq, dtype=cp.float32)\nmf = 1 / cp.sqrt(1 - (wl * freq_gpu / (2 * veff)) ** 2) - 1\ncol_base = cp.arange(ncols, dtype=cp.float32)\nr_sc_px = cp.float32(r_sc / d_rg)\ncol_coords = col_base[cp.newaxis, :] + mf[:, cp.newaxis] * (r_sc_px + col_base[cp.newaxis, :])\nrow_coords = cp.ascontiguousarray(cp.broadcast_to(cp.arange(data_len, dtype=cp.float32)[:, cp.newaxis], (data_len, ncols)))\ncoords_gpu = cp.stack([row_coords, col_coords], axis=0)\ndel mf, col_base, row_coords, col_coords, freq_gpu\ncp.get_default_memory_pool().free_all_blocks()\n\n_t1 = _time.monotonic()\n\n# Staged: real part\niq_real_gpu = cp.asarray(iq_data_rd.real, dtype=cp.float32)\nout_real = gpu_map_coordinates(iq_real_gpu, coords_gpu, order=3, mode='nearest')\nout_real_cpu = cp.asnumpy(out_real)\ndel iq_real_gpu, out_real\ncp.get_default_memory_pool().free_all_blocks()\n\n_t2 = _time.monotonic()\n\n# Staged: imag part\niq_imag_gpu = cp.asarray(iq_data_rd.imag, dtype=cp.float32)\nout_imag = gpu_map_coordinates(iq_imag_gpu, coords_gpu, order=3, mode='nearest')\nout_imag_cpu = cp.asnumpy(out_imag)\ndel iq_imag_gpu, coords_gpu, out_imag\ncp.get_default_memory_pool().free_all_blocks()\n\niq_data_rcmc = (out_real_cpu + 1j * out_imag_cpu).astype(np.complex64)\ndel out_real_cpu, out_imag_cpu\n\nprint(f'RCMC (GPU f32): {iq_data_rcmc.shape} (coords:{_t1-_t0:.2f}s, real:{_t2-_t1:.2f}s, imag:{_time.monotonic()-_t2:.2f}s, total:{_time.monotonic()-_t0:.2f}s)')",
+            "label": "RCMC"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n17",
+        "type": "canvasNode",
+        "position": {
+          "x": 5137,
+          "y": -14
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "slant_range = c * fast_time / 2 / 1e3\ndoppler_axis = np.arange(-npulses//2, npulses//2) * (prf / npulses) + doppler_centroid\nextent = [slant_range[0], slant_range[-1], doppler_axis[-1], doppler_axis[0]]\nimage_plot_dB(iq_data_rcmc, extent=extent, xlabel='Range (km)', ylabel='Doppler (Hz)')",
+            "label": "RCMC Plot"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n18",
+        "type": "canvasNode",
+        "position": {
+          "x": 5137,
+          "y": 635
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# azimuth chirp signal generation\ndef azimuth_chirp(doppler_centroid, tau, fm_rate):\n    dt = 1 / prf\n    n_points = np.floor(tau * prf).astype(int)\n    t = np.arange(-n_points // 2, n_points // 2) * dt\n    phase = 2 * np.pi * doppler_centroid * t + np.pi * fm_rate * t**2\n    chirp = np.exp(1j * phase)\n    return chirp\n\n# azimuth reference function generation\ndef azimuth_reference(ri, datalen):\n    ri = ri / np.sqrt(1 - (wl * doppler_centroid) / (2 * veff) ** 2)\n    fm_rate = -(2 * veff**2 / wl) / ri\n    az_beamwidth = ri * (wl / l_a) * 1.2\n    tau_az = az_beamwidth / veff\n\n    az_ref = azimuth_chirp(doppler_centroid, tau_az, fm_rate)\n    az_ref_len = len(az_ref)\n    az_ref_padded = np.zeros(datalen, np.complex64)\n    az_ref_padded[:az_ref_len] = az_ref\n    shift = az_ref_len//2 + int(-(2*(doppler_centroid)/fm_rate)*prf)//2\n    az_ref = np.roll(az_ref_padded, - shift)\n\n    return az_ref\n\n# azimuth compression\ndef azimuth_compression(data):\n    datalen = data.shape[0]\n    for i in range(len(data[0])):\n        ri = r_sc + c / (2 * fs) * i\n        az_ref = azimuth_reference(ri, datalen)\n        az_ref = np.conj(np.fft.fftshift(np.fft.fft(az_ref))).astype(np.complex64)\n        data[:, i] = data[:, i] * az_ref\n    return data\n\nprint('Az functions defined')",
+            "label": "Az Chirp & Compress Funcs"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n19",
+        "type": "canvasNode",
+        "position": {
+          "x": 5597,
+          "y": 295.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# azimuth compression (GPU v5 - batch FFT on GPU)\nimport cupy as cp\nimport time as _time\n_t0 = _time.monotonic()\n\ndatalen = iq_data_rcmc.shape[0]\nncols = iq_data_rcmc.shape[1]\ndt = 1 / prf\n\n# All ri values\nri_all = r_sc + c / (2 * fs) * np.arange(ncols)\nri_corr = ri_all / np.sqrt(1 - (wl * doppler_centroid) / (2 * veff) ** 2)\nfm_rate_all = -(2 * veff**2 / wl) / ri_corr\naz_bw_all = ri_corr * (wl / l_a) * 1.2\ntau_az_all = az_bw_all / veff\nn_points_all = np.floor(tau_az_all * prf).astype(int)\n\n# Build all padded chirps on CPU (loop is fast, chirps are small)\npadded_all = np.zeros((ncols, datalen), dtype=np.complex64)\nfor i in range(ncols):\n    npts = n_points_all[i]\n    t_chirp = np.arange(-npts // 2, npts // 2) * dt\n    phase = 2 * np.pi * doppler_centroid * t_chirp + np.pi * fm_rate_all[i] * t_chirp**2\n    padded_all[i, :npts] = np.exp(1j * phase).astype(np.complex64)\n    shift = npts // 2 + int(-(2 * doppler_centroid / fm_rate_all[i]) * prf) // 2\n    padded_all[i] = np.roll(padded_all[i], -shift)\n\n_t1 = _time.monotonic()\n\n# Batch FFT on GPU (all columns at once)\npadded_gpu = cp.asarray(padded_all)\naz_refs_gpu = cp.conj(cp.fft.fftshift(cp.fft.fft(padded_gpu, axis=1), axes=1)).astype(cp.complex64)\ndel padded_gpu\n\n# GPU multiply\niq_gpu = cp.asarray(iq_data_rcmc)\niq_az_cmp = cp.asnumpy(iq_gpu * az_refs_gpu.T).astype(np.complex64)\n\ndel az_refs_gpu, iq_gpu\ncp.get_default_memory_pool().free_all_blocks()\n\nprint(f'Az compression (GPU v5): {iq_az_cmp.shape} (chirp:{_t1-_t0:.2f}s, fft+mul:{_time.monotonic()-_t1:.2f}s, total:{_time.monotonic()-_t0:.2f}s)')",
+            "label": "Az Compression"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n20",
+        "type": "canvasNode",
+        "position": {
+          "x": 6057,
+          "y": 226
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "slant_range = c * fast_time / 2 / 1e3\ndoppler_axis = np.arange(-npulses//2, npulses//2) * (prf / npulses) + doppler_centroid\nextent = [slant_range[0], slant_range[-1], doppler_axis[-1], doppler_axis[0]]\nimage_plot_dB(iq_az_cmp, extent=extent, xlabel='Range (km)', ylabel='Doppler (Hz)')",
+            "label": "Az Comp Plot"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n21",
+        "type": "canvasNode",
+        "position": {
+          "x": 6057,
+          "y": 875
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# azimuth ifft (GPU, with memory cleanup)\nimport cupy as cp\n\niq_gpu = cp.asarray(iq_az_cmp)\nslc = cp.asnumpy(cp.fft.ifft(cp.fft.fftshift(iq_gpu, axes=0), axis=0)).astype(np.complex64)\ndel iq_gpu\ncp.get_default_memory_pool().free_all_blocks()\nprint(f'SLC (GPU): {slc.shape}')",
+            "label": "Az IFFT to SLC"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n22",
+        "type": "canvasNode",
+        "position": {
+          "x": 6517,
+          "y": 22.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "peak_idx = peak_find(slc, interval=10, num=1)\nd_rg = c / 2 / fs\nd_az = veff / prf\nplot_len = 100\n\nslant_range = c * fast_time / 2\naz_center = az_array[peak_idx[0][0]]\nrg_center = slant_range[peak_idx[0][1]]\naz_half = plot_len // 2 * d_az\nrg_half = plot_len // 2 * d_rg\nextent = [(rg_center - rg_half)/1e3, (rg_center + rg_half)/1e3,\n          (az_center + az_half)/1e3, (az_center - az_half)/1e3]\n\nprint(f'Peak position: az={peak_idx[0][0]} ({az_center:.1f} m), rg={peak_idx[0][1]} ({rg_center:.1f} m)')\nimage_plot_dB(slc[peak_idx[0][0]-plot_len//2:peak_idx[0][0]+plot_len//2,peak_idx[0][1]-plot_len//2:peak_idx[0][1]+plot_len//2],\n              extent=extent, xlabel='Range (km)', ylabel='Azimuth (km)')",
+            "label": "Peak & Zoom Plot"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n23",
+        "type": "canvasNode",
+        "position": {
+          "x": 6977,
+          "y": 192.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# range profile (km)\nplot_len = 100\nslant_range = c * fast_time / 2 / 1e3\nrg_axis = np.linspace(slant_range[peak_idx[0][1] - plot_len//2], slant_range[peak_idx[0][1] + plot_len//2], plot_len)\nplt.plot(rg_axis, np.abs(slc[peak_idx[0][0], peak_idx[0][1]-plot_len//2:peak_idx[0][1]+plot_len//2]))\nplt.xlabel('Range (km)')\nplt.title('Range Profile')\nplt.show()",
+            "label": "Range Profile"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n24",
+        "type": "canvasNode",
+        "position": {
+          "x": 7437,
+          "y": 274.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# azimuth profile (km)\nplot_len = 100\naz_km = az_array / 1e3\naz_axis = np.linspace(az_km[peak_idx[0][0] - plot_len//2], az_km[peak_idx[0][0] + plot_len//2], plot_len)\nplt.plot(az_axis, np.abs(slc[peak_idx[0][0]-plot_len//2:peak_idx[0][0]+plot_len//2, peak_idx[0][1]]))\nplt.xlabel('Azimuth (km)')\nplt.title('Azimuth Profile')\nplt.show()",
+            "label": "Azimuth Profile"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n25",
+        "type": "canvasNode",
+        "position": {
+          "x": 6517,
+          "y": 906.5
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "from scipy.signal import peak_widths\n\ndef resolution_estimation(data, interp_ratio=10):\n    data = np.abs(data)\n    idx = np.argmax(data)\n\n    range_cut = data[idx // data.shape[1]]\n    azimuth_cut = data[:, idx % data.shape[1]]\n\n    range_cut = np.abs(fft_interp(range_cut, interp_ratio)) ** 2\n    peak_idx_rg = [np.argmax(range_cut)]\n    width_rg = peak_widths(range_cut, peak_idx_rg, rel_height=0.5)\n\n    azimuth_cut = np.abs(fft_interp(azimuth_cut, interp_ratio)) ** 2\n    peak_idx_az = [np.argmax(azimuth_cut)]\n    width_az = peak_widths(azimuth_cut, peak_idx_az, rel_height=0.5)\n\n    return width_rg[0] / interp_ratio, width_az[0] / interp_ratio\n\n# fft interpolator\ndef fft_interp(sig, interp_ratio):\n    sig_f = np.fft.fftshift(np.fft.fft(sig))\n    tmp = np.zeros(len(sig) * interp_ratio, dtype=np.complex64)\n    tmp[0 : len(sig_f)] = sig_f\n    tmp = np.roll(tmp, len(tmp) // 2 - len(sig_f) // 2)\n    return np.fft.ifft(np.fft.fftshift(tmp)).astype(np.complex64)\n\nprint('Resolution functions defined')",
+            "label": "Resolution Est Funcs"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n26",
+        "type": "canvasNode",
+        "position": {
+          "x": 6992.236174240064,
+          "y": 871.0478219991944
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "d_rg = c/2/fs\nd_az = veff/prf\nres_rg, res_az = resolution_estimation(slc)\nprint(f'range resolution: {res_rg*d_rg}')\nprint(f'azimuth resolution: {res_az*d_az}')",
+            "label": "Resolution Calc"
+          }
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n27",
+        "type": "canvasNode",
+        "position": {
+          "x": 6998.315273873568,
+          "y": 1116.929558715945
+        },
+        "data": {
+          "label": "Comment",
+          "category": "utility",
+          "blockType": "comment",
+          "inputs": [],
+          "outputs": [],
+          "defaultParameters": {
+            "text": "range=1.8918744\nazimuth 2.27794821"
+          }
+        },
+        "width": 400
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_1773985774220_l8dq",
+        "source": "n3",
+        "sourceHandle": "out_0",
+        "target": "n4",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985774503_5t8r",
+        "source": "n6",
+        "sourceHandle": "out_0",
+        "target": "n7",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985774627_9dap",
+        "source": "n7",
+        "sourceHandle": "out_0",
+        "target": "n8",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985774726_slnr",
+        "source": "n8",
+        "sourceHandle": "out_0",
+        "target": "n9",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985774823_og67",
+        "source": "n9",
+        "sourceHandle": "out_0",
+        "target": "n10",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985775036_lrex",
+        "source": "n11",
+        "sourceHandle": "out_0",
+        "target": "n12",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985775135_ma47",
+        "source": "n12",
+        "sourceHandle": "out_0",
+        "target": "n13",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985775368_tz8a",
+        "source": "n14",
+        "sourceHandle": "out_0",
+        "target": "n15",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985775600_9e3y",
+        "source": "n16",
+        "sourceHandle": "out_0",
+        "target": "n17",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985775790_5sfe",
+        "source": "n18",
+        "sourceHandle": "out_0",
+        "target": "n19",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985775882_9c0h",
+        "source": "n19",
+        "sourceHandle": "out_0",
+        "target": "n20",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985776127_l310",
+        "source": "n21",
+        "sourceHandle": "out_0",
+        "target": "n22",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985776231_mvfb",
+        "source": "n22",
+        "sourceHandle": "out_0",
+        "target": "n23",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985776331_wv46",
+        "source": "n23",
+        "sourceHandle": "out_0",
+        "target": "n24",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1773985776524_fk73",
+        "source": "n25",
+        "sourceHandle": "out_0",
+        "target": "n26",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "xy-edge__n21out_0-n25in_0",
+        "source": "n21",
+        "sourceHandle": "out_0",
+        "target": "n25",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "xy-edge__n19out_0-n21in_0",
+        "source": "n19",
+        "sourceHandle": "out_0",
+        "target": "n21",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "xy-edge__n16out_0-n18in_0",
+        "source": "n16",
+        "sourceHandle": "out_0",
+        "target": "n18",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "xy-edge__n14out_0-n16in_0",
+        "source": "n14",
+        "sourceHandle": "out_0",
+        "target": "n16",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "xy-edge__n1out_0-n3in_0",
+        "source": "n1",
+        "sourceHandle": "out_0",
+        "target": "n3",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "xy-edge__n4out_0-n6in_0",
+        "source": "n4",
+        "sourceHandle": "out_0",
+        "target": "n6",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "xy-edge__n9out_0-n11in_0",
+        "source": "n9",
+        "sourceHandle": "out_0",
+        "target": "n11",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "xy-edge__n12out_0-n14in_0",
+        "source": "n12",
+        "sourceHandle": "out_0",
+        "target": "n14",
+        "targetHandle": "in_0"
+      }
+    ],
+    "viewport": {
+      "x": -1230.909966523146,
+      "y": 228.09380535304172,
+      "zoom": 0.3968502853777637
+    }
+  }
+}

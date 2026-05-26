@@ -1,0 +1,124 @@
+# Claude Code (skills and CLAUDE.md are tracked)
+.claude/*
+!.claude/skills/
+
+# Chat logs
+Chat_Log/
+
+# Claude Code terminal session folder (except CLAUDE.md)
+AI-CHAT/*
+!AI-CHAT/CLAUDE.md
+
+# Environment variables (API keys)
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Screenshots (overwritten each capture)
+screenshots/
+
+# CDP browser profile (created by start.bat)
+.browser-cdp-profile/
+.edge-cdp-profile/
+
+# Logs
+server.log
+
+# Node.js
+node_modules/
+
+# Vite build output
+dist/
+
+# User workspaces (created at runtime)
+workspaces/
+
+# Test artifacts
+test_heavy.json
+
+# User-created blocks (runtime)
+blocks/user/
+
+# Voice agent PID file
+voice-agent/.agent.pid
+
+# Runtime port-discovery file (written by Electron at startup, deleted on exit)
+.hiyocanvas-runtime.json
+
+# Temp files
+temp_*.txt
+tmp_*.txt
+tmp_*.py
+tmp_*.json
+tmp_*.png
+
+# Renderer crash diagnostics (local-only runtime logs, written by src/main.js)
+logs/
+
+# Simulation outputs
+*.vcd
+*.surf.ron
+
+# ZipCPU dblclockfft (cloned repo with its own .git)
+hil/fft/dblclockfft/
+
+# Setup data (deployment snapshot)
+setup_data/
+
+# Release zip output
+release/
+
+# OS
+Thumbs.db
+.DS_Store
+nul
+
+# ── FPGA HIL (workspace-FPGA-HIL) ──────────────────────────────────────
+# Vivado project: commit the recipe (hdl/ tcl/ scripts/ docs/ + bitstreams/
+# *.bit) only. Everything below is regenerable by build_hil_bd.tcl /
+# synthesis and reaches several GB — never commit it (vivado-bridge SKILL
+# git_management guidance).
+workspace-FPGA-HIL/project-HIL/project-HIL.cache/
+workspace-FPGA-HIL/project-HIL/project-HIL.gen/
+workspace-FPGA-HIL/project-HIL/project-HIL.runs/
+workspace-FPGA-HIL/project-HIL/project-HIL.sim/
+workspace-FPGA-HIL/project-HIL/project-HIL.hw/
+workspace-FPGA-HIL/project-HIL/project-HIL.ip_user_files/
+workspace-FPGA-HIL/project-HIL/project-HIL.srcs/
+workspace-FPGA-HIL/project-HIL/*.jou
+workspace-FPGA-HIL/project-HIL/*.log
+# Scratch test vectors — regenerated every run by hil_vectors.py
+# (memory: "scratch working file, not a frozen asset, git-untracked")
+workspace-FPGA-HIL/scripts/test_vector*.npz
+workspace-FPGA-HIL/scripts/test_vector*.mem
+workspace-FPGA-HIL/scripts/test_vector*.npy
+workspace-FPGA-HIL/scripts/_*.py
+workspace-FPGA-HIL/scripts/notes_tmp.json
+workspace-FPGA-HIL/**/__pycache__/
+workspace-FPGA-HIL/.pytest_cache/
+workspace-FPGA-HIL/build/
+# build_hil_bd.tcl rollback backup (transient, not a source asset)
+workspace-FPGA-HIL/tcl/*.bak
+
+# Step7.5+ session-scoped Tcl drivers and JSON request files (scratch:
+# diagnose / one-shot BD-clean+regen / sim+synth requests, not sources).
+workspace-FPGA-HIL/tcl/_*.tcl
+workspace-FPGA-HIL/tcl/_*.json
+
+# passthrough_tb.sv per-Step snapshots (regiment-unified with tcl/*.bak;
+# the Step transitions are recorded in docs/STEP{n}_*.md + git history,
+# so the .bak file itself is a local-only rollback aid, not a source asset).
+workspace-FPGA-HIL/hdl/*.bak
+
+# FPGA HIL design-review scratch drafts (verification artifacts, not sources)
+tmp_step*_dryrun.md
+tmp_desktop_gap_review.md
+
+# Large reference assets (downloadable separately, not source)
+*.zip
+workspace-SAR-SIM/**/photo_large.png

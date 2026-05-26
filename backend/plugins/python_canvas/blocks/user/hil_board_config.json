@@ -1,0 +1,19 @@
+{
+  "id": "hil_board_config",
+  "label": "HIL Board Config",
+  "category": "hdl/hil",
+  "description": "Configure PYNQ board connection for Hardware-in-the-Loop testing. Verifies SSH and Jupyter API connectivity.",
+  "parameters": [
+    {"id": "board_type", "label": "Board Type", "dtype": "enum", "default": "pynq-z1", "options": ["pynq-z1", "pynq-z2"]},
+    {"id": "host", "label": "Board IP", "dtype": "string", "default": "192.168.137.10"},
+    {"id": "jupyter_port", "label": "Jupyter Port", "dtype": "string", "default": "9090"},
+    {"id": "password", "label": "Password", "dtype": "string", "default": "xilinx"},
+    {"id": "config_var", "label": "Config Variable", "dtype": "string", "default": "hil_board"},
+    {"id": "code", "label": "Code", "dtype": "code", "default": "import sys\nsys.path.insert(0, 'hil/scripts')\nfrom pynq_deploy import PYNQDeployer, HILBoardConfig\n\n# Create board configuration\nhil_config = HILBoardConfig(\n    board_type='${board_type}',\n    host='${host}',\n    jupyter_port=${jupyter_port},\n    password='${password}'\n)\n\n# Create deployer and check connection\n${config_var} = PYNQDeployer(config=hil_config)\nstatus = ${config_var}.check_connection()\n\nprint(f'Board: {hil_config.board_type}')\nprint(f'Host:  {hil_config.host}:{hil_config.jupyter_port}')\nprint(f'Jupyter API: {\"OK\" if status[\"jupyter\"] else \"FAILED\"}')\nprint(f'SSH:         {\"OK\" if status[\"ssh\"] else \"FAILED\"}')\n\nif not status['connected']:\n    raise ConnectionError(f'Cannot connect to PYNQ board: {status[\"info\"]}')"}
+  ],
+  "inputs": [],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

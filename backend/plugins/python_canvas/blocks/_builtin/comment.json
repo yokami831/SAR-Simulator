@@ -1,0 +1,17 @@
+{
+  "id": "comment",
+  "label": "Comment",
+  "category": "Utility",
+  "description": "Text note or comment (not executed)",
+  "parameters": [
+    {
+      "id": "text",
+      "label": "Text",
+      "dtype": "code",
+      "default": ""
+    }
+  ],
+  "inputs": [],
+  "outputs": [],
+  "code_template": ""
+}

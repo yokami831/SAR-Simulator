@@ -1,0 +1,40 @@
+diff --git a/node_modules/mind-elixir/dist/MindElixir.js b/node_modules/mind-elixir/dist/MindElixir.js
+index 642f6ca..e86b2c4 100644
+--- a/node_modules/mind-elixir/dist/MindElixir.js
++++ b/node_modules/mind-elixir/dist/MindElixir.js
+@@ -251,7 +251,7 @@ function Qe(e) {
+ const xt = function(e) {
+   if (!e) return;
+   const t = document.createElement("div"), n = e.nodeObj, o = n.topic, { offsetLeft: s, offsetTop: i } = H(this.nodes, e);
+-  this.nodes.appendChild(t), t.id = "input-box", t.textContent = o, t.contentEditable = "plaintext-only", t.spellcheck = !1;
++  this.nodes.appendChild(t), t.id = "input-box", t.textContent = o, t.contentEditable = "true", t.spellcheck = !0;
+   const l = getComputedStyle(e);
+   t.style.cssText = `
+   left: ${s}px;
+@@ -1039,7 +1039,7 @@ function _n(e) {
+       }
+     }
+     const O = e.spacePressed && f.button === 0 && f.pointerType === "mouse", X = !e.editable || f.button === T && f.pointerType === "mouse" || f.pointerType === "touch";
+-    !O && !X || (t.x = f.clientX, t.y = f.clientY, w.className !== "circle" && w.contentEditable !== "plaintext-only" && (t.mousedown = !0, w.setPointerCapture(f.pointerId)));
++    !O && !X || (t.x = f.clientX, t.y = f.clientY, w.className !== "circle" && w.contentEditable !== "true" && w.contentEditable !== "plaintext-only" && (t.mousedown = !0, w.setPointerCapture(f.pointerId)));
+   }, _ = (f) => {
+     if (f.pointerType === "touch" && s.has(f.pointerId)) {
+       if (s.set(f.pointerId, { x: f.clientX, y: f.clientY }), l !== null && c !== null && f.pointerId === a) {
+@@ -1064,7 +1064,7 @@ function _n(e) {
+       }
+     }
+     if (!(i && i.pointerId !== null && (Sn(e, i, f), i.isDragging))) {
+-      if (f.target.contentEditable !== "plaintext-only" || e.spacePressed && t.mousedown) {
++      if ((f.target.contentEditable !== "plaintext-only" && f.target.contentEditable !== "true") || e.spacePressed && t.mousedown) {
+         const w = f.clientX - t.x, T = f.clientY - t.y;
+         t.onMove(w, T);
+       }
+@@ -1187,7 +1187,7 @@ const j = "http://www.w3.org/2000/svg", fe = function(e) {
+ }, lt = function(e, t, n) {
+   if (!t) return;
+   const o = n.label, s = t.cloneNode(!0);
+-  e.nodes.appendChild(s), s.id = "input-box", s.textContent = o, s.contentEditable = "plaintext-only", s.spellcheck = !1, s.style.cssText = `
++  e.nodes.appendChild(s), s.id = "input-box", s.textContent = o, s.contentEditable = "true", s.spellcheck = !0, s.style.cssText = `
+     left:${t.style.left};
+     top:${t.style.top}; 
+     max-width: 200px;

@@ -1,0 +1,33 @@
+{
+  "id": "gui_dropdown",
+  "label": "Dropdown",
+  "category": "GUI Controls",
+  "description": "ドロップダウンメニューから選択する",
+  "parameters": [
+    {
+      "id": "var_name",
+      "label": "Variable Name",
+      "dtype": "string",
+      "default": "selection"
+    },
+    {
+      "id": "value",
+      "label": "Value",
+      "dtype": "string",
+      "default": ""
+    },
+    {
+      "id": "options_csv",
+      "label": "Options (comma separated)",
+      "dtype": "string",
+      "default": "option_a,option_b,option_c"
+    }
+  ],
+  "inputs": [],
+  "outputs": [],
+  "code_template": "",
+  "gui_widget": {
+    "type": "dropdown",
+    "dtype": "select"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "hil_deploy",
+  "label": "HIL Deploy",
+  "category": "hdl/hil",
+  "description": "Upload bitstream to PYNQ board and load overlay. Requires board connection (HIL Board Config) and built bitstream (HIL Synthesize).",
+  "parameters": [
+    {"id": "config_var", "label": "Board Config Variable", "dtype": "string", "default": "hil_board"},
+    {"id": "result_var", "label": "Build Result Variable", "dtype": "string", "default": "hil_build_result"},
+    {"id": "deploy_var", "label": "Deploy Result Variable", "dtype": "string", "default": "hil_deploy_result"},
+    {"id": "code", "label": "Code", "dtype": "code", "default": "# Deploy overlay to PYNQ board\nprint('=== Deploying overlay to PYNQ ===')\n${deploy_var} = ${config_var}.deploy_overlay(\n    bit_path=${result_var}['bit_path'],\n    hwh_path=${result_var}['hwh_path']\n)\n\nif not ${deploy_var}['success']:\n    raise RuntimeError(f'Deploy failed: {${deploy_var}.get(\"error\", \"unknown\")}')\n\nprint(f'\\nOverlay deployed successfully')\nif ${deploy_var}.get('base_addr'):\n    print(f'User IP base address: 0x{${deploy_var}[\"base_addr\"]:08X}')\nprint(f'IP dict: {list(${deploy_var}.get(\"ip_dict\", {}).keys())}')"}
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

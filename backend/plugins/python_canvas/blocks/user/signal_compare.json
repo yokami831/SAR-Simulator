@@ -1,0 +1,20 @@
+{
+  "id": "signal_compare",
+  "label": "Signal Compare",
+  "category": "hdl",
+  "description": "Compare two signals with overlay plot, difference plot, and error statistics (MSE, SNR, max error).",
+  "parameters": [
+    {"id": "ref_var", "label": "Reference Signal Var", "dtype": "string", "default": "ref_output"},
+    {"id": "test_var", "label": "Test Signal Var", "dtype": "string", "default": "hdl_output"},
+    {"id": "ref_label", "label": "Reference Label", "dtype": "string", "default": "Python (float)"},
+    {"id": "test_label", "label": "Test Label", "dtype": "string", "default": "HDL (fixed-point)"},
+    {"id": "code", "label": "Code", "dtype": "code", "default": "import numpy as np\nimport matplotlib.pyplot as plt\n\n_ref = np.array(${ref_var}, dtype=float)\n_test = np.array(${test_var}, dtype=float)\n_n = min(len(_ref), len(_test))\n_ref, _test = _ref[:_n], _test[:_n]\n_diff = _ref - _test\n\n# Error statistics\n_mse = np.mean(_diff**2)\n_max_err = np.max(np.abs(_diff))\n_snr = 10*np.log10(np.mean(_ref**2) / _mse) if _mse > 0 else float('inf')\n\nfig, axes = plt.subplots(3, 1, figsize=(10, 7), sharex=True)\naxes[0].plot(_ref, 'b-', alpha=0.8, label='${ref_label}')\naxes[0].plot(_test, 'r--', alpha=0.8, label='${test_label}')\naxes[0].set_title('Signal Comparison')\naxes[0].legend()\naxes[0].grid(True, alpha=0.3)\n\naxes[1].plot(_diff, 'g-', linewidth=0.8)\naxes[1].set_title(f'Error (MSE={_mse:.2e}, Max={_max_err:.2e}, SNR={_snr:.1f} dB)')\naxes[1].grid(True, alpha=0.3)\n\naxes[2].semilogy(np.abs(_diff) + 1e-20, 'm-', linewidth=0.8)\naxes[2].set_title('Absolute Error (log scale)')\naxes[2].set_xlabel('Sample')\naxes[2].grid(True, alpha=0.3)\n\nplt.tight_layout()\nplt.show()\nprint(f'MSE: {_mse:.6e} | Max Error: {_max_err:.6e} | SNR: {_snr:.1f} dB')"}
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "gui_toggle",
+  "label": "Toggle",
+  "category": "GUI Controls",
+  "description": "ON/OFF スイッチ",
+  "parameters": [
+    {
+      "id": "var_name",
+      "label": "Variable Name",
+      "dtype": "string",
+      "default": "enabled"
+    },
+    {
+      "id": "value",
+      "label": "Value",
+      "dtype": "boolean",
+      "default": "false"
+    },
+    {
+      "id": "label_on",
+      "label": "ON Label",
+      "dtype": "string",
+      "default": "ON"
+    },
+    {
+      "id": "label_off",
+      "label": "OFF Label",
+      "dtype": "string",
+      "default": "OFF"
+    }
+  ],
+  "inputs": [],
+  "outputs": [],
+  "code_template": "",
+  "gui_widget": {
+    "type": "toggle",
+    "dtype": "boolean"
+  }
+}

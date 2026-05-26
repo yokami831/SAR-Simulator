@@ -1,0 +1,1266 @@
+{
+  "version": 1,
+  "type": "flow",
+  "title": "SAR-Transmit",
+  "description": "",
+  "created": "2026-05-23T03:14:27.361456+00:00",
+  "modified": "2026-05-23T14:20:50.112346+00:00",
+  "canvas": {
+    "nodes": [
+      {
+        "id": "n1",
+        "type": "canvasNode",
+        "position": {
+          "x": 50,
+          "y": 563
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "import numpy as np\nfrom scipy.constants import c\n\n# ---- Fixed system parameters (PoC scale; B/Fs/Tp reduced for tractability) ----\nfc   = 9.65e9          # X-band carrier [Hz]\nB    = 60e6            # chirp bandwidth [Hz]   (real: 600e6)\nTp   = 10e-6           # pulse width [s]        (real: 30e-6)\nFs   = 72e6            # range sampling rate [Hz] = 1.2*B\nPRF  = 4000.0          # pulse repetition frequency [Hz]\nH    = 514e3           # orbit altitude [m]\nV    = 7600.0          # platform velocity [m/s]\nlook = np.deg2rad(25)  # off-nadir angle [rad]\nLa   = 4.8             # antenna length, azimuth (along-track) [m]\nLr   = 0.8             # antenna length, range (elevation) [m]\nprint('params set: fc=%.2fGHz B=%.0fMHz Tp=%.0fus PRF=%.0f La=%.1fm Lr=%.1fm' % (fc/1e9, B/1e6, Tp*1e6, PRF, La, Lr))\n\n# ============================================================================\n# Scene controls (sar-visualizer parity). The focused-image display window is\n# a 0-centred symmetric box of half-extent PEAK_HALF * view_scale; point\n# targets (and later clutter) live inside it. n_targets / view_scale are set\n# by GUI slider blocks; these fallbacks apply when those haven't run yet.\n# ============================================================================\nPEAK_HALF = 60.0                       # base display-window half-extent [m]\n# n_targets and view_scale come from GUI slider blocks that run earlier in the\n# flow. No fallbacks here on purpose: if a downstream node sees NameError it\n# means the GUI block is missing or out of order — that must surface as a real\n# error, not be hidden by a default.\n\ndef make_rand(seed):\n    \"\"\"mulberry32 PRNG (exact port). float in [0,1).\"\"\"\n    box = {'a': int(seed) & 0xFFFFFFFF}\n    M = 0xFFFFFFFF\n    def _rand():\n        box['a'] = (box['a'] + 0x6d2b79f5) & M\n        t = box['a']\n        t = (((t ^ (t >> 15)) & M) * ((1 | t) & M)) & M           # Math.imul(t^(t>>>15), 1|t)\n        t = ((t + ((((t ^ (t >> 7)) & M) * ((61 | t) & M)) & M)) & M) ^ t  # +Math.imul(t^(t>>>7),61|t), ^t\n        t &= M\n        return ((t ^ (t >> 14)) & M) / 4294967296.0\n    return _rand\n\ndef make_point_targets(count, half_az_m, half_range_m, seed, R0):\n    \"\"\"Point targets, sar-visualizer parity. T1 is always the centre\n    reference (az 0, slant R0); extras are seeded-random inside +/-0.85*half\n    so they sit clearly within the display window.\"\"\"\n    out = [('T1', 0.0, R0)]\n    rnd = make_rand(seed)\n    az_span = half_az_m * 0.85\n    r_span = half_range_m * 0.85\n    for i in range(1, int(count)):\n        az_m = (rnd() * 2 - 1) * az_span\n        sr_m = R0 + (rnd() * 2 - 1) * r_span\n        out.append(('T%d' % (i + 1), az_m, sr_m))\n    return out\n# Shared 3D-display helpers (surface3d, upsample_complex, ...) are provided by\n# HiyoCanvas itself (injected at kernel startup), so they are not defined here.",
+            "label": "Common Parameters",
+            "spec": "Shared SAR system parameters (TerraSAR-X reference, X-band).\nBound once here and read by every downstream block via the shared kernel namespace.\n\nReal values (full-res spec):\n- fc 9.65 GHz, B 600 MHz, Tp 30 us, Fs 720 MHz (1.2*B), PRF 4 kHz\n- H 514 km, V 7600 m/s, look 25 deg, La 4.8 m\n\nSimulation note: this PoC lowers B/Fs 10x and Tp 3x so the grid stays browser-tractable; geometry params unchanged."
+          },
+          "codeCollapsed": true,
+          "executionOrder": 7
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n2",
+        "type": "canvasNode",
+        "position": {
+          "x": 510,
+          "y": 67
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# ---- Derived quantities ----\nlam     = c / fc                 # wavelength [m]\nKr      = B / Tp                 # chirp rate [Hz/s]\nR0      = H / np.cos(look)       # T1 slant range [m]\ntheta_a = lam / La               # first-null beamwidth [rad]\naz_foot = theta_a * R0           # azimuth footprint [m]\n\n# ---- Range grid ----\nR_half = 80.0                    # +/- range swath [m] (PoC)\nt_r_center = 2 * R0 / c\ndt_r = 1 / Fs\nt_r_half_window = R_half / c + Tp / 2 + 2e-6\nNr = int(np.ceil(2 * t_r_half_window / dt_r));  Nr += Nr % 2\nt_r = t_r_center + (np.arange(Nr) - Nr // 2) * dt_r\n\n# ---- Azimuth grid ----\naz_extent = 300.0 + az_foot / 2 + 200.0\nNa = int(np.ceil(2 * az_extent / V * PRF));  Na += Na % 2\neta = (np.arange(Na) - Na // 2) / PRF\naz_pos = V * eta\n\n# ---- Transmit reference chirp (baseband), centered at t=0 ----\nt_ref = (np.arange(Nr) - Nr // 2) * dt_r\nref_chirp = ((np.abs(t_ref) <= Tp/2).astype(np.float32)\n             * np.exp(1j * np.pi * Kr * t_ref**2)).astype(np.complex64)\nprint('Kr=%.3e Hz/s  R0=%.1f km  grid Nr=%d Na=%d' % (Kr, R0/1e3, Nr, Na))",
+            "label": "Generate chirp signal",
+            "spec": "Generate the transmit linear-FM (chirp) pulse and the imaging grid.\n\nParameters (from mindmap):\n- Frequency: min/max  -> chirp sweeps fc-B/2 .. fc+B/2\n- Pulse width: Tp\n- PRF: pulse repetition frequency\n\nPhysics:\n- chirp rate  Kr = B/Tp\n- baseband chirp  s(t) = rect(|t|<=Tp/2) * exp(j*pi*Kr*t^2)\n- wavelength lam = c/fc, ref slant range R0 = H/cos(look)\n\nThis block also designs the range/azimuth sampling grid (Nr,Na,t_r,eta,az_pos) the echo will live on."
+          },
+          "codeCollapsed": true,
+          "executionOrder": 8
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n3",
+        "type": "canvasNode",
+        "position": {
+          "x": 1021.7200005608117,
+          "y": 75.75599801846501
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: up-conversion not modeled; baseband + carrier-phase used downstream)\npass",
+            "label": "UpConvert",
+            "spec": "REAL HW: mixes the baseband chirp up to the RF carrier fc (CenterFrequency).\n\nSimulation: SKIPPED. The simulator works at baseband with R_eta phase carrying the carrier term (-4*pi*R/lam), so explicit up-conversion is not modeled. Placeholder block kept so the structure matches the real transmit chain."
+          },
+          "codeCollapsed": true,
+          "executionOrder": 9
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n4",
+        "type": "canvasNode",
+        "position": {
+          "x": 1024.8599956069743,
+          "y": 326.755998018465
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: ideal amplifier; saturation/NF/flatness not modeled)\npass",
+            "label": "XPA",
+            "spec": "REAL HW: high-power amplifier. Characteristics: saturation, noise floor (NF), frequency flatness.\n\nSimulation: SKIPPED (ideal linear amplification assumed). Placeholder for future refinement (e.g. add AM/AM saturation, NF)."
+          },
+          "codeCollapsed": true,
+          "executionOrder": 11
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n5",
+        "type": "canvasNode",
+        "position": {
+          "x": 1031.1136753535654,
+          "y": 518.755998018465
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: ideal band-pass; filter response not modeled)\npass",
+            "label": "RF-BPF",
+            "spec": "REAL HW: RF band-pass filter. Characteristic: filter response shapes the transmit spectrum.\n\nSimulation: SKIPPED (ideal flat passband assumed). Placeholder for future refinement."
+          },
+          "codeCollapsed": true,
+          "executionOrder": 12
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n6",
+        "type": "canvasNode",
+        "position": {
+          "x": 1591.4481321461037,
+          "y": 66.49078550911027
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# ---- Antenna beamwidths from physical dimensions ----\ntheta_az = lam / La           # azimuth (along-track) beamwidth [rad]\ntheta_rg = lam / Lr           # range (elevation) beamwidth [rad]\n\ndef antenna_pattern(squint):\n    return np.sinc(squint / theta_az) ** 2\n\ndef antenna_pattern_2d(az_ang, rg_ang):\n    return np.sinc(az_ang / theta_az) ** 2 * np.sinc(rg_ang / theta_rg) ** 2\n\nprint('antenna: theta_az=%.4f deg, theta_rg=%.4f deg' % (np.rad2deg(theta_az), np.rad2deg(theta_rg)))\n\n# ---- 2-D radiation pattern as a 3D surface (same Three.js helper) ----\n# equal angular span on both axes so the narrow azimuth beam vs the wider\n# range beam is read honestly.\nang_max = 3 * max(theta_az, theta_rg)\n_az = np.linspace(-ang_max, ang_max, 240)\n_rg = np.linspace(-ang_max, ang_max, 240)\nAZ, RG = np.meshgrid(_az, _rg)\nG = antenna_pattern_2d(AZ, RG)              # linear power 0..1\n# surface3d takes 20*log10(|field|); pass sqrt(G) so dB = 10*log10(G) (power dB)\nsurface3d(np.sqrt(G), np.rad2deg(_az), np.rad2deg(_rg),\n          'Antenna 2-D radiation pattern',\n          xlabel='azimuth angle [deg]', ylabel='range angle [deg]')\n",
+            "label": "Antenna",
+            "spec": "REAL HW: antenna pattern shapes the illumination. Characteristics (mindmap): range direction, azimuth direction, gain.\n\nSimulation: azimuth pattern modeled as normalized-sinc^2 with first null at the beamwidth theta_a:\n  pat(squint) = sinc(squint/theta_a)^2\nThis is a first-null beamwidth approximation (NOT 3 dB). Range-direction pattern and absolute gain are not modeled (relative pattern only)."
+          },
+          "codeCollapsed": true,
+          "executionOrder": 13
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n7",
+        "type": "canvasNode",
+        "position": {
+          "x": 2155.3781016214944,
+          "y": 232.4712830444718
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Reflection / Raw Echo — point targets + (optional) ground clutter.\n# sar-visualizer parity: clutter scatterers are ordinary reflectors that flow\n# through the SAME echo kernel as the point targets, so they get the same\n# range+azimuth compression gain and survive focusing as coherent speckle\n# (unlike the LNA's incoherent thermal noise, which sinks under processing gain).\n#\n# Display window: 0-centred box of half-extent PEAK_HALF * view_scale. Point\n# targets: T1 at centre, the rest seeded-random inside +/-0.85*half. Clutter:\n# clutter_n scatterers uniform over +/-half with circular-complex-Gaussian\n# reflectivity, scale 10^(clutter_rcs_db/20) vs the unit point target. The\n# clutter_n / clutter_rcs_db GUI sliders drive this (n=0 -> no clutter).\nTARGET_SEED  = 42\nCLUTTER_SEED = 2\nhalf = PEAK_HALF * view_scale\n\n# Point targets carry unit reflectivity (1+0j); represent every source as\n# (name, az, slant, re_re, re_im) so the one echo loop handles both kinds.\nsources = [(n, a, s, 1.0, 0.0) for (n, a, s) in\n           make_point_targets(n_targets, half, half, TARGET_SEED, R0)]\n\ndef make_clutter_scatterers(count, rcs_db, half_az_m, half_range_m, seed, R0):\n    \"\"\"sar-visualizer makeClutterScatterers: `count` scatterers uniform over the\n    patch, each with circular complex Gaussian reflectivity (Box-Muller),\n    per-component sigma = 10^(rcs_db/20)/sqrt(2) so |reflectivity| std equals the\n    10^(rcs_db/20) scale relative to the unit point target.\"\"\"\n    rnd = make_rand(seed)\n    sigma = (10.0 ** (rcs_db / 20.0)) / np.sqrt(2.0)\n    out = []\n    for i in range(int(count)):\n        az_m = (rnd() * 2 - 1) * half_az_m\n        sr_m = R0 + (rnd() * 2 - 1) * half_range_m\n        u1 = max(rnd(), 1e-12); u2 = rnd()\n        mag = sigma * np.sqrt(-2.0 * np.log(u1))\n        re_re = mag * np.cos(2 * np.pi * u2)\n        re_im = mag * np.sin(2 * np.pi * u2)\n        out.append(('clutter%d' % i, az_m, sr_m, re_re, re_im))\n    return out\n\nn_clutter = int(clutter_n)\nif n_clutter > 0:\n    sources += make_clutter_scatterers(n_clutter, clutter_rcs_db, half, half, CLUTTER_SEED, R0)\n\nprint('sources: %d point + %d clutter  window=+/-%.0f m' % (n_targets, n_clutter, half))\n\ns_raw = np.zeros((Na, Nr), dtype=np.complex64)\nfor name, az_t, sr_t, gre, gim in sources:\n    R_eta  = np.sqrt(sr_t**2 + (az_pos - az_t)**2)        # (Na,)\n    tau    = 2 * R_eta / c\n    squint = np.arctan2(az_pos - az_t, sr_t)\n    pat    = antenna_pattern(squint)                      # (Na,)\n    dt     = t_r[None, :] - tau[:, None]                  # (Na,Nr)\n    rect   = (np.abs(dt) <= Tp/2).astype(np.float32)\n    phase  = np.pi * Kr * dt**2 - 4 * np.pi * R_eta[:, None] / lam\n    refl   = np.complex64(gre + 1j * gim)                 # 1+0j for point targets\n    s_raw += (refl * pat[:, None] * rect * np.exp(1j * phase)).astype(np.complex64)\n\nprint('raw echo: shape=%s dtype=%s  peak|s|=%.1f' % (s_raw.shape, s_raw.dtype, np.abs(s_raw).max()))\n",
+            "label": "Reflection / Raw Echo",
+            "spec": "Generate the raw SAR echo: transmit chirp reflects off point targets and returns with range delay.\n\nPhysics (per target, faithful to the prototype):\n  R_eta  = sqrt(sr^2 + (az_pos - az_t)^2)     hyperbolic range history\n  tau    = 2*R_eta / c                         two-way delay\n  squint = atan2(az_pos - az_t, sr)\n  pat    = antenna_pattern(squint)             (from Antenna block)\n  dt     = t_r - tau ; rect = |dt| <= Tp/2\n  phase  = pi*Kr*dt^2 - 4*pi*R_eta/lam         range chirp + carrier\n  s_raw += pat * rect * exp(j*phase)\n\nThis is the simulator's combined transmit->reflect->receive step (the real chain's UpConvert/XPA/RF-BPF are folded into the ideal baseband+carrier model)."
+          },
+          "executionOrder": 14,
+          "codeCollapsed": true
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n8",
+        "type": "canvasNode",
+        "position": {
+          "x": 2658.733653014898,
+          "y": 135.38592229232574
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 2: Raw echo — full view + x6-upsampled 0-centred crop.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = PEAK_HALF * view_scale\nsurface3d(s_raw, rg_axis, az_pos, 'Step 2: Raw echo (full view)')\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_ac = np.where((az_pos  >= -_W) & (az_pos  <= _W))[0]\n_sub = s_raw[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\nF = 6\n_mag = upsample_complex(_sub, F)\n_rgu = upsample_axis(_rgx, F); _azu = upsample_axis(_azx, F)\nsurface3d(_mag, _rgu, _azu, 'Step 2: Raw echo (x6 crop)', status='upsample x6')\n",
+            "label": "Plot Raw Echo",
+            "spec": "Display-only: show |s_raw| (raw echo amplitude) over (range, azimuth). Does not modify any physical array."
+          },
+          "codeCollapsed": true,
+          "executionOrder": 15
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n9",
+        "type": "canvasNode",
+        "position": {
+          "x": 72.81110701429424,
+          "y": 2321.7193929719856
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: analog BPF not modeled; raw echo passed through)\npass",
+            "label": "Analog BPF",
+            "spec": "REAL HW (Receive): analog band-pass filter on the received echo before down-conversion. Selects the signal band, rejects out-of-band noise/interference.\n\nSimulation: SKIPPED (ideal — the raw echo is already band-limited). Placeholder so the structure matches the real receive chain."
+          },
+          "executionOrder": 18
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n10",
+        "type": "canvasNode",
+        "position": {
+          "x": 75.31352820809508,
+          "y": 2573.7193929719856
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: down-conversion not modeled; baseband echo used directly)\npass",
+            "label": "Downconvert",
+            "spec": "REAL HW (Receive): mixes the received RF signal down to baseband (I/Q demodulation).\n\nSimulation: SKIPPED. The simulator already works at baseband (the echo phase carries -4*pi*R/lam directly), so explicit down-conversion is not modeled. Placeholder."
+          },
+          "executionOrder": 19
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n11",
+        "type": "canvasNode",
+        "position": {
+          "x": 75.31352820809508,
+          "y": 2825.7193929719856
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: receive filtering not modeled)\npass",
+            "label": "Filtering",
+            "spec": "REAL HW (Receive): anti-alias / channel filtering after down-conversion.\n\nSimulation: SKIPPED (ideal). Placeholder for future refinement."
+          },
+          "executionOrder": 20
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n12",
+        "type": "canvasNode",
+        "position": {
+          "x": 75.31352820809508,
+          "y": 3077.7193929719856
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: down-sampling not modeled; grid already at processing rate)\npass",
+            "label": "Down sample & filter",
+            "spec": "REAL HW (Receive): decimation to the processing sample rate with the matching anti-alias filter.\n\nSimulation: SKIPPED. The grid is already designed at Fs=1.2*B, so no resampling is modeled. Placeholder."
+          },
+          "executionOrder": 21
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n13",
+        "type": "canvasNode",
+        "position": {
+          "x": 75.31352820809508,
+          "y": 3329.7193929719856
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# (simulation: BAQ not modeled; full-precision s_raw kept)\npass",
+            "label": "BAQ compression",
+            "spec": "REAL HW (Receive): Block Adaptive Quantization — onboard lossy compression of the raw echo to save downlink bandwidth. Parameter: number of bits.\n\nSimulation: SKIPPED (full-precision complex64 kept). Placeholder; a future refinement could quantize s_raw to N bits/sample to study BAQ artifacts."
+          },
+          "executionOrder": 22
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n14",
+        "type": "canvasNode",
+        "position": {
+          "x": 673.9962912517171,
+          "y": 2602.6531130425055
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Range matched filter from the transmit reference chirp (already built in n2).\nt_ref = (np.arange(Nr) - Nr // 2) * dt_r\n_ref = ((np.abs(t_ref) <= Tp/2).astype(np.float32) * np.exp(1j*np.pi*Kr*t_ref**2)).astype(np.complex64)\nH_range = np.conj(np.fft.fft(np.fft.ifftshift(_ref)))\ns_rc = np.fft.ifft(np.fft.fft(s_raw, axis=1) * H_range[None, :], axis=1).astype(np.complex64)\nprint('range-compressed: shape=%s dtype=%s' % (s_rc.shape, s_rc.dtype))",
+            "label": "Range Compression",
+            "spec": "PROCESSING (RDA step 1): compress each range line by matched filtering with the conjugate of the transmit chirp.\n\nPhysics:\n  H_range = conj( FFT( ifftshift(ref_chirp) ) )\n  s_rc = IFFT( FFT(s_raw, axis=range) * H_range )\nConcentrates each target's chirp smear into a sharp range peak."
+          },
+          "executionOrder": 23,
+          "codeCollapsed": true
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n15",
+        "type": "canvasNode",
+        "position": {
+          "x": 1141.7738587230813,
+          "y": 2545.8633505796774
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "S_rd  = np.fft.fftshift(np.fft.fft(s_rc, axis=0), axes=0).astype(np.complex64)\nf_eta = np.fft.fftshift(np.fft.fftfreq(Na, 1/PRF))\nprint('range-Doppler: shape=%s  f_eta=[%.1f, %.1f] Hz' % (S_rd.shape, f_eta.min(), f_eta.max()))",
+            "label": "Azimuth FFT (Range-Doppler)",
+            "spec": "PROCESSING (RDA step 2): FFT along azimuth (slow-time) to enter the Range-Doppler domain. Range axis is never shifted; azimuth is fftshift-ed so the Doppler axis is centered.\n\n  S_rd  = fftshift( FFT(s_rc, axis=azimuth) )\n  f_eta = fftshift( fftfreq(Na, 1/PRF) )   # Doppler axis"
+          },
+          "executionOrder": 25,
+          "codeCollapsed": true
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n16",
+        "type": "canvasNode",
+        "position": {
+          "x": 1590.1910919668742,
+          "y": 2487.913598035505
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "delta_R = (lam**2 * R0 * f_eta**2) / (8 * V**2)      # (Na,) m\ndelta_t = 2 * delta_R / c\nf_r = np.fft.fftfreq(Nr, dt_r)                        # range freq (not shifted)\nS_rd_rf = np.fft.fft(S_rd, axis=1)\nshift = np.exp(1j * 2 * np.pi * f_r[None, :] * delta_t[:, None])\nS_rd_rcmc = np.fft.ifft(S_rd_rf * shift, axis=1).astype(np.complex64)\nrange_cell_m = c * dt_r / 2\nprint('RCMC: max RCM = %.3f m = %.1f range cells' % (delta_R.max(), delta_R.max()/range_cell_m))",
+            "label": "RCMC",
+            "spec": "PROCESSING (RDA step 3): Range Cell Migration Correction. In the Range-Doppler domain a target's energy lies on a parabola across range cells; RCMC straightens it via a range-frequency phase shift.\n\n  delta_R = lam^2 * R0 * f_eta^2 / (8 V^2)   (narrow-beam)\n  shift   = exp(j 2pi f_r * 2 delta_R / c)\n  S_rd_rcmc = IFFT( FFT(S_rd, axis=range) * shift )"
+          },
+          "executionOrder": 27,
+          "codeCollapsed": true
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n17",
+        "type": "canvasNode",
+        "position": {
+          "x": 2084.402642281824,
+          "y": 2044.0411337104774
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "Ka = 2 * V**2 / (lam * R0)                            # azimuth FM rate [Hz/s]\nH_az = np.exp(-1j * np.pi * f_eta**2 / Ka)\nimg = np.fft.ifft(np.fft.ifftshift(S_rd_rcmc * H_az[:, None], axes=0), axis=0).astype(np.complex64)\nprint('focused image: shape=%s  Ka=%.1f Hz/s  peak=%.1f' % (img.shape, Ka, np.abs(img).max()))",
+            "label": "Azimuth Compression",
+            "spec": "PROCESSING (RDA step 4): focus in azimuth with the conjugate azimuth matched filter, then inverse azimuth FFT -> focused complex image.\n\n  Ka  = 2 V^2 / (lam R0)            # azimuth FM rate\n  H_az = exp(-j pi f_eta^2 / Ka)    # conjugate (focuses at az=0)\n  img = IFFT( ifftshift( S_rd_rcmc * H_az ) )\nResult: each point target collapses to its impulse response (IRF)."
+          },
+          "executionOrder": 29
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n18",
+        "type": "canvasNode",
+        "position": {
+          "x": 2736.8498837975094,
+          "y": 1336.3859222923256
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 6: Focused image — two views in one block:\n#   (1) full view  — the whole focused scene, no upsampling\n#   (2) x6 crop    — 0-centred +/-W window (W = PEAK_HALF * view_scale, the\n#                    target-placement window), 6x complex-upsampled to reveal\n#                    the IRF sidelobe structure.\nrg_axis = (t_r - t_r_center) * c / 2\n\n# (1) Full view\nsurface3d(img, rg_axis, az_pos, 'Step 6: Focused image (full view)')\n\n# (2) x6 crop\nW = PEAK_HALF * view_scale\n_rc = np.where((rg_axis >= -W) & (rg_axis <= W))[0]\n_ac = np.where((az_pos  >= -W) & (az_pos  <= W))[0]\n_sub = img[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\nF = 6\n_mag = upsample_complex(_sub, F)\n_rgu = upsample_axis(_rgx, F); _azu = upsample_axis(_azx, F)\nsurface3d(_mag, _rgu, _azu, 'Step 6: Focused image (x6, 0-centred +/-%dm)' % int(W), status='upsample x6')\n",
+            "label": "Plot Focused Image",
+            "spec": "Display-only: 3-D surface of the focused image |img| in dB (the final RDA output). Each point target should appear as a sharp peak (its impulse response / IRF). Interactive; Expand opens a large copy. Does not modify any physical array."
+          },
+          "codeCollapsed": true,
+          "executionOrder": 30
+        },
+        "width": 832,
+        "style": {}
+      },
+      {
+        "id": "n19",
+        "type": "canvasNode",
+        "position": {
+          "x": 681.0182097102215,
+          "y": 1088.6531130425055
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 3: Range-compressed — full view + x6-upsampled 0-centred crop.\n# The crop is 6x complex-upsampled (same as the focused crop) so the range\n# sinc sidelobes are smooth instead of stair-stepped at the native sampling.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = PEAK_HALF * view_scale\n\n# (1) Full view\nsurface3d(s_rc, rg_axis, az_pos, 'Step 3: Range-compressed (full view)')\n\n# (2) x6 crop\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_ac = np.where((az_pos  >= -_W) & (az_pos  <= _W))[0]\n_sub = s_rc[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\nF = 6\n_mag = upsample_complex(_sub, F)\n_rgu = upsample_axis(_rgx, F); _azu = upsample_axis(_azx, F)\nsurface3d(_mag, _rgu, _azu, 'Step 3: Range-compressed (x6 crop)', status='upsample x6')\n",
+            "label": "Plot: Range-compressed",
+            "spec": "Display-only: 3-D dB surface of |s_rc| after range compression. Targets are now sharp in range (thin ridges) but still spread in azimuth. Peak-preserving max-pool downsample; Expand for full size."
+          },
+          "executionOrder": 24,
+          "codeCollapsed": true
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n20",
+        "type": "canvasNode",
+        "position": {
+          "x": 1168.6305703413266,
+          "y": 1088.5459768106005
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 4: Range-Doppler — full view + range-only x6 crop. Vertical axis is\n# Doppler [Hz] (not metres), so only the range axis is cropped AND upsampled;\n# the Doppler axis is left as-is.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = PEAK_HALF * view_scale\nsurface3d(S_rd, rg_axis, f_eta, 'Step 4: Range-Doppler (full view)', ylabel='Doppler [Hz]')\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_sub = S_rd[:, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]\nF = 6\n_mag = upsample_complex_range(_sub, F)\n_rgu = upsample_axis(_rgx, F)\nsurface3d(_mag, _rgu, f_eta, 'Step 4: Range-Doppler (range x6 crop)', ylabel='Doppler [Hz]', status='upsample x6 (range)')\n",
+            "label": "Plot: Range-Doppler",
+            "spec": "Display-only: 3-D dB surface of |S_rd| in the Range-Doppler domain. A target's energy lies on the RCM parabola (curved ridge across range vs Doppler) — this is why RCMC is needed. Axes: range [m] x Doppler [Hz]. Max-pool downsample."
+          },
+          "executionOrder": 26,
+          "codeCollapsed": true
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n21",
+        "type": "canvasNode",
+        "position": {
+          "x": 1645.3812868104822,
+          "y": 1066.9135980355052
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 5: After RCMC — full view + range-only x6 crop. Vertical axis is Doppler\n# [Hz], so only the range axis is cropped AND upsampled; Doppler left as-is.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = PEAK_HALF * view_scale\nsurface3d(S_rd_rcmc, rg_axis, f_eta, 'Step 5: After RCMC (full view)', ylabel='Doppler [Hz]')\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_sub = S_rd_rcmc[:, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]\nF = 6\n_mag = upsample_complex_range(_sub, F)\n_rgu = upsample_axis(_rgx, F)\nsurface3d(_mag, _rgu, f_eta, 'Step 5: After RCMC (range x6 crop)', ylabel='Doppler [Hz]', status='upsample x6 (range)')\n",
+            "label": "Plot: RCMC",
+            "spec": "Display-only: 3-D dB surface of |S_rd_rcmc| after Range Cell Migration Correction. The curved RCM ridge from the previous step is now straightened (energy aligned to one range cell across Doppler). Axes: range [m] x Doppler [Hz]. Max-pool downsample."
+          },
+          "executionOrder": 28,
+          "codeCollapsed": true
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n23",
+        "type": "canvasNode",
+        "position": {
+          "x": 2061.0352370935925,
+          "y": -39.37473848662674
+        },
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "n_targets",
+            "value": "1",
+            "min": "1",
+            "max": "10",
+            "step": "1",
+            "label": "Targets (count)"
+          },
+          "executionOrder": 2
+        },
+        "width": 250,
+        "style": {}
+      },
+      {
+        "id": "n24",
+        "type": "canvasNode",
+        "position": {
+          "x": 45.34153804096178,
+          "y": 142.3654117100904
+        },
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "view_scale",
+            "value": "1",
+            "min": "1",
+            "max": "16",
+            "step": "1",
+            "label": "View area (scale)",
+            "snap_values": "1,2,4,8,16"
+          },
+          "executionOrder": 4
+        },
+        "width": 250,
+        "style": {}
+      },
+      {
+        "id": "n25",
+        "type": "canvasNode",
+        "position": {
+          "x": -488.98322183952496,
+          "y": 1258.717301627971
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# LNA (Low Noise Amplifier) — adds receiver thermal noise to the raw echo.\n# Physically the LNA is the front-end stage whose noise figure dominates the\n# receiver noise (Friis), so thermal noise is injected here, right after the\n# antenna/echo. No gain is modelled (the echo path models no attenuation yet),\n# so this stage only ADDS noise; with noise off it is a pass-through.\n#\n# Faithful to sar-visualizer (addComplexGaussianNoise): circular complex\n# Gaussian, sigma = peak / 10^(snrDb/20), split sigma/sqrt(2) per I/Q so the\n# complex-magnitude std equals sigma. snrDb = -noise_level_db (the slider shows\n# noise level: right = more noise). Deterministic via a fixed seed.\nNOISE_SEED = 1\nsnr_db = -float(noise_level_db)            # slider is noise level; SNR is its negation\npeak = float(np.abs(s_raw).max())\nif peak > 0:\n    sigma = peak / (10.0 ** (snr_db / 20.0))\n    sig_comp = sigma / np.sqrt(2.0)\n    rng = np.random.RandomState(int(NOISE_SEED) & 0xFFFFFFFF)\n    noise = (rng.standard_normal(s_raw.shape) + 1j * rng.standard_normal(s_raw.shape)).astype(np.complex64)\n    s_raw = (s_raw + (sig_comp * noise).astype(np.complex64)).astype(np.complex64)\n    print('LNA: noise_level=%.0f dB (SNR=%.0f dB)  sigma=%.3g  peak=%.3g' % (noise_level_db, snr_db, sigma, peak))\nelse:\n    print('LNA: peak=0, no signal -> noise skipped')\n",
+            "label": "LNA",
+            "spec": "Low Noise Amplifier (receiver front-end). Adds receiver thermal noise to the raw echo here because the LNA's noise figure dominates the system noise (Friis). Noise model matches sar-visualizer: circular complex Gaussian, sigma = peak / 10^(SNR_dB/20), split sigma/sqrt(2) per I/Q. The slider sets noise level (= -SNR_dB); at the -60 dB minimum noise is ~1/1000 of the peak (effectively off). Gain = 1 (no amplification): the echo path models no attenuation yet, so this stage only adds noise and otherwise passes the signal through."
+          },
+          "executionOrder": 16,
+          "codeCollapsed": true
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n26",
+        "type": "canvasNode",
+        "position": {
+          "x": -398.3485967175327,
+          "y": 1117.4087821824053
+        },
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "noise_level_db",
+            "value": "-37",
+            "min": "-60",
+            "max": "30",
+            "step": "1",
+            "label": "Noise level (dB)"
+          },
+          "executionOrder": 5
+        },
+        "width": 250,
+        "style": {}
+      },
+      {
+        "id": "n27",
+        "type": "canvasNode",
+        "position": {
+          "x": 83.26967594231539,
+          "y": 1120.7193929719856
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Step 2: Raw echo with noise (after LNA) — full view + x6-upsampled crop.\nrg_axis = (t_r - t_r_center) * c / 2\n_W = PEAK_HALF * view_scale\nsurface3d(s_raw, rg_axis, az_pos, 'Step 2: Raw echo with noise (full view)')\n_rc = np.where((rg_axis >= -_W) & (rg_axis <= _W))[0]\n_ac = np.where((az_pos  >= -_W) & (az_pos  <= _W))[0]\n_sub = s_raw[_ac[0]:_ac[-1]+1, _rc[0]:_rc[-1]+1]\n_rgx = rg_axis[_rc[0]:_rc[-1]+1]; _azx = az_pos[_ac[0]:_ac[-1]+1]\nF = 6\n_mag = upsample_complex(_sub, F)\n_rgu = upsample_axis(_rgx, F); _azu = upsample_axis(_azx, F)\nsurface3d(_mag, _rgu, _azu, 'Step 2: Raw echo with noise (x6 crop)', status='upsample x6')\n",
+            "label": "Plot Raw Echo with noise",
+            "spec": "Display-only: show |s_raw| (raw echo amplitude) over (range, azimuth). Does not modify any physical array."
+          },
+          "codeCollapsed": true,
+          "executionOrder": 17
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n28",
+        "type": "canvasNode",
+        "position": {
+          "x": 2330.901408088625,
+          "y": -163.69839282637565
+        },
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "clutter_n",
+            "value": "0",
+            "min": "0",
+            "max": "400",
+            "step": "10",
+            "label": "Clutter N"
+          },
+          "executionOrder": 1
+        },
+        "width": 250,
+        "style": {}
+      },
+      {
+        "id": "n29",
+        "type": "canvasNode",
+        "position": {
+          "x": 2332.69992816726,
+          "y": -17.698392826375652
+        },
+        "data": {
+          "label": "Slider",
+          "category": "gui",
+          "blockType": "gui_slider",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "clutter_rcs_db",
+            "value": "-20",
+            "min": "-40",
+            "max": "0",
+            "step": "1",
+            "label": "Clutter level (dB)"
+          },
+          "executionOrder": 3
+        },
+        "width": 250,
+        "style": {}
+      },
+      {
+        "id": "n30",
+        "type": "canvasNode",
+        "position": {
+          "x": 517.750928267203,
+          "y": 291.6732811860106
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# Fixed Parameters — display-only summary table of the SAR system parameters\n# and the resolutions/grid they imply (mirrors the sar-visualizer panel).\n# Reads kernel variables defined upstream (n1 params, n2 derived); modifies\n# nothing. range res = c/(2B), azimuth res = La/2.\nfrom IPython.display import display as _display, HTML as _HTML\n\n_rows = [\n    (\"Carrier fc\",          \"%.2f GHz (&lambda;&approx;%.0f mm)\" % (fc / 1e9, lam * 1e3)),\n    (\"Bandwidth B\",         \"%.0f MHz\" % (B / 1e6)),\n    (\"Pulse width Tp\",      \"%.0f &micro;s\" % (Tp * 1e6)),\n    (\"PRF\",                 \"%.0f Hz\" % PRF),\n    (\"Altitude H\",          \"%.0f km\" % (H / 1e3)),\n    (\"Velocity V\",          \"%.0f m/s\" % V),\n    (\"Look angle\",          \"%.0f&deg;\" % np.rad2deg(look)),\n    (\"Antenna La\",          \"%.1f m (&theta;a = &lambda;/La)\" % La),\n    (\"Range res (slant)\",   \"c/(2B) = %.2f m\" % (c / (2 * B))),\n    (\"Azimuth res\",         \"La/2 = %.2f m\" % (La / 2)),\n    (\"Target T1\",           \"az 0 m, slant range R0 &approx; %.1f km\" % (R0 / 1e3)),\n    (\"Samples (range &times; azimuth)\", \"%d &times; %d\" % (Nr, Na)),\n]\n\n_html = [\n    '<div style=\"display:inline-block;background:#0e1422;border:1px solid #2a3142;'\n    'border-radius:8px;padding:10px 14px;font:13px system-ui,sans-serif;color:#cfd6e6\">',\n    '<div style=\"color:#9aa4ba;font-size:11px;letter-spacing:1px;margin-bottom:8px\">FIXED PARAMETERS</div>',\n    '<table style=\"border-collapse:collapse\">',\n]\nfor _label, _val in _rows:\n    _html.append(\n        '<tr>'\n        '<td style=\"color:#7f8aa3;padding:2px 18px 2px 0;white-space:nowrap\">%s</td>'\n        '<td style=\"color:#cfd6e6;text-align:right;white-space:nowrap\">%s</td>'\n        '</tr>' % (_label, _val)\n    )\n_html.append('</table></div>')\n_display(_HTML(''.join(_html)))\nprint('fixed parameters displayed')\n",
+            "label": "Fixed Parameters"
+          },
+          "codeCollapsed": true,
+          "executionOrder": 10
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n31",
+        "type": "canvasNode",
+        "position": {
+          "x": 46.50147021286739,
+          "y": 288.36541171009037
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "params": "",
+          "defaultParameters": {
+            "code": "# === Plot library (workspace-local) ===\n# Display/interpolation helpers for this SAR workspace. Defined here as a\n# visible first node (not hidden in app code) so they are easy to find and\n# edit, and shared with every downstream node via the kernel namespace.\n# See this block's SPEC for what each function does.\n\nimport json as _json\nfrom IPython.display import display as _display, HTML as _HTML\n\n_SURF_TEMPLATE = '\\n<div id=\"wrap\" style=\"position:relative;width:100%;height:__HEIGHT__;background:#08090c\">\\n<canvas id=\"sc\" style=\"width:100%;height:100%;display:block\"></canvas>\\n<div id=\"cbar\" style=\"position:absolute;top:12px;right:12px;background:rgba(14,20,34,0.85);border:1px solid #2a3142;border-radius:6px;padding:5px 7px;color:#cfd6e6;font:10px/1.2 system-ui,sans-serif;user-select:none\">\\n  <div style=\"margin-bottom:3px;color:#9aa4ba\">[dB]</div>\\n  <svg id=\"cbsvg\" width=\"40\" height=\"136\" style=\"display:block\"></svg>\\n</div>\\n<div id=\"ustat\" style=\"position:absolute;bottom:8px;right:10px;background:rgba(14,20,34,0.8);border:1px solid #2a3142;border-radius:4px;padding:2px 8px;font:11px sans-serif;color:#9aa6bd;display:none\"></div>\\n<div style=\"position:absolute;top:8px;left:10px;color:#cbd3e4;font:13px sans-serif\" id=\"ttl\"></div>\\n<button id=\"expandbtn\" title=\"Open in a new window\" style=\"position:absolute;top:8px;right:64px;background:rgba(14,20,34,0.85);border:1px solid #2a3142;border-radius:4px;color:#cfd6e6;font:11px sans-serif;padding:3px 8px;cursor:pointer\">? Expand</button>\\n<script src=\"https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js\"></script>\\n<script>\\nconst D = (window.__POPOUT_D !== undefined) ? window.__POPOUT_D : __PAYLOAD__;\\ndocument.getElementById(\"ttl\").textContent = D.title;\\nif(D.status){const u=document.getElementById(\"ustat\");u.textContent=D.status;u.style.display=\"block\";}\\nconst cv=document.getElementById(\"sc\");\\nconst _wrapEl=document.getElementById(\"wrap\");\\nfunction _W(){return _wrapEl.clientWidth||cv.clientWidth||300;}\\nfunction _H(){return _wrapEl.clientHeight||cv.clientHeight||300;}\\nconst rn=new THREE.WebGLRenderer({canvas:cv,antialias:true});\\nrn.setSize(_W(), _H()); rn.setClearColor(0x08090c);\\nconst sc=new THREE.Scene();\\nconst cam=new THREE.PerspectiveCamera(50, _W()/_H(), 0.01, 100);\\nconst LUT=[[0,0.0015,0.0005,0.0139],[0.13,0.087,0.045,0.255],[0.25,0.231,0.059,0.437],[0.38,0.392,0.111,0.451],[0.5,0.550,0.161,0.405],[0.63,0.716,0.215,0.330],[0.75,0.868,0.288,0.217],[0.88,0.967,0.470,0.106],[1,0.988,0.998,0.645]];\\nfunction inferno(v){let i=0;while(i<LUT.length-1&&v>LUT[i+1][0])i++;const a=LUT[i],b=LUT[Math.min(i+1,LUT.length-1)];const f=(v-a[0])/((b[0]-a[0])||1);return [a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f,a[3]+(b[3]-a[3])*f];}\\n(function(){const FLOOR=-40,barH=120,barW=12,padTop=6;const NS=\"http://www.w3.org/2000/svg\";\\n const svg=document.getElementById(\"cbsvg\");const defs=document.createElementNS(NS,\"defs\");\\n const lg=document.createElementNS(NS,\"linearGradient\");lg.setAttribute(\"id\",\"inf-bar\");lg.setAttribute(\"x1\",\"0\");lg.setAttribute(\"y1\",\"0\");lg.setAttribute(\"x2\",\"0\");lg.setAttribute(\"y2\",\"1\");\\n const GS=24;for(let i=0;i<=GS;i++){const frac=i/GS;const tt=1-frac;const r=inferno(tt);const st=document.createElementNS(NS,\"stop\");st.setAttribute(\"offset\",(frac*100)+\"%\");st.setAttribute(\"stop-color\",\"rgb(\"+(r[0]*255|0)+\",\"+(r[1]*255|0)+\",\"+(r[2]*255|0)+\")\");lg.appendChild(st);}\\n defs.appendChild(lg);svg.appendChild(defs);const rect=document.createElementNS(NS,\"rect\");rect.setAttribute(\"x\",0);rect.setAttribute(\"y\",padTop);rect.setAttribute(\"width\",barW);rect.setAttribute(\"height\",barH);rect.setAttribute(\"fill\",\"url(#inf-bar)\");rect.setAttribute(\"stroke\",\"#2a3142\");rect.setAttribute(\"stroke-width\",1);svg.appendChild(rect);\\n for(let db=0;db>=FLOOR;db-=10){const frac=db/FLOOR;const y=padTop+frac*barH;const ln=document.createElementNS(NS,\"line\");ln.setAttribute(\"x1\",barW);ln.setAttribute(\"y1\",y);ln.setAttribute(\"x2\",barW+3);ln.setAttribute(\"y2\",y);ln.setAttribute(\"stroke\",\"#6c7894\");ln.setAttribute(\"stroke-width\",1);svg.appendChild(ln);const tx=document.createElementNS(NS,\"text\");tx.setAttribute(\"x\",barW+6);tx.setAttribute(\"y\",y+3);tx.setAttribute(\"fill\",\"#cfd6e6\");tx.setAttribute(\"font-size\",9);tx.textContent=db;svg.appendChild(tx);}\\n})();\\nconst R=D.nrows,C=D.ncols;\\nconst pos=new Float32Array(R*C*3), col=new Float32Array(R*C*3);\\nfor(let r=0;r<R;r++)for(let cc=0;cc<C;cc++){const k=r*C+cc;const tv=D.t[k];pos[k*3]=(cc/(C-1))*2-1;pos[k*3+1]=tv*D.H;pos[k*3+2]=(r/(R-1))*2-1;const rgb=inferno(tv);col[k*3]=rgb[0];col[k*3+1]=rgb[1];col[k*3+2]=rgb[2];}\\nconst idx=[];for(let r=0;r<R-1;r++)for(let cc=0;cc<C-1;cc++){const a=r*C+cc,b=r*C+cc+1,d=(r+1)*C+cc,e=(r+1)*C+cc+1;idx.push(a,d,b,b,d,e);}\\nconst g=new THREE.BufferGeometry();g.setAttribute(\"position\",new THREE.BufferAttribute(pos,3));g.setAttribute(\"color\",new THREE.BufferAttribute(col,3));g.setIndex(idx);\\nconst mat=new THREE.ShaderMaterial({vertexColors:true,side:THREE.DoubleSide,vertexShader:\"varying vec3 vC; void main(){vC=color; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}\",fragmentShader:\"varying vec3 vC; void main(){float l=max(vC.r,max(vC.g,vC.b)); if(l<0.06) discard; gl_FragColor=vec4(vC,1.0);}\"});\\nsc.add(new THREE.Mesh(g,mat));\\nconst grid=new THREE.GridHelper(2,16,0x1c2230,0x12161f); grid.position.y=-0.001; sc.add(grid);\\nfunction label(text,color){const cn=document.createElement(\"canvas\");cn.width=128;cn.height=32;const x=cn.getContext(\"2d\");x.font=\"20px sans-serif\";x.fillStyle=color;x.textAlign=\"center\";x.textBaseline=\"middle\";x.fillText(text,64,16);const tx=new THREE.CanvasTexture(cn);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tx,depthTest:false}));sp.scale.set(0.5,0.125,1);return sp;}\\nfunction addTick(text,x,y,z,color){const s=label(text,color||\"#9aa6bd\");s.position.set(x,y,z);sc.add(s);}\\nconst NT=5;for(let i=0;i<NT;i++){const f=i/(NT-1);const xv=D.xr[0]+(D.xr[1]-D.xr[0])*f; addTick(xv.toFixed(0), f*2-1, -0.06, 1.12, \"#9aa6bd\");const yv=D.yr[0]+(D.yr[1]-D.yr[0])*f; addTick(yv.toFixed(0), -1.12, -0.06, f*2-1, \"#9aa6bd\");}\\naddTick(D.xlabel, 0, -0.18, 1.30, \"#cbd3e4\");\\naddTick(D.ylabel, -1.34, -0.18, 0, \"#cbd3e4\");\\nconst tgt=new THREE.Vector3(0,D.H*0.3,0);\\nlet sph={r:3.4,theta:Math.PI*0.25,phi:Math.PI*0.34};\\nfunction upd(){cam.position.set(tgt.x+sph.r*Math.sin(sph.phi)*Math.cos(sph.theta), tgt.y+sph.r*Math.cos(sph.phi), tgt.z+sph.r*Math.sin(sph.phi)*Math.sin(sph.theta));cam.lookAt(tgt);if(typeof draw===\"function\")draw();}\\nupd();\\nlet mode=0; let pv={x:0,y:0};\\ncv.addEventListener(\"contextmenu\",e=>e.preventDefault());\\ncv.addEventListener(\"pointerdown\",e=>{mode=(e.button===2||e.button===1)?2:1;pv={x:e.clientX,y:e.clientY};cv.setPointerCapture(e.pointerId);});\\ncv.addEventListener(\"pointerup\",e=>{mode=0;});\\ncv.addEventListener(\"pointermove\",e=>{\\n  if(!mode)return; const dx=e.clientX-pv.x, dy=e.clientY-pv.y; pv={x:e.clientX,y:e.clientY};\\n  if(mode===1){ sph.theta+=dx*0.01; sph.phi=Math.max(0.05,Math.min(Math.PI/2-0.02,sph.phi-dy*0.01)); }\\n  else { const right=new THREE.Vector3(), up=new THREE.Vector3();\\n    right.setFromMatrixColumn(cam.matrixWorld,0); up.setFromMatrixColumn(cam.matrixWorld,1);\\n    const k=sph.r*0.0016; tgt.addScaledVector(right,-dx*k); tgt.addScaledVector(up, dy*k); }\\n  upd();\\n});\\ncv.addEventListener(\"wheel\",e=>{e.preventDefault();sph.r*=e.deltaY>0?1.1:0.9;sph.r=Math.max(0.2,Math.min(20,sph.r));upd();},{passive:false});\\nfunction draw(){rn.render(sc,cam);}\\nfunction _fit(){rn.setSize(_W(),_H());cam.aspect=_W()/_H();cam.updateProjectionMatrix();draw();}\\ndraw();new ResizeObserver(()=>{_fit();if(window.__POPOUT_D===undefined){window.parent.postMessage({type:\"iframe-resize\",height:500},\"*\");}}).observe(document.body);\\nif(window.__POPOUT_D!==undefined){requestAnimationFrame(_fit);setTimeout(_fit,80);setTimeout(_fit,300);window.addEventListener(\"resize\",_fit);}\\nconst _eb=document.getElementById(\"expandbtn\");\\nif(window.__POPOUT_D!==undefined){ _eb.style.display=\"none\"; }\\nelse { _eb.addEventListener(\"click\",function(){\\n  var w=window.open(\"\",\"_blank\"); if(!w){alert(\"Popup blocked\");return;}\\n  var html=decodeURIComponent(escape(atob(\"__POPB64__\")));\\n  w.document.open(); w.document.write(html); w.document.close();\\n}); }\\n</script>\\n</div>\\n'\ndef _catmull(p0,p1,p2,p3,t):\n    t2=t*t; t3=t2*t\n    return 0.5*(2*p1+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3)\ndef _interp_axis(a, f):\n    import numpy as _np\n    N=a.shape[-1]; outN=(N-1)*f+1; oc=_np.arange(outN); fc=oc/f\n    c1=_np.minimum(N-2,_np.floor(fc).astype(int)); tc=fc-c1\n    cm1=_np.clip(c1-1,0,N-1); c0=_np.clip(c1,0,N-1); cp1=_np.clip(c1+1,0,N-1); cp2=_np.clip(c1+2,0,N-1)\n    return _catmull(a[...,cm1],a[...,c0],a[...,cp1],a[...,cp2],tc)\ndef upsample_complex(field, factor):\n    import numpy as _np\n    f=int(factor)\n    if f<=1: return _np.abs(field)\n    re=field.real; im=field.imag\n    re=_interp_axis(re,f); im=_interp_axis(im,f)\n    re=_np.moveaxis(_interp_axis(_np.moveaxis(re,0,-1),f),-1,0)\n    im=_np.moveaxis(_interp_axis(_np.moveaxis(im,0,-1),f),-1,0)\n    return _np.hypot(re,im)\ndef upsample_axis(ax, f):\n    import numpy as _np\n    f=int(f); return _np.linspace(float(ax[0]), float(ax[-1]), (len(ax)-1)*f+1) if f>1 else _np.asarray(ax)\ndef surface3d(field, x_axis, y_axis, title, xlabel='range [m]', ylabel='azimuth [m]', x_range=None, y_range=None, status=None):\n    import numpy as _np, base64 as _b64\n    A = _np.abs(field) if _np.iscomplexobj(field) else _np.asarray(field); xa = x_axis; ya = y_axis\n    if x_range is not None:\n        sel = _np.where((x_axis >= x_range[0]) & (x_axis <= x_range[1]))[0]\n        j0, j1 = int(sel[0]), int(sel[-1]); A = A[:, j0:j1+1]; xa = x_axis[j0:j1+1]\n    if y_range is not None:\n        sel = _np.where((y_axis >= y_range[0]) & (y_axis <= y_range[1]))[0]\n        i0, i1 = int(sel[0]), int(sel[-1]); A = A[i0:i1+1, :]; ya = y_axis[i0:i1+1]\n    dbv = 20*_np.log10(A / A.max() + 1e-12); dbv = _np.clip(dbv, -40, 0)\n    tv = ((dbv + 40) / 40).astype(_np.float32)\n    nr, nc = tv.shape\n    payload = _json.dumps({'t':[round(float(v),3) for v in tv.flatten()],\n        'nrows':nr,'ncols':nc,'xr':[float(xa.min()),float(xa.max())],\n        'yr':[float(ya.min()),float(ya.max())],'H':0.35,\n        'xlabel':xlabel,'ylabel':ylabel,'title':title,'status':status})\n    print('three.js surface: %d x %d = %.2fM verts, payload %.1f MB' % (nr,nc,nr*nc/1e6,len(payload)/1e6))\n    # Popout: same surface body at 100vh, payload via window.__POPOUT_D, button hidden.\n    pop_body = _SURF_TEMPLATE.replace('__HEIGHT__','100vh').replace('__POPB64__','')\n    pop_doc = ('<!doctype html><html><head><meta charset=\"utf-8\"><title>' + title +\n        '</title><style>html,body{margin:0;height:100%;background:#08090c;overflow:hidden}</style>'\n        '<script>window.__POPOUT_D=' + payload + ';</scr'+'ipt></head><body>' + pop_body +\n        '</body></html>')\n    popb64 = _b64.b64encode(pop_doc.encode('utf-8')).decode('ascii')\n    # Inline: 480px, real payload, popout doc embedded as base64 in the Expand handler.\n    inline = _SURF_TEMPLATE.replace('__HEIGHT__','480px').replace('__PAYLOAD__', payload).replace('__POPB64__', popb64)\n    _display(_HTML(inline))\n\ndef upsample_complex_range(field, factor):\n    \"\"\"Complex upsample along the LAST axis (range) only — re/im interpolated\n    separately, then magnitude. Use for Range-Doppler/RCMC crops where only the\n    range axis is cropped and the Doppler axis must stay as-is.\"\"\"\n    import numpy as _np\n    f = int(factor)\n    if f <= 1:\n        return _np.abs(field)\n    re = _interp_axis(field.real, f)\n    im = _interp_axis(field.imag, f)\n    return _np.hypot(re, im)\n\nprint('plot library ready: surface3d, upsample_complex, upsample_complex_range, upsample_axis')\n",
+            "label": "Plot Library",
+            "spec": "Plot library for this SAR workspace (workspace-local, not app code). Defined as an unconnected first node so it runs before everything (input-unconnected nodes execute first) and shares its functions with all downstream nodes via the kernel namespace.\n\nFunctions:\n- surface3d(field, x_axis, y_axis, title, xlabel, ylabel, x_range, y_range, status): interactive Three.js 3D dB surface (inferno, -40..0 dB). x_range/y_range crop range/azimuth. On-demand render; left-drag rotate, right-drag pan, wheel zoom; Expand opens a new window.\n- upsample_complex(field, factor): 2-axis complex Catmull-Rom upsample (re/im then |z|) for smooth sidelobes on cropped views.\n- upsample_complex_range(field, factor): complex upsample along the range axis only (Range-Doppler/RCMC crops; Doppler stays as-is).\n- upsample_axis(ax, factor): matching linear upsample of an axis vector.\n- _catmull/_interp_axis: internal Catmull-Rom helpers."
+          },
+          "executionOrder": 6,
+          "codeCollapsed": true
+        },
+        "style": {
+          "width": 400
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_1779506139427_j3ag",
+        "source": "n2",
+        "sourceHandle": "out_0",
+        "target": "n3",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779506139474_tzv6",
+        "source": "n3",
+        "sourceHandle": "out_0",
+        "target": "n4",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779506139520_v2sv",
+        "source": "n4",
+        "sourceHandle": "out_0",
+        "target": "n5",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779506139583_ldd5",
+        "source": "n5",
+        "sourceHandle": "out_0",
+        "target": "n6",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779506139644_q6cz",
+        "source": "n6",
+        "sourceHandle": "out_0",
+        "target": "n7",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779506150472_7cxg",
+        "source": "n7",
+        "sourceHandle": "out_0",
+        "target": "n8",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316521_k9d7",
+        "source": "n9",
+        "sourceHandle": "out_0",
+        "target": "n10",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316608_ai23",
+        "source": "n10",
+        "sourceHandle": "out_0",
+        "target": "n11",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316655_6x55",
+        "source": "n11",
+        "sourceHandle": "out_0",
+        "target": "n12",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316725_vt1z",
+        "source": "n12",
+        "sourceHandle": "out_0",
+        "target": "n13",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316795_ec09",
+        "source": "n13",
+        "sourceHandle": "out_0",
+        "target": "n14",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316860_kn1t",
+        "source": "n14",
+        "sourceHandle": "out_0",
+        "target": "n15",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316912_is88",
+        "source": "n15",
+        "sourceHandle": "out_0",
+        "target": "n16",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513316976_a6k2",
+        "source": "n16",
+        "sourceHandle": "out_0",
+        "target": "n17",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513317048_lu2b",
+        "source": "n17",
+        "sourceHandle": "out_0",
+        "target": "n18",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513686551_04g8",
+        "source": "n14",
+        "sourceHandle": "out_0",
+        "target": "n19",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513686626_akbo",
+        "source": "n15",
+        "sourceHandle": "out_0",
+        "target": "n20",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779513686688_jhu9",
+        "source": "n16",
+        "sourceHandle": "out_0",
+        "target": "n21",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779537023441_4xwo",
+        "source": "n1",
+        "sourceHandle": "out_0",
+        "target": "n2",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779538044561_991o",
+        "source": "n7",
+        "sourceHandle": "out_0",
+        "target": "n25",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779538044735_2z3e",
+        "source": "n25",
+        "sourceHandle": "out_0",
+        "target": "n9",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "xy-edge__n25out_0-n27in_0",
+        "source": "n25",
+        "sourceHandle": "out_0",
+        "target": "n27",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1779542656908_c4d3",
+        "source": "n2",
+        "sourceHandle": "out_0",
+        "target": "n30",
+        "targetHandle": "in_0"
+      }
+    ],
+    "viewport": {
+      "x": 361.2539332375144,
+      "y": -577.3611883698038,
+      "zoom": 0.6593228815496978
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "timer",
+  "label": "Timer",
+  "category": "Utility",
+  "description": "Measure execution time of downstream blocks",
+  "parameters": [
+    {"id": "var_name", "label": "Variable Name", "dtype": "string", "default": "_timer_start"},
+    {"id": "code", "label": "Code", "dtype": "code", "default": "import time\n${var_name} = time.perf_counter()\nprint(f'Timer started: ${var_name}')"}
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

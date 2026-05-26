@@ -1,0 +1,22 @@
+{
+  "id": "hil_synthesize",
+  "label": "HIL Synthesize",
+  "category": "hdl/hil",
+  "description": "Generate AXI-Lite wrapper for Amaranth module and build PYNQ overlay via Vivado. Requires Vivado running with socket server.",
+  "parameters": [
+    {"id": "module_var", "label": "Module Variable", "dtype": "string", "default": "dut"},
+    {"id": "config_var", "label": "Board Config Variable", "dtype": "string", "default": "hil_board"},
+    {"id": "io_mode", "label": "I/O Mode", "dtype": "enum", "default": "mmio", "options": ["mmio", "dma"]},
+    {"id": "project_name", "label": "Project Name", "dtype": "string", "default": "hil_design"},
+    {"id": "build_dir", "label": "Build Directory", "dtype": "string", "default": "hil/build"},
+    {"id": "result_var", "label": "Build Result Variable", "dtype": "string", "default": "hil_build_result"},
+    {"id": "code", "label": "Code", "dtype": "code", "default": "import sys, os\nos.chdir('D:/Claude/HiyoCanvas')\nsys.path.insert(0, 'D:/Claude/HiyoCanvas/hil/scripts')\nfrom axi_wrapper import generate_hil_design\nfrom vivado_build import build_hil_overlay\n\nio_mode = '${io_mode}'\n\n# Step 1: Generate Verilog + AXI wrapper\nprint('=== Step 1: Generating HIL design files ===')\nhil_design = generate_hil_design(\n    ${module_var},\n    output_dir='D:/Claude/HiyoCanvas/${build_dir}/${project_name}',\n    io_mode=io_mode\n)\n\n# Step 2: Build overlay via Vivado\nprint('\\n=== Step 2: Building PYNQ overlay via Vivado ===')\nprint('(This may take 15-30 minutes for first build, cached afterwards)')\n${result_var} = build_hil_overlay(\n    verilog_dir='D:/Claude/HiyoCanvas/${build_dir}/${project_name}',\n    board_type=${config_var}.config.board_type,\n    project_name='${project_name}'\n)\n\nif ${result_var}.get('cached'):\n    print('\\nUsed cached bitstream (no rebuild needed)')\nelse:\n    print('\\nBuild completed successfully')\n\nprint(f'Bitstream: {${result_var}[\"bit_path\"]}')\nprint(f'Design hash: {${result_var}[\"design_hash\"]}')"}
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

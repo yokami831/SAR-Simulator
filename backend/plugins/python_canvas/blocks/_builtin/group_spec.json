@@ -1,0 +1,17 @@
+{
+  "id": "group_spec",
+  "label": "Group Spec",
+  "category": "Documentation",
+  "description": "Overall design specification for a group/subgraph (not executed). Include this block when grouping so the group's spec survives Ungroup.",
+  "parameters": [
+    {
+      "id": "text",
+      "label": "Spec",
+      "dtype": "code",
+      "default": "## Group spec\n\n- purpose:\n- key parameters:\n"
+    }
+  ],
+  "inputs": [],
+  "outputs": [],
+  "code_template": ""
+}

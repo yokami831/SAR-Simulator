@@ -1,0 +1,16 @@
+{
+  "id": "data_filter",
+  "label": "Data Filter",
+  "category": "Transform",
+  "description": "Filter and transform a DataFrame with a condition",
+  "parameters": [
+    {"id": "code", "label": "Code", "dtype": "code", "default": "# Filter a DataFrame 'df' by condition\n# filtered = df[df['column'] > threshold]\n# print(f'Filtered: {len(filtered)}/{len(df)} rows')\n# filtered.head()"}
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

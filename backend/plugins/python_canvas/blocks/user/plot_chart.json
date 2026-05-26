@@ -1,0 +1,16 @@
+{
+  "id": "plot_chart",
+  "label": "Plot Chart",
+  "category": "Visualization",
+  "description": "Create a matplotlib chart from data in the kernel namespace",
+  "parameters": [
+    {"id": "code", "label": "Code", "dtype": "code", "default": "import matplotlib.pyplot as plt\n\n# Example: plot from a DataFrame 'df'\n# plt.figure(figsize=(8, 5))\n# plt.plot(df['x'], df['y'])\n# plt.title('My Chart')\n# plt.xlabel('X')\n# plt.ylabel('Y')\n# plt.grid(True)\n# plt.tight_layout()\n# plt.show()"}
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

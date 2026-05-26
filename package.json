@@ -1,0 +1,48 @@
+{
+  "name": "hiyocanvas",
+  "version": "1.0.0",
+  "description": "HiyoCanvas - visual node editor built with React Flow",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "vite",
+    "build": "vite build",
+    "postinstall": "patch-package"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@blocknote/core": "^0.47.3",
+    "@blocknote/mantine": "^0.47.3",
+    "@blocknote/react": "^0.47.3",
+    "@codemirror/autocomplete": "^6.20.0",
+    "@codemirror/commands": "^6.10.2",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/language": "^6.12.2",
+    "@codemirror/state": "^6.5.4",
+    "@codemirror/view": "^6.39.15",
+    "@excalidraw/excalidraw": "^0.18.0",
+    "@excalidraw/mermaid-to-excalidraw": "^2.2.2",
+    "@svar-ui/react-filemanager": "^2.5.0",
+    "@xyflow/react": "^12",
+    "@xyflow/system": "^0",
+    "codemirror": "^6.0.2",
+    "dompurify": "^3.3.1",
+    "marked": "^17.0.3",
+    "mind-elixir": "^5.10.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "@types/dompurify": "^3.0.5",
+    "@types/three": "^0.160.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "electron": "^33.4.11",
+    "patch-package": "^8.0.1",
+    "typescript": "^5.9.3",
+    "vite": "^6"
+  }
+}

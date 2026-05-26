@@ -1,0 +1,21 @@
+{
+  "id": "hil_run",
+  "label": "HIL Run",
+  "category": "hdl/hil",
+  "description": "Send test vectors to FPGA and collect results. Supports MMIO and DMA modes. Requires deployed overlay (HIL Deploy).",
+  "parameters": [
+    {"id": "config_var", "label": "Board Config Variable", "dtype": "string", "default": "hil_board"},
+    {"id": "result_var", "label": "Build Result Variable", "dtype": "string", "default": "hil_build_result"},
+    {"id": "deploy_var", "label": "Deploy Result Variable", "dtype": "string", "default": "hil_deploy_result"},
+    {"id": "input_var", "label": "Input Data Variable", "dtype": "string", "default": "test_input"},
+    {"id": "output_var", "label": "Output Variable", "dtype": "string", "default": "hw_output"},
+    {"id": "code", "label": "Code", "dtype": "code", "default": "import sys\nimport numpy as np\nsys.path.insert(0, 'D:/Claude/HiyoCanvas/hil/scripts')\nfrom pynq_run import run_on_hardware, run_on_hardware_dma\n\nreg_map = ${result_var}['register_map']\nio_mode = reg_map.get('io_mode', 'mmio')\n\n# Prepare input data\ninput_signals = {}\nfor input_name in reg_map['inputs']:\n    input_signals[input_name] = np.array(${input_var}, dtype=int)\n    break\n\nprint(f'=== Running test vectors on FPGA ({io_mode} mode) ===')\n\nif io_mode == 'dma':\n    # Get DMA base address from deploy result\n    dma_base_addr = None\n    ip_dict = ${deploy_var}.get('ip_dict', {})\n    for ip_name, ip_info in ip_dict.items():\n        if 'dma' in ip_name.lower():\n            dma_base_addr = ip_info.get('phys_addr', 0)\n            break\n    if dma_base_addr is None:\n        raise RuntimeError('DMA IP not found in overlay')\n    run_result = run_on_hardware_dma(\n        deployer=${config_var}, register_map=reg_map,\n        base_addr=${deploy_var}['base_addr'],\n        dma_base_addr=dma_base_addr,\n        input_data=input_signals, timeout=120\n    )\nelse:\n    run_result = run_on_hardware(\n        deployer=${config_var}, register_map=reg_map,\n        base_addr=${deploy_var}['base_addr'],\n        input_data=input_signals\n    )\n\nif not run_result['success']:\n    raise RuntimeError(f'HIL run failed: {run_result.get(\"error\", \"unknown\")}')\n\nfor output_name, output_data in run_result['outputs'].items():\n    ${output_var} = output_data\n    n = len(output_data)\n    print(f'Output signal: {output_name}')\n    print(f'Samples: {n}')\n    print(f'Range: [{output_data.min()}, {output_data.max()}]')\n    if io_mode == 'dma' and run_result.get('elapsed_ms'):\n        ms = run_result['elapsed_ms']\n        print(f'FPGA time: {ms:.1f} ms ({n/ms*1000:.0f} samples/sec)')\n    break\n\nprint(f'\\nResult stored in: ${output_var}')"}
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

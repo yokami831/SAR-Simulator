@@ -1,0 +1,259 @@
+{
+  "version": 1,
+  "type": "mindmap",
+  "title": "Sar-Sim-Mindmap",
+  "description": "",
+  "created": "2026-05-23T01:57:25.588898+00:00",
+  "modified": "2026-05-23T04:32:25.085063+00:00",
+  "mindmapData": {
+    "nodeData": {
+      "id": "e528d31e23826157",
+      "topic": "System",
+      "children": [
+        {
+          "topic": "Common parameter",
+          "id": "e528dbdbd35b5655",
+          "direction": 1
+        },
+        {
+          "topic": "Transmit",
+          "id": "e528d8ffaa74ed7d",
+          "direction": 0,
+          "children": [
+            {
+              "topic": "Generate charp signal",
+              "id": "e528e2b517f1b114",
+              "children": [
+                {
+                  "topic": "Parameter",
+                  "id": "e528eb745ba026d1",
+                  "children": [
+                    {
+                      "topic": "Frequency",
+                      "id": "e528ee5b91f5cb52",
+                      "children": [
+                        {
+                          "topic": "min",
+                          "id": "e528f39c4b058436"
+                        },
+                        {
+                          "topic": "max",
+                          "id": "e528f449b81062a6"
+                        }
+                      ],
+                      "expanded": true
+                    },
+                    {
+                      "topic": "Pulse width",
+                      "id": "e528eff060096da5"
+                    },
+                    {
+                      "topic": "PRF",
+                      "id": "e528f1f2a0769ba3"
+                    }
+                  ],
+                  "expanded": true
+                }
+              ],
+              "expanded": true
+            },
+            {
+              "topic": "UpConvert",
+              "id": "e5290a4f80f55230",
+              "children": [
+                {
+                  "topic": "CenterFrequency",
+                  "id": "e5290bd24bb3c2ef"
+                }
+              ],
+              "expanded": true
+            },
+            {
+              "topic": "XPA",
+              "id": "e5291c392dfb702f",
+              "children": [
+                {
+                  "topic": "saturation",
+                  "id": "e5291d1063ff8746"
+                },
+                {
+                  "topic": "noise floor(NF)",
+                  "id": "e5291efe5bc7174b"
+                },
+                {
+                  "topic": "Frequency flatness",
+                  "id": "e5292134016f6d12"
+                }
+              ],
+              "expanded": true
+            },
+            {
+              "topic": "RF-BPF",
+              "id": "e5291b5e0d21eb12",
+              "children": [
+                {
+                  "topic": "Filter charactaristics",
+                  "id": "e5292441b407efdd"
+                }
+              ],
+              "expanded": true
+            },
+            {
+              "topic": "Antenna",
+              "id": "e528e0c444968af5",
+              "children": [
+                {
+                  "topic": "range direction",
+                  "id": "e52915df673c032d"
+                },
+                {
+                  "topic": "azimath direction",
+                  "id": "e529111d12f5b50d"
+                },
+                {
+                  "topic": "gain",
+                  "id": "e5291544b31785dc"
+                }
+              ],
+              "expanded": true
+            }
+          ],
+          "expanded": true
+        },
+        {
+          "topic": "Simulation reflected signal",
+          "id": "e5293bcb1b221efc",
+          "direction": 1,
+          "children": [
+            {
+              "topic": "observation condition",
+              "id": "e529403b8c338f46",
+              "children": [
+                {
+                  "topic": "point target",
+                  "id": "e52942f3bcb378f7"
+                },
+                {
+                  "topic": "mult point",
+                  "id": "e529440989ddeb52"
+                },
+                {
+                  "topic": "image",
+                  "id": "e529461e03781e2c"
+                },
+                {
+                  "topic": "etc",
+                  "id": "e52946c8a62dfb59"
+                }
+              ],
+              "expanded": true
+            }
+          ],
+          "expanded": true
+        },
+        {
+          "topic": "Receive",
+          "id": "e528dea7a740b29c",
+          "direction": 1,
+          "children": [
+            {
+              "topic": "Analog BPF",
+              "id": "e5294892d3f3176d"
+            },
+            {
+              "topic": "Downconvert",
+              "id": "e5294ba4377e4505"
+            },
+            {
+              "topic": "Filtering",
+              "id": "e5294dab3acd603c"
+            },
+            {
+              "topic": "Down sample & filter",
+              "id": "e5294ec125cf1890"
+            },
+            {
+              "topic": "BAQ compression",
+              "id": "e52955c4fa175ef3",
+              "children": [
+                {
+                  "topic": "number of bits",
+                  "id": "e529598625e79c13"
+                }
+              ],
+              "expanded": true
+            }
+          ],
+          "expanded": true
+        },
+        {
+          "topic": "Processing",
+          "id": "e528dfa2e956fa5a",
+          "direction": 1,
+          "children": [
+            {
+              "topic": "range compression",
+              "id": "e531a8bd51fcc34e"
+            },
+            {
+              "topic": "RCMC",
+              "id": "e531aa7c71575db8"
+            },
+            {
+              "topic": "Azimath compression",
+              "id": "e531acf5a83aa491"
+            },
+            {
+              "topic": "Ground projected",
+              "id": "e531afa5d9d31161"
+            }
+          ],
+          "expanded": true
+        }
+      ],
+      "expanded": true
+    },
+    "arrows": [],
+    "summaries": [],
+    "direction": 1,
+    "theme": {
+      "name": "Dark",
+      "type": "dark",
+      "palette": [
+        "#848FA0",
+        "#748BE9",
+        "#D2F9FE",
+        "#4145A5",
+        "#789AFA",
+        "#706CF4",
+        "#EF987F",
+        "#775DD5",
+        "#FCEECF",
+        "#DA7FBC"
+      ],
+      "cssVar": {
+        "--node-gap-x": "30px",
+        "--node-gap-y": "10px",
+        "--main-gap-x": "65px",
+        "--main-gap-y": "45px",
+        "--root-radius": "30px",
+        "--main-radius": "20px",
+        "--root-color": "#ffffff",
+        "--root-bgcolor": "#2d3748",
+        "--root-border-color": "rgba(255, 255, 255, 0.1)",
+        "--main-color": "#ffffff",
+        "--main-bgcolor": "#4c4f69",
+        "--main-bgcolor-transparent": "rgba(76, 79, 105, 0.8)",
+        "--topic-padding": "3px",
+        "--color": "#cccccc",
+        "--bgcolor": "#252526",
+        "--selected": "#4dc4ff",
+        "--accent-color": "#789AFA",
+        "--panel-color": "#ffffff",
+        "--panel-bgcolor": "#2d3748",
+        "--panel-border-color": "#696969",
+        "--map-padding": "50px 80px"
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "amaranth_sim",
+  "label": "Amaranth Simulate",
+  "category": "hdl",
+  "description": "Define an Amaranth HDL module and run clock-level simulation. Results stored in kernel namespace.",
+  "parameters": [
+    {"id": "code", "label": "Code", "dtype": "code", "default": "from amaranth import *\nfrom amaranth.sim import Simulator\nimport numpy as np\n\n# === Define your Amaranth module ===\nclass MyModule(Elaboratable):\n    def __init__(self):\n        self.input = Signal(signed(16))\n        self.output = Signal(signed(16))\n\n    def elaborate(self, platform):\n        m = Module()\n        # Example: pass-through (replace with your logic)\n        m.d.sync += self.output.eq(self.input)\n        return m\n\n# === Simulation ===\ndut = MyModule()\nsim = Simulator(dut)\nsim.add_clock(1e-6)  # 1 MHz clock\n\n# Prepare input/output capture\n# Assumes 'test_input' exists in kernel namespace\n_sim_input = np.array(test_input, dtype=int)\n_sim_output = []\n\nasync def testbench(ctx):\n    for i, val in enumerate(_sim_input):\n        ctx.set(dut.input, int(val))\n        await ctx.tick()\n        _sim_output.append(ctx.get(dut.output))\n\nsim.add_testbench(testbench)\nwith sim.write_vcd('sim_trace.vcd'):\n    sim.run()\n\nhdl_output = np.array(_sim_output)\nprint(f'Simulated {len(hdl_output)} samples')"}
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

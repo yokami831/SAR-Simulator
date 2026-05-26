@@ -1,0 +1,21 @@
+{
+  "id": "fxp_convert",
+  "label": "Fixed-Point Convert",
+  "category": "hdl",
+  "description": "Convert float array to fixed-point using fxpmath. Outputs Fxp object, quantized float, integer representation, and bit-width metadata for downstream HDL modules.",
+  "parameters": [
+    {"id": "input_var", "label": "Input Variable", "dtype": "string", "default": "signal_float"},
+    {"id": "output_var", "label": "Output Variable", "dtype": "string", "default": "signal_fxp"},
+    {"id": "n_word", "label": "Word Length (bits)", "dtype": "string", "default": "16"},
+    {"id": "n_frac", "label": "Fractional Bits", "dtype": "string", "default": "14"},
+    {"id": "signed", "label": "Signed", "dtype": "string", "default": "True"},
+    {"id": "code", "label": "Code", "dtype": "code", "default": "from fxpmath import Fxp\nimport numpy as np\n\n# Convert float signal to fixed-point\n_input = ${input_var}\n${output_var} = Fxp(_input, signed=${signed}, n_word=${n_word}, n_frac=${n_frac})\n${output_var}_float = ${output_var}.astype(float)  # quantized back to float\n\n# Integer representation for HDL (Amaranth Signal values)\n${output_var}_int = ${output_var}.val.astype(int)\n\n# Bit-width metadata for downstream modules\n${output_var}_n_word = int(${n_word})\n${output_var}_n_frac = int(${n_frac})\n${output_var}_signed = ${signed}\n\n# Report quantization stats\n_err = np.array(_input, dtype=float) - ${output_var}_float\nprint(f'Fixed-point: Q{int(${n_word})-int(${n_frac})}.{${n_frac}} ({\"signed\" if ${signed} else \"unsigned\"})')\nprint(f'Word: {${n_word}} bits, Frac: {${n_frac}} bits')\nprint(f'Range: [{${output_var}.lower}, {${output_var}.upper}]')\nprint(f'Resolution: {${output_var}.precision}')\nprint(f'Max quantization error: {np.max(np.abs(_err)):.6e}')\nprint(f'Integer values: {${output_var}_int[:8].tolist()}...' if len(${output_var}_int) > 8 else f'Integer values: {${output_var}_int.tolist()}')"}
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

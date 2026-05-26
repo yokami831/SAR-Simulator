@@ -1,0 +1,33 @@
+{
+  "id": "gui_text_input",
+  "label": "Text Input",
+  "category": "GUI Controls",
+  "description": "テキストデータを直接入力し、カーネル変数に格納する",
+  "parameters": [
+    {
+      "id": "var_name",
+      "label": "Variable Name",
+      "dtype": "string",
+      "default": "text_data"
+    },
+    {
+      "id": "value",
+      "label": "Value",
+      "dtype": "textarea",
+      "default": ""
+    },
+    {
+      "id": "placeholder",
+      "label": "Placeholder",
+      "dtype": "string",
+      "default": "Enter text here..."
+    }
+  ],
+  "inputs": [],
+  "outputs": [],
+  "code_template": "",
+  "gui_widget": {
+    "type": "text_input",
+    "dtype": "string"
+  }
+}

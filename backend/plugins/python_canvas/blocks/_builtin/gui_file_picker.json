@@ -1,0 +1,33 @@
+{
+  "id": "gui_file_picker",
+  "label": "File Picker",
+  "category": "GUI Controls",
+  "description": "ファイルパスを選択して変数に格納する",
+  "parameters": [
+    {
+      "id": "var_name",
+      "label": "Variable Name",
+      "dtype": "string",
+      "default": "file_path"
+    },
+    {
+      "id": "value",
+      "label": "File Path",
+      "dtype": "string",
+      "default": ""
+    },
+    {
+      "id": "accept",
+      "label": "File Types",
+      "dtype": "string",
+      "default": "txt,csv,json"
+    }
+  ],
+  "inputs": [],
+  "outputs": [],
+  "code_template": "",
+  "gui_widget": {
+    "type": "file_picker",
+    "dtype": "filepath"
+  }
+}

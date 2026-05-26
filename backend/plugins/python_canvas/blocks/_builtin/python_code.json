@@ -1,0 +1,27 @@
+{
+  "id": "python_code",
+  "label": "Python Code",
+  "category": "Code",
+  "description": "Execute arbitrary Python code",
+  "parameters": [
+    {
+      "id": "spec",
+      "label": "Spec",
+      "dtype": "spec",
+      "default": ""
+    },
+    {
+      "id": "code",
+      "label": "Code",
+      "dtype": "code",
+      "default": "# Write Python code here\n"
+    }
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HiyoCanvas</title>
+  <link href="theme.css" rel="stylesheet">
+  <link href="styles.css" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e1e1e">
+</head>
+<body>
+  <!-- Main Area -->
+  <div id="main">
+    <div id="bookmark-bar"></div>
+    <div id="toolbar"></div>
+    <div id="content-area">
+      <div id="loading">Loading...</div>
+    </div>
+    <!-- Console/Log Panel (bottom of main area) -->
+    <div id="console-panel" data-role="console-panel">
+      <div id="console-edge-tab" title="Toggle Log"><span class="tab-arrow">▼</span> Log</div>
+      <div id="console-resize-handle"></div>
+      <div id="console-header">
+        <span>Log</span>
+        <div class="spacer"></div>
+        <button id="console-clear-btn" title="Clear">&#128465; Clear</button>
+        <button id="console-close-btn" class="panel-close-btn" title="Close">&times;</button>
+      </div>
+      <div id="console-body"></div>
+    </div>
+    <div id="taskbar"></div>
+  </div>
+
+  <!-- AI Chat Panel (right side, toggled by AI button) -->
+  <div id="terminal-panel" class="terminal-panel-hidden" data-role="terminal-panel">
+    <div id="terminal-resize-handle"></div>
+    <div id="terminal-edge-tab" title="Toggle AI Chat"><span class="tab-arrow">◀</span> AI</div>
+    <div id="terminal-header">
+      <span>&#x2728; AI Chat</span>
+      <button id="terminal-close-btn" title="Close">&times;</button>
+    </div>
+    <div id="terminal-container"></div>
+  </div>
+
+  <!-- Hidden flowgraph state for AI agent accessibility -->
+  <div id="flowgraph-state" data-role="flowgraph-state" style="display:none"
+       aria-hidden="true" data-node-count="0" data-edge-count="0" data-is-running="false">
+    <script type="application/json" data-role="flowgraph-json">{"nodes":[],"edges":[]}</script>
+  </div>
+
+
+  <script>
+    // Global error capture — installed before modules load.
+    // Collects errors into a queue; backend.js drains it once WebSocket connects.
+    window.__errorQueue = [];
+    window.onerror = function(message, source, lineno, colno, error) {
+      var key = message + ':' + source + ':' + lineno;
+      if (window.__lastErrorKey === key) return;
+      window.__lastErrorKey = key;
+      var entry = { type: 'js_error', message: message, source: source,
+                    lineno: lineno, colno: colno,
+                    stack: error && error.stack ? error.stack : '' };
+      window.__errorQueue.push(entry);
+      if (window.__sendErrorToBackend) window.__sendErrorToBackend(entry);
+      if (window.__consoleLog) window.__consoleLog('error', message, error && error.stack ? error.stack : '', 'js');
+    };
+    window.onunhandledrejection = function(event) {
+      var reason = event.reason;
+      var msg = reason ? (reason.message || String(reason)) : 'Unknown';
+      var key = 'rejection:' + msg;
+      if (window.__lastErrorKey === key) return;
+      window.__lastErrorKey = key;
+      var entry = { type: 'unhandled_rejection', message: msg,
+                    stack: reason && reason.stack ? reason.stack : '' };
+      window.__errorQueue.push(entry);
+      if (window.__sendErrorToBackend) window.__sendErrorToBackend(entry);
+      if (window.__consoleLog) window.__consoleLog('error', msg, reason && reason.stack ? reason.stack : '', 'js');
+    };
+  </script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

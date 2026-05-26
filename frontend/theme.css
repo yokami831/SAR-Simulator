@@ -1,0 +1,227 @@
+/* ============================================================
+   HiyoCanvas Theme — CSS Custom Properties
+   ============================================================
+   All color values are centralized here.
+   Components reference these variables via var(--name).
+   To create a new theme, override these values.
+   ============================================================ */
+
+:root {
+
+  /* === Base Backgrounds === */
+  --bg-primary:       #1a1a1a;   /* Canvas, main content areas          */
+  --bg-secondary:     #1e1e1e;   /* Sidebars, panels                    */
+  --bg-tertiary:      #333;      /* Hover backgrounds, subtle fills     */
+  --bg-hover:         #383838;   /* Interactive hover state             */
+  --bg-input:         #222;      /* Input field backgrounds             */
+  --bg-panel:         #2e2e2e;   /* Floating panels, popups             */
+  --bg-header:        #252525;   /* Section headers (sidebar, console)  */
+  --bg-card:          #2a2a2a;   /* Cards, context menus, modals        */
+  --bg-deep:          #1a1a1a;   /* Deeply nested backgrounds           */
+  --bg-block-cat:     #222222;   /* Block category header               */
+  --bg-block-cat-sub: #282828;   /* Block sub-category hover            */
+  --bg-block-hover:   #303030;   /* Block category header hover         */
+
+  /* === Text Colors === */
+  --text-primary:     #ddd;      /* Primary text                        */
+  --text-secondary:   #aaa;      /* Secondary / label text              */
+  --text-muted:       #888;      /* Muted, de-emphasized text           */
+  --text-dim:         #666;      /* Very dim text (dates, types)        */
+  --text-faint:       #555;      /* Faintest text (counts, disabled)    */
+  --text-bright:      #eee;      /* Bright / emphasized text            */
+  --text-white:       #fff;      /* Pure white text                     */
+  --text-label:       #bbb;      /* Labels, doc text                    */
+  --text-hover:       #ccc;      /* Text on hover                       */
+  --text-code:        #e0e0e0;   /* Code / monospace text               */
+
+  /* === Border Colors === */
+  --border-color:     #333;      /* Primary borders                     */
+  --border-light:     #444;      /* Light borders (cards, popups)       */
+  --border-input:     #555;      /* Input field borders                 */
+  --border-hover:     #777;      /* Input hover borders                 */
+  --border-subtle:    #2a2a2a;   /* Very subtle separators              */
+
+  /* === Accent Colors === */
+  --accent-green:     #8bc34a;   /* Focus, success, active tab          */
+  --accent-blue:      #4fc3f7;   /* Selected, info, links               */
+  --accent-orange:    #ffa726;   /* Warning, toast                      */
+  --accent-red:       #e74c3c;   /* Danger, error                       */
+  --accent-cyan:      #4dd0e1;   /* Mindmap accent, toolbar cyan        */
+  --accent-purple:    #ce93d8;   /* Toolbar purple accent               */
+
+  /* === Accent Shadows (with alpha) === */
+  --accent-green-glow:  rgba(139, 195, 74, 0.15);
+  --accent-blue-glow:   rgba(66, 165, 245, 0.4);
+  --accent-cyan-glow:   rgba(77, 208, 225, 0.2);
+
+  /* === Overlay / Shadow === */
+  --overlay-light:    rgba(0, 0, 0, 0.1);
+  --overlay-medium:   rgba(0, 0, 0, 0.4);
+  --overlay-heavy:    rgba(0, 0, 0, 0.5);
+  --overlay-dark:     rgba(0, 0, 0, 0.6);
+  --shadow-dropdown:  0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-popup:     0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-modal:     0 8px 32px rgba(0, 0, 0, 0.6);
+
+  /* === Scrollbar === */
+  --scrollbar-track:  rgba(0, 0, 0, 0.1);
+  --scrollbar-thumb:  #555;
+  --scrollbar-hover:  #777;
+
+  /* === Semi-transparent Whites (for dark-theme overlays) === */
+  --white-alpha-02:   rgba(255, 255, 255, 0.02);
+  --white-alpha-03:   rgba(255, 255, 255, 0.03);
+  --white-alpha-05:   rgba(255, 255, 255, 0.05);
+  --white-alpha-06:   rgba(255, 255, 255, 0.06);
+  --white-alpha-08:   rgba(255, 255, 255, 0.08);
+  --white-alpha-10:   rgba(255, 255, 255, 0.1);
+  --white-alpha-20:   rgba(255, 255, 255, 0.2);
+  --white-alpha-25:   rgba(255, 255, 255, 0.25);
+  --white-alpha-35:   rgba(255, 255, 255, 0.35);
+  --white-alpha-40:   rgba(255, 255, 255, 0.4);
+
+  /* === Block Type Colors === */
+  --block-source:         #4caf50;
+  --block-source-text:    #1b5e20;
+  --block-processing:     #2196f3;
+  --block-processing-text:#0d47a1;
+  --block-sink:           #f44336;
+  --block-sink-text:      #b71c1c;
+  --block-gui:            #9c27b0;
+  --block-gui-text:       #4a148c;
+  --block-utility:        #ffc107;
+  --block-utility-text:   #6d4c00;
+  --block-hdl-start:      #ff8c00;
+  --block-hdl-end:        #ff6b00;
+  --block-hdl-text:       #7a3300;
+
+  /* === Port Type Colors === */
+  --port-complex:     #42A5F5;
+  --port-float:       #FFA726;
+  --port-int:         #26A69A;
+  --port-short:       #FFEE58;
+  --port-byte:        #E040FB;
+  --port-message:     #BDBDBD;
+  --port-audio:       #66bb6a;
+
+  /* === Execution Status === */
+  --exec-executing:       #2196f3;
+  --exec-completed:       #4caf50;
+  --exec-completed-glow:  rgba(76, 175, 80, 0.5);
+  --exec-error:           #f44336;
+  --exec-error-glow:      rgba(244, 67, 54, 0.5);
+  --exec-next:            #42a5f5;
+  --exec-next-glow:       rgba(66, 165, 245, 0.4);
+  --exec-cancelled:       #666;
+  --exec-pulse-start:     rgba(33, 150, 243, 0.4);
+  --exec-pulse-mid:       rgba(33, 150, 243, 0.8);
+  --exec-result-bg:       #1a1a2e;
+  --exec-output-text:     #a5d6a7;
+  --exec-error-text:      #ef9a9a;
+  --exec-result-value:    #90caf9;
+
+  /* === Toolbar Buttons === */
+  --btn-run-bg:           #2e7d32;
+  --btn-run-border:       #4caf50;
+  --btn-run-hover:        #388e3c;
+  --btn-stop-bg:          #c62828;
+  --btn-stop-border:      #ef5350;
+  --btn-stop-hover:       #d32f2f;
+  --btn-step-bg:          #1565c0;
+  --btn-step-border:      #42a5f5;
+  --btn-step-hover:       #1976d2;
+  --btn-reset-bg:         #e65100;
+  --btn-reset-border:     #ff9800;
+  --btn-reset-hover:      #ef6c00;
+  --btn-run-remaining-bg: #1b5e20;
+  --btn-run-remaining-border: #66bb6a;
+  --btn-run-remaining-hover:  #2e7d32;
+
+  /* === Node UI === */
+  --node-run-btn:         #fdd835;
+  --node-run-btn-hover:   #ffee58;
+  --node-label-edit-bg:   rgba(0, 0, 0, 0.3);
+  --node-label-edit-border: rgba(255, 255, 255, 0.4);
+  --node-error-line-bg:   rgba(255, 0, 0, 0.15);
+  --node-error-line-border: #ff4444;
+  --node-disabled-border: #555;
+  --node-disabled-header: #3a3a3a;
+  --node-selected-ring:   #fff;
+  --node-params-bg:       rgba(0, 0, 0, 0.15);
+
+  /* === Console === */
+  --console-badge-bg:     #c62828;
+  --console-info:         #4fc3f7;
+  --console-warning:      #ffa726;
+  --console-error:        #ef5350;
+  --console-active-bg:    #37474f;
+  --console-active-border:#546e7a;
+  --console-active-text:  #b0bec5;
+
+  /* === Modal === */
+  --modal-overlay:        rgba(0, 0, 0, 0.5);
+  --modal-input-focus:    #6c8ebf;
+  --modal-primary-bg:     #2e7d32;
+  --modal-primary-border: #4caf50;
+  --modal-primary-hover:  #388e3c;
+  --modal-danger-bg:      #c62828;
+  --modal-danger-border:  #ef5350;
+  --modal-danger-hover:   #d32f2f;
+
+  /* === Chat === */
+  --chat-user-gradient:   linear-gradient(135deg, #667eea, #764ba2);
+  --chat-user-text:       #f0eeff;
+  --chat-ai-gradient:     linear-gradient(135deg, #f093fb, #f5576c);
+  --chat-assistant-gradient: linear-gradient(135deg, #2d2f3e, #3a3d52);
+  --chat-assistant-text:  #e0e0e8;
+  --chat-assistant-border:rgba(240, 147, 251, 0.15);
+  --chat-code-bg:         #1a1a1a;
+  --chat-link:            #64b5f6;
+  --chat-input-bg:        #2d2d2d;
+  --chat-input-focus:     #667eea;
+  --chat-send-gradient:   linear-gradient(135deg, #667eea, #764ba2);
+  --chat-send-hover:      linear-gradient(135deg, #5a6fe0, #6a4098);
+  --chat-stop-bg:         #ef4444;
+  --chat-stop-hover:      #dc2626;
+  --chat-mic-bg:          #3a3a3a;
+  --chat-mic-hover:       #4a4a4a;
+  --chat-mic-speaking:    rgba(239, 68, 68, 0.35);
+  --chat-mic-speaking-hover: #dc2626;
+
+  /* === Toast === */
+  --toast-bg:             rgba(30, 30, 30, 0.92);
+  --toast-color:          #ffa726;
+  --toast-border:         #ffa726;
+
+  /* === Tooltip / Highlight Ring === */
+  --highlight-ring:       rgba(102, 187, 106, 0.8);
+  --highlight-ring-glow:  rgba(102, 187, 106, 0.3);
+  --highlight-pulse-mid:  rgba(102, 187, 106, 0.5);
+
+  /* === Tab Close / Danger === */
+  --tab-close-hover:      #ef5350;
+
+  /* === Context Menu === */
+  --ctx-bg:               #3a3a3a;
+  --ctx-hover:            #484848;
+  --ctx-danger:           #c62828;
+
+  /* === VCD === */
+  --vcd-btn-bg:           #1e3a5f;
+  --vcd-btn-border:       #2d5a8e;
+  --vcd-btn-text:         #89b4fa;
+  --vcd-btn-hover-bg:     #2d5a8e;
+  --vcd-btn-hover-text:   #cdd6f4;
+
+  /* === Excalidraw (unified with --bg-primary) === */
+  --excalidraw-surface:   #1a1a1a;
+
+  /* === Layout (non-color, kept together for convenience) === */
+  --sidebar-width:        200px;
+  --tabbar-height:        36px;
+  --toolbar-height:       36px;
+  --console-min-height:   180px;
+  --font-mono:            'Consolas', 'Fira Code', monospace;
+  --code-font-size:       11px;
+  --exec-result-font-size:13px;
+}

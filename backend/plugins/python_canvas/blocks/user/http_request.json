@@ -1,0 +1,18 @@
+{
+  "id": "http_request",
+  "label": "HTTP Request",
+  "category": "Data IO",
+  "description": "Make an HTTP request and store the response as 'response'",
+  "parameters": [
+    {"id": "url", "label": "URL", "dtype": "string", "default": "https://httpbin.org/get"},
+    {"id": "method", "label": "Method", "dtype": "enum", "default": "GET", "options": ["GET", "POST", "PUT", "DELETE"]},
+    {"id": "code", "label": "Code", "dtype": "code", "default": "import requests\nresponse = requests.${method}('${url}')\nprint(f'Status: {response.status_code}')\nresponse.json()"}
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}

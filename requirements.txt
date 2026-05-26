@@ -1,0 +1,35 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+aiohttp>=3.9.0
+Pillow>=10.0.0
+python-multipart>=0.0.6
+jupyter_client>=8.0.0
+ipykernel>=6.0.0
+sdfcad>=0.5.0
+
+# Voice Agent (RINA) — required when features.rina=true in app-config.json
+livekit==1.1.2
+livekit-agents==1.4.3
+livekit-api==1.1.0
+livekit-blingfire==1.1.0
+livekit-plugins-deepgram==1.4.3
+livekit-plugins-groq==1.4.3
+livekit-plugins-openai==1.4.3
+livekit-plugins-silero==1.4.3
+livekit-protocol==1.1.2
+
+# SAR simulator (workspace-SAR-SIM) — NUFFT echo generation.
+# finufft = CPU NUFFT (always usable). cupy + cufinufft = GPU acceleration
+# (n32 is ~2.7x faster on GPU). cupy/cufinufft need a matching CUDA toolkit.
+# IMPORTANT: in code, import cupy BEFORE cufinufft — cupy registers the CUDA DLL
+# directory; otherwise cufinufft fails with "Could not find cufinufft library in
+# system path" (see CLAUDE.md, n32 SPEC). GPU pkgs are optional: n32 falls back
+# to CPU finufft when cufinufft is absent.
+finufft>=2.5.0
+cupy-cuda12x>=14.0.0    # optional (GPU); pick the wheel matching your CUDA
+cufinufft>=2.5.0        # optional (GPU NUFFT); import cupy first
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+httpx>=0.25.0

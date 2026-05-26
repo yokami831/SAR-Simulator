@@ -1,0 +1,51 @@
+{
+  "id": "gui_slider",
+  "label": "Slider",
+  "category": "GUI Controls",
+  "description": "数値パラメータをスライダーで調整する",
+  "parameters": [
+    {
+      "id": "var_name",
+      "label": "Variable Name",
+      "dtype": "string",
+      "default": "param"
+    },
+    {
+      "id": "value",
+      "label": "Value",
+      "dtype": "number",
+      "default": "50"
+    },
+    {
+      "id": "min",
+      "label": "Min",
+      "dtype": "number",
+      "default": "0"
+    },
+    {
+      "id": "max",
+      "label": "Max",
+      "dtype": "number",
+      "default": "100"
+    },
+    {
+      "id": "step",
+      "label": "Step",
+      "dtype": "number",
+      "default": "1"
+    },
+    {
+      "id": "snap_values",
+      "label": "Snap Values (CSV, optional)",
+      "dtype": "string",
+      "default": ""
+    }
+  ],
+  "inputs": [],
+  "outputs": [],
+  "code_template": "",
+  "gui_widget": {
+    "type": "slider",
+    "dtype": "number"
+  }
+}

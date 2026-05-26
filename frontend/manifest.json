@@ -1,0 +1,8 @@
+{
+  "name": "HiyoCanvas",
+  "short_name": "HiyoCanvas",
+  "display": "standalone",
+  "start_url": "/",
+  "background_color": "#1e1e1e",
+  "theme_color": "#1e1e1e"
+}

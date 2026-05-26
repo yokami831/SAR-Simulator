@@ -1,0 +1,17 @@
+{
+  "id": "csv_reader",
+  "label": "CSV Reader",
+  "category": "Data IO",
+  "description": "Read a CSV file into a pandas DataFrame (stored as 'df')",
+  "parameters": [
+    {"id": "filepath", "label": "File Path", "dtype": "string", "default": "data.csv"},
+    {"id": "code", "label": "Code", "dtype": "code", "default": "import pandas as pd\ndf = pd.read_csv('${filepath}')\nprint(f'Loaded {len(df)} rows, {len(df.columns)} columns')\ndf.head()"}
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "${code}"
+}
