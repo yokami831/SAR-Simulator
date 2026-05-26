@@ -5,22 +5,31 @@
 HiyoCanvas: React FlowベースのビジュアルノードエディタをElectron + FastAPIで構築するプロジェクト。
 Jupyter Kernelでフロー実行可能。venv環境で動作し、GNU Radio/Radioconda依存を排除。
 
-**Phase 2.1完了**: エッジ＝実行順序のみ（データパッシング廃止）、ノードUI刷新（タブ廃止、コードtextarea、ポートラベル非表示、ヘッダーリネーム）、リッチ表示（matplotlib画像、pandas HTML表、result_value）。variable/print_valueブロック削除済み。タブごとに独立したAIターミナル（PTY/WebSocket）、パネル表示状態のタブ別保存・復元。
+**現状の主な特徴**: エッジ＝実行順序のみ（データパッシング廃止）、ノードUI（タブ廃止、コードtextarea、ポートラベル非表示、ヘッダーリネーム）、リッチ表示（matplotlib画像、pandas HTML表、result_value）。タブごとに独立したAIターミナル（PTY/WebSocket）、パネル表示状態のタブ別保存・復元。
 
-- **References**: `references/` にアーキテクチャ、タブ別仕様、API、RINA文書。旧仕様は `references/archive/` に保管
+- **References**: `references/` にアーキテクチャ、タブ別仕様、API、RINA 文書（目次は `references/INDEX.md`）
 - **SKILL.md** (`.claude/skills/hiyocanvas/SKILL.md`): AIからキャンバスを操作するための全手順・ルール
 
 ## Git / リポジトリ構成 (IMPORTANT)
 
-**HiyoCanvas-new は独立したgitリポジトリ**（`D:\Claude\HiyoCanvas-new\.git`、リモート: `https://github.com/manahiyo831/HiyoCanvas.git`、ブランチ `main`）。
-親の `D:\Claude\` モノリポとは**別管理**で、モノリポの `.gitignore` は `HiyoCanvas-new/` を除外している。これは「個別プロジェクトに .git を置かない」というモノリポ規約の**例外**。
+**場所**: `d:\kamijo\HiyoCanvas`（ブランチ `main`）。
 
-- **git操作は必ず `D:\Claude\HiyoCanvas-new` 内で行う**（`cd D:\Claude` で見る git status は親モノリポのものなので無関係）。
+**Remote 構成（2026-05-26〜）**:
+
+| Remote | URL | 用途 |
+|--------|-----|------|
+| `origin` | `https://github.com/yokami831/SAR-Simulator.git` | 本プロジェクトの正リポジトリ。push 先はここのみ |
+| `upstream` | `https://github.com/manahiyo831/HiyoCanvas.git` | HiyoCanvas 本家。**fetch 専用**（push URL は `no_push` に差し替え済み、誤 push 防止） |
+
+- 本家 HiyoCanvas のアップデートを取り込む時は `git fetch upstream` → 必要な部分のみ cherry-pick。**`git push upstream` は実行禁止**（URL レベルで失敗するよう設定済み）。
+- ローカルの作業はすべて `d:\kamijo\HiyoCanvas` 内。**他フォルダの git status は無関係**。
 - このリポジトリには複数の作業（`workspace-SAR-SIM/`, `workspace-FPGA-HIL/` など）と一時ファイルが混在する。**コミット方針:**
   1. **関連ファイルだけ `git add` で名指し**（`git add .` / `git add -A` は禁止 — 無関係な別タスクの変更や一時ファイルを巻き込む）
   2. **一時ファイル** (`tmp_*`, `tmp.json`, `ids.txt` 等) と **`logs/`**（レンダラークラッシュ診断ログ）は `.gitignore` 済み。コミットしない
   3. **`tmp/` フォルダ専用**: SKILL ワークフロー (`canvas_api.py update_element` の `code_file` / `add_element` の `@file`) で作る一時ファイルは **必ず `tmp/<name>.{py,json}` に書く**。リポジトリルートに `tmp_*.py` / `tmp_*.json` を散らかさない（旧パターンは非推奨）。`tmp/` は `.gitignore` 済み
-  3. コミット前に `git status --short` で意図したファイルのみがステージされているか確認
+  4. コミット前に `git status --short` で意図したファイルのみがステージされているか確認
+
+**セーフティタグ**: `safety/pre-upstream-merge-2026-05-26` — 本家からの取り込み前の main を固定。万が一に備えてローカル保持。
 
 ## Architecture
 
@@ -92,32 +101,23 @@ backend/
 workspaces/               ← デフォルトのワークスペースフォルダ（変更可能、HOME画面から切替）
 app-config.json           ← アプリ全体設定（lastWorkspacesDir等、プロジェクトルートに固定）
 references/
+  INDEX.md                ← references/ の目次
+  architecture.md         ← 共通アーキテクチャ（プラグインシステム、保存、ショートカット、UI構造）
   api_reference.md        ← 全REST APIエンドポイント一覧
   blocks.md               ← ブロック定義フォーマット仕様
-  common_operations.md    ← クロスタブ共通操作ガイド
-  fft_design_spec.md      ← FFT設計仕様＋HIL実験結果
-  flow_operations.md      ← Flowタブ操作ガイド
-  gui_widget_nodes_spec.md ← GUIウィジェットノード仕様
-  hdl_simulation.md       ← HDLシミュレーションワークフロー
-  mindmap_operations.md   ← MindMapタブ操作ガイド
   rich_display.md         ← リッチHTML/3D表示テンプレート
   troubleshooting.md      ← よくある問題と解決策
-  hiyocanvas-notes-spec.md ← Notesタブ設計仕様
-  hiyocanvas-mermaid-excalidraw-spec.md ← Mermaid/Excalidraw連携仕様
-vite.config.js            ← Vite設定（root=frontend, build→dist/, proxy設定）
-package.json              ← Electron + Vite + React/xyflow/xterm依存
-start.bat                 ← 起動スクリプト（venv activate → Electron起動）
-references/
-  architecture.md         ← 共通アーキテクチャ
+  skill-api.md            ← SKILL / AI操作API
+  rina-voice-agent.md     ← RINA ボイスエージェント
   tab-flow.md             ← Flow タブ仕様
+  tab-flow-fpga.md        ← FPGA/HDL 拡張
   tab-mindmap.md          ← Mindmap タブ仕様
   tab-excalidraw.md       ← Excalidraw タブ仕様
   tab-notes.md            ← Notes タブ仕様
   tab-files.md            ← Files タブ仕様
-  tab-flow-fpga.md        ← FPGA/HDL拡張
-  skill-api.md            ← SKILL / AI操作API
-  rina-voice-agent.md     ← RINA ボイスエージェント
-  archive/                ← 旧仕様書・設計書（レガシー）
+vite.config.js            ← Vite設定（root=frontend, build→dist/, proxy設定）
+package.json              ← Electron + Vite + React/xyflow/xterm依存
+start.bat                 ← 起動スクリプト（venv activate → Electron起動）
 tests/
   test_server.py          ← APIエンドポイントテスト
   test_flow_executor.py   ← フロー実行エンジンテスト
@@ -172,20 +172,8 @@ tests/
 - agent.pyが存在しない場合は自動スキップ
 
 ### リファレンスドキュメント
-- `references/architecture.md` — 共通アーキテクチャ（プラグインシステム、保存、ショートカット、UI構造）
-- `references/tab-flow.md` — Flow タブ仕様
-- `references/tab-mindmap.md` — Mindmap タブ仕様
-- `references/tab-excalidraw.md` — Excalidraw タブ仕様
-- `references/tab-notes.md` — Notes タブ仕様
-- `references/tab-files.md` — Files タブ仕様
-- `references/tab-flow-fpga.md` — Flow FPGA/HDL拡張
-- `references/skill-api.md` — SKILL / AI操作API
-- `references/rina-voice-agent.md` — RINA ボイスエージェント
-- `references/api_reference.md` — REST API詳細リファレンス
-- `references/blocks.md` — ブロック定義フォーマット
-- `references/rich_display.md` — リッチHTML/3D表示テンプレート
-- `references/fft_design_spec.md` — FFT設計仕様＋HIL実験結果
-- `references/troubleshooting.md` — トラブルシューティング
+
+`references/INDEX.md` を参照（リスト本体は上の Architecture セクションに集約）。
 
 ## Terminology
 
@@ -534,18 +522,6 @@ complex AWGN: per-component σ = noise_std_FS / √2
 - **Creating files**: Proceed without asking
 - **Updating existing files**: Proceed without asking
 - **Deleting files**: Ask for approval first
-
-## Implementation Status
-
-| Phase | Status | Description |
-|-------|--------|-------------|
-| Phase 0 | ✅ | RadioCanvasフォーク + GNU Radio除去 |
-| Phase 1 | ✅ | 汎用ノードシステム + ブロック定義 |
-| Phase 1.5 | ✅ | タブ + ワークスペース基盤 |
-| Phase 2 | ✅ | Jupyter Kernel実行エンジン |
-| Phase 3 | ✅ | SKILL.md + CLIスクリプト + リファレンス |
-| Phase 2.1 | ✅ | エッジ簡素化 + ノードUI刷新 + リッチ表示 + タブ別ターミナル |
-| Phase 3.1 | ✅ | API v2 + hiyocanvas-bridge SKILL |
 
 ## HiyoCanvas制御（Claude Codeから）
 
