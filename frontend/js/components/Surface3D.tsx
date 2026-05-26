@@ -41,6 +41,8 @@ interface SubPayload {
   xlabel: string;
   ylabel: string;
   dtype: string;   // "float32"
+  db_vmin?: number;  // dBFS at tv=0 (default -40)
+  db_vmax?: number;  // dBFS at tv=1 (default 0)
   field_b64: string;
 }
 
@@ -88,6 +90,8 @@ function decodeSubPayload(sub: SubPayload): SurfaceData {
     ylabel: sub.ylabel,
     title: sub.title,
     status: sub.status,
+    dbVmin: sub.db_vmin,
+    dbVmax: sub.db_vmax,
     field,
   };
 }
@@ -96,13 +100,25 @@ function decodeSubPayload(sub: SubPayload): SurfaceData {
 // Colorbar SVG (matches _SURF_TEMPLATE exactly)
 // ---------------------------------------------------------------------------
 
-const FLOOR = -40;
 const BAR_H = 120;
 const BAR_W = 12;
 const PAD_TOP = 6;
 const GS = 24; // gradient stops
 
-function ColorBar(): React.ReactElement {
+// Choose a "nice" tick step (e.g. 10, 20, 25) that gives roughly 4–6 labels.
+function niceTickStep(range: number, target: number = 5): number {
+  const raw = range / target;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / pow;
+  let step: number;
+  if (norm < 1.5) step = 1;
+  else if (norm < 3) step = 2;
+  else if (norm < 7) step = 5;
+  else step = 10;
+  return step * pow;
+}
+
+function ColorBar({ dbVmin = -40, dbVmax = 0 }: { dbVmin?: number; dbVmax?: number }): React.ReactElement {
   // Build gradient stops using the same 256-entry LUT as the 3D surface
   const stops: React.ReactElement[] = [];
   for (let i = 0; i <= GS; i++) {
@@ -119,15 +135,18 @@ function ColorBar(): React.ReactElement {
     );
   }
 
-  // dB tick marks at 0, -10, -20, -30, -40
+  // Dynamic dB tick marks across [dbVmin, dbVmax]; tv=0 -> bottom, tv=1 -> top.
+  const range = dbVmax - dbVmin;
+  const step = range > 0 ? niceTickStep(range) : 10;
+  const tickStart = Math.ceil(dbVmin / step) * step;
   const ticks: React.ReactElement[] = [];
-  for (let db = 0; db >= FLOOR; db -= 10) {
-    const frac = db / FLOOR;
-    const y = PAD_TOP + frac * BAR_H;
+  for (let db = tickStart; db <= dbVmax + 1e-6; db += step) {
+    const frac = (db - dbVmin) / range; // 0 at bottom
+    const y = PAD_TOP + (1 - frac) * BAR_H;
     ticks.push(
       <React.Fragment key={db}>
         <line x1={BAR_W} y1={y} x2={BAR_W + 3} y2={y} stroke="#6c7894" strokeWidth={1} />
-        <text x={BAR_W + 6} y={y + 3} fill="#cfd6e6" fontSize={9}>{db}</text>
+        <text x={BAR_W + 6} y={y + 3} fill="#cfd6e6" fontSize={9}>{db >= 0 ? `+${db}` : `${db}`}</text>
       </React.Fragment>
     );
   }
@@ -139,8 +158,8 @@ function ColorBar(): React.ReactElement {
       borderRadius: 6, padding: '5px 7px',
       color: '#cfd6e6', font: '10px/1.2 system-ui,sans-serif', userSelect: 'none',
     }}>
-      <div style={{ marginBottom: 3, color: '#9aa4ba' }}>[dB]</div>
-      <svg width="40" height="136" style={{ display: 'block' }}>
+      <div style={{ marginBottom: 3, color: '#9aa4ba' }}>[dBFS]</div>
+      <svg width="44" height="136" style={{ display: 'block' }}>
         <defs>
           <linearGradient id="inf-bar" x1="0" y1="0" x2="0" y2="1">
             {stops}
@@ -264,7 +283,8 @@ function ExpandModal({ surfaceData, isPair, dataA, dataB, onClose }: ExpandModal
           <div ref={hostRef} className="nodrag nopan" style={{ width: '100%', height: '100%', position: 'relative' }}>
             <canvas className="surface3d-target"
               style={{ width: '100%', height: '100%', display: 'block' }} />
-            <ColorBar />
+            <ColorBar dbVmin={(isPair ? (activeTab === 'b' ? dataB : dataA) : surfaceData)?.dbVmin}
+                      dbVmax={(isPair ? (activeTab === 'b' ? dataB : dataA) : surfaceData)?.dbVmax} />
             {isPair && dataA && dataB && (
               <ToggleButtons active={activeTab} onToggle={handleToggle} />
             )}
@@ -457,8 +477,8 @@ export function Surface3D({ payloadJson }: Surface3DProps): React.ReactElement {
           />
         </div>
 
-        {/* Colorbar (SVG, same design as _SURF_TEMPLATE) */}
-        <ColorBar />
+        {/* Colorbar (SVG, ticks/labels follow the active sub's dBFS range) */}
+        <ColorBar dbVmin={activeData?.dbVmin} dbVmax={activeData?.dbVmax} />
 
         {/* Title overlay */}
         {title && (

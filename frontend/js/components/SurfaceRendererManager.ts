@@ -175,6 +175,9 @@ export interface SurfaceData {
   ylabel: string;
   title: string;
   status: string | null;
+  /** dBFS range that tv=[0,1] maps to (for colorbar labelling). Default -40..0. */
+  dbVmin?: number;
+  dbVmax?: number;
   /** dB-normalised scalar field, row-major, length = nrows * ncols, values in [0, 1] */
   field: Float32Array;
 }
