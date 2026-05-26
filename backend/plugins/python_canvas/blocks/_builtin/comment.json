@@ -2,7 +2,7 @@
   "id": "comment",
   "label": "Comment",
   "category": "Utility",
-  "description": "Text note or comment (not executed). Use for documentation, section labels, and visual annotation on the canvas.",
+  "description": "Text note / annotation. Plain text by default; optionally add a colored border and background to act as a labelled frame around other nodes (set border_width > 0). Double-click to edit text (Enter inserts a newline), right-click → Edit Style for fonts/colors/borders.",
   "parameters": [
     {
       "id": "text",
@@ -35,6 +35,26 @@
       "label": "Background",
       "dtype": "color",
       "default": "transparent"
+    },
+    {
+      "id": "border_color",
+      "label": "Border Color",
+      "dtype": "color",
+      "default": "#5078c8"
+    },
+    {
+      "id": "border_style",
+      "label": "Border Style",
+      "dtype": "enum",
+      "options": ["solid", "dashed", "dotted"],
+      "default": "dashed"
+    },
+    {
+      "id": "border_width",
+      "label": "Border Width",
+      "dtype": "enum",
+      "options": ["0", "1", "2", "3", "4"],
+      "default": "0"
     }
   ],
   "inputs": [],

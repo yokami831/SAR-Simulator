@@ -253,3 +253,122 @@ export function rcAlert(message: string, { title = '' }: { title?: string } = {}
     ],
   });
 }
+
+/**
+ * Style editor modal for decorative nodes (comment, frame).
+ *
+ * Renders a small form of typed fields (color / enum / text) and resolves
+ * with the new values when the user clicks Apply, or null on Cancel.
+ * Kept here (DOM-based) rather than as a React component so it can be
+ * launched from anywhere via a Promise — same ergonomics as rcPrompt.
+ */
+export interface StyleField {
+  id: string;
+  label: string;
+  dtype: 'color' | 'enum' | 'text';
+  default?: string;
+  options?: string[];   // for dtype: 'enum'
+}
+
+export function rcStyleEditor(
+  fields: StyleField[],
+  initial: Record<string, string>,
+  { title = 'Edit Style' }: { title?: string } = {},
+): Promise<Record<string, string> | null> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'rc-modal-overlay';
+    const modal = document.createElement('div');
+    modal.className = 'rc-modal rc-style-editor';
+
+    if (title) {
+      const titleEl = document.createElement('div');
+      titleEl.className = 'rc-modal-title';
+      titleEl.textContent = title;
+      modal.appendChild(titleEl);
+    }
+
+    const inputs: Record<string, HTMLInputElement | HTMLSelectElement> = {};
+    const swatches: Record<string, HTMLInputElement> = {};
+
+    fields.forEach((f) => {
+      const row = document.createElement('div');
+      row.className = 'rc-style-row';
+      const lbl = document.createElement('div');
+      lbl.className = 'rc-style-label';
+      lbl.textContent = f.label;
+      row.appendChild(lbl);
+
+      const value = initial[f.id] !== undefined ? initial[f.id] : (f.default || '');
+
+      if (f.dtype === 'color') {
+        // swatch + text (text accepts rgba/transparent that swatch can't represent)
+        const wrap = document.createElement('div');
+        wrap.className = 'rc-style-color';
+        const sw = document.createElement('input');
+        sw.type = 'color';
+        sw.className = 'rc-style-swatch';
+        sw.value = /^#[0-9a-fA-F]{6}$/.test(value.trim()) ? value.trim() : '#000000';
+        const txt = document.createElement('input');
+        txt.type = 'text';
+        txt.className = 'rc-style-input';
+        txt.value = value;
+        sw.addEventListener('input', () => { txt.value = sw.value; });
+        txt.addEventListener('input', () => {
+          if (/^#[0-9a-fA-F]{6}$/.test(txt.value.trim())) sw.value = txt.value.trim();
+        });
+        wrap.appendChild(sw);
+        wrap.appendChild(txt);
+        row.appendChild(wrap);
+        inputs[f.id] = txt;
+        swatches[f.id] = sw;
+      } else if (f.dtype === 'enum') {
+        const sel = document.createElement('select');
+        sel.className = 'rc-style-input';
+        (f.options || []).forEach((opt) => {
+          const o = document.createElement('option');
+          o.value = opt; o.textContent = opt;
+          if (opt === value) o.selected = true;
+          sel.appendChild(o);
+        });
+        row.appendChild(sel);
+        inputs[f.id] = sel;
+      } else {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'rc-style-input';
+        inp.value = value;
+        row.appendChild(inp);
+        inputs[f.id] = inp;
+      }
+
+      modal.appendChild(row);
+    });
+
+    const cleanup = () => { overlay.remove(); };
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'rc-modal-buttons';
+    const cancel = document.createElement('button');
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', () => { cleanup(); resolve(null); });
+    const apply = document.createElement('button');
+    apply.textContent = 'Apply';
+    apply.className = 'primary';
+    apply.addEventListener('click', () => {
+      const out: Record<string, string> = {};
+      for (const f of fields) out[f.id] = inputs[f.id]?.value ?? '';
+      cleanup();
+      resolve(out);
+    });
+    btnRow.appendChild(cancel);
+    btnRow.appendChild(apply);
+    modal.appendChild(btnRow);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) { cleanup(); resolve(null); }
+    });
+  });
+}

@@ -289,8 +289,18 @@ export function useNodeOperations({
   const resolveOverlaps = useCallback(() => {
     setNodes(currentNodes => {
       const LAYOUT_V_GAP = 30;
+      // Comment nodes are deliberately overlap-friendly: they live behind /
+      // around real blocks (especially when border_width > 0 makes one act
+      // as a frame). Excluding them here means resizing a comment never
+      // displaces the blocks sitting on top of it.
+      const isDecoration = (n: Node) => {
+        const bt = (n.data as { blockType?: string } | undefined)?.blockType;
+        return bt === 'comment';
+      };
       const physicalNodes = currentNodes.filter(n =>
-        !(n.type === 'subgraph' && n.data?.collapsed === false) && !(n as Record<string, unknown>).parentId);
+        !(n.type === 'subgraph' && n.data?.collapsed === false)
+        && !(n as Record<string, unknown>).parentId
+        && !isDecoration(n));
       const columns = new Map();
       for (const n of physicalNodes) {
         const colKey = Math.round(n.position.x / 100) * 100;

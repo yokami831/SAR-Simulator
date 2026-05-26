@@ -25,7 +25,8 @@ import { setNodesRef, setAddBlockCallback, resetNodeIdCounter, fetchBlockData, g
 import { BlockLibrarySidebar } from './components/BlockLibrarySidebar.js';
 import { CanvasNode, ContextMenu, Tooltip, HighlightRing } from './components.js';
 import { SubgraphNode } from './subgraph.js';
-import { rcConfirmSave } from './modal.js';
+import { rcConfirmSave, rcStyleEditor } from './modal.js';
+import type { StyleField } from './modal.js';
 import { BookmarkBar } from './bookmarkBar.js';
 import { BottomTaskbar } from './taskbar.js';
 import './mindmap.js';
@@ -333,6 +334,37 @@ function App() {
   // Alias for backward compatibility (context menu uses deleteNode)
   const deleteNode = deleteNodeShared;
   const clearAll = clearAllShared;
+
+  // Decoration style editor: invoked from ContextMenu's "Edit Style..." for
+  // comment / frame nodes. Reads the node's current defaultParameters,
+  // shows the per-type field set in a modal, and merges the result back.
+  const onEditStyle = useCallback(async (nodeId: string) => {
+    const node = (rfInstance.current?.getNodes() || []).find((n) => n.id === nodeId);
+    if (!node) return;
+    const data = node.data as { blockType?: string; defaultParameters?: Record<string, string> };
+    const bt = data.blockType;
+    const params = data.defaultParameters || {};
+    // Comment is the single decoration node; with border_width > 0 it acts
+    // as a labelled frame. The editor exposes both the text-style and the
+    // border/background fields so users can dial it to either role.
+    if (bt !== 'comment') return;
+    const fields: StyleField[] = [
+      { id: 'font_size', label: 'Font Size', dtype: 'enum', options: ['12', '14', '16', '20', '24', '32', '48'], default: '14' },
+      { id: 'font_weight', label: 'Weight', dtype: 'enum', options: ['normal', 'bold'], default: 'normal' },
+      { id: 'text_color', label: 'Text Color', dtype: 'color', default: '#e0e0e0' },
+      { id: 'bg_color', label: 'Background', dtype: 'color', default: 'transparent' },
+      { id: 'border_color', label: 'Border Color', dtype: 'color', default: '#5078c8' },
+      { id: 'border_style', label: 'Border Style', dtype: 'enum', options: ['solid', 'dashed', 'dotted'], default: 'dashed' },
+      { id: 'border_width', label: 'Border Width', dtype: 'enum', options: ['0', '1', '2', '3', '4'], default: '0' },
+    ];
+    const result = await rcStyleEditor(fields, params, { title: 'Comment Style' });
+    if (!result) return;
+    setNodes((nds) => nds.map((n) => {
+      if (n.id !== nodeId) return n;
+      const d = n.data as { defaultParameters?: Record<string, string> };
+      return { ...n, data: { ...n.data, defaultParameters: { ...(d.defaultParameters || {}), ...result } } };
+    }));
+  }, [setNodes]);
 
   // Guarded destructive operations — blocked during stepping
   const steppingGuard = useCallback((fn: () => void) => {
@@ -763,9 +795,14 @@ function App() {
   const onNodeContextMenu = useCallback((e: React.MouseEvent, node: Node) => {
     e.preventDefault();
     if (wasRightDrag(e)) return;
+    // Pass the *block* type (data.blockType) when it's a wrapped canvasNode.
+    // ContextMenu uses this to decide which items to show (e.g. "Edit Style"
+    // for decoration nodes vs subgraph-specific items). Falls back to the
+    // React Flow type for non-wrapped nodes like 'subgraph'.
+    const effectiveType = (node.data?.blockType as string | undefined) || node.type;
     setContextMenu({
       x: e.clientX, y: e.clientY, nodeId: node.id,
-      nodeType: node.type,
+      nodeType: effectiveType,
       collapsed: node.data?.collapsed as boolean | undefined,
       nodeLabel: node.data?.label as string | undefined,
       nodeDescription: node.data?.description as string | undefined,
@@ -1031,6 +1068,7 @@ function App() {
       onRename: renameSubgraph,
       onSetDescription: setSubgraphDescription,
       onCreateSubgraph: createSubgraph,
+      onEditStyle,
     })
   );
 }

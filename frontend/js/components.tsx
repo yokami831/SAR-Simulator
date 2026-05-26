@@ -740,51 +740,137 @@ function ImageGroup({ images }: { images: DisplayItem[] }) {
 // ===== CanvasNode Component =====
 
 export function CanvasNode(props: { id: string; data: BlockNodeData; selected?: boolean }) {
-  // Decoration: frame is a low-z-index colored rectangle, not a real block.
-  if (props.data?.blockType === 'frame') {
-    return <FrameNode {...props} />;
+  // Decoration: comment is a colored rectangle + multi-line text. With
+  // border_width=0 it's a plain note; with border_width>0 it acts as a
+  // labelled frame around other blocks. Style is edited via right-click →
+  // "Edit Style..." (see ContextMenu).
+  if (props.data?.blockType === 'comment') {
+    return <CommentNode {...props} />;
   }
   return <RegularBlockNode {...props} />;
 }
 
 /**
- * Decorative frame: low-z-index colored rectangle for visually grouping nodes.
- * No ports, no execution, no header — just a resizable backdrop. Children
- * are NOT linked to it (user explicitly chose "frame moves alone"), so any
- * blocks placed on top stay where they are when the frame is dragged.
+ * Decorative text annotation. Renders as plain text by default; optionally
+ * a colored border and background turn it into a labelled frame around
+ * other nodes (set border_width > 0). One block, two use cases:
+ *
+ *   - Plain note: leave border_width=0, bg=transparent → just text.
+ *   - Group frame: set border_width=2 + bg=rgba(...) → text sits inside
+ *     a colored rectangle that other nodes can be placed on top of.
+ *
+ * Editing: double-click anywhere in the node to enter text (Enter inserts
+ * a newline, Esc cancels, click outside saves). Right-click → "Edit Style"
+ * opens the full style editor (fonts, colors, border).
+ *
+ * Behaviour: comment nodes are excluded from resolveOverlaps in
+ * useNodeOperations so resizing one as a frame never displaces the blocks
+ * sitting on top of it.
  */
-function FrameNode({ id, data, selected }: { id: string; data: BlockNodeData; selected?: boolean }) {
+function CommentNode({ id, data, selected }: { id: string; data: BlockNodeData; selected?: boolean }) {
   const params = (data.defaultParameters || {}) as Record<string, string>;
-  const bgColor = params.bg_color || 'rgba(80, 120, 200, 0.08)';
+  const text = params.text || '';
+  const fontSize = params.font_size || '14';
+  const fontWeight = params.font_weight || 'normal';
+  const textColor = params.text_color || '#e0e0e0';
+  const bgColor = params.bg_color || 'transparent';
   const borderColor = params.border_color || '#5078c8';
   const borderStyle = params.border_style || 'dashed';
-  const borderWidth = params.border_width || '2';
+  const borderWidth = params.border_width || '0';
+  const bw = Math.max(0, parseInt(borderWidth, 10) || 0);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => { setDraft(text); }, [text]);
+  useEffect(() => {
+    if (editing && taRef.current) {
+      taRef.current.focus();
+      taRef.current.select();
+    }
+  }, [editing]);
+
+  const commit = useCallback(() => {
+    setEditing(false);
+    if (draft !== text) {
+      const setNodes = getSetNodesRef();
+      if (!setNodes) return;
+      setNodes((nds) => nds.map(n => {
+        if (n.id !== id) return n;
+        const d = n.data as BlockNodeData;
+        return { ...n, data: { ...d, defaultParameters: { ...(d.defaultParameters || {}), text: draft } } };
+      }));
+    }
+  }, [draft, text, id]);
+
+  // Outer wrapper carries the border/background; text sits at the top-left
+  // so it reads as a frame title when a border is present, and as a plain
+  // note when no border is set. wordBreak + pre-wrap honor Enter newlines.
+  const wrapperStyle: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
+    minHeight: 32,
+    position: 'relative',
+    background: bgColor,
+    border: bw > 0 ? `${bw}px ${borderStyle} ${borderColor}` : 'none',
+    borderRadius: 6,
+    boxSizing: 'border-box',
+    outline: selected ? '1px dashed #888' : 'none',
+  };
+
+  const textStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: 4,
+    left: 8,
+    right: 8,
+    maxHeight: 'calc(100% - 8px)',
+    fontSize: `${fontSize}px`,
+    fontWeight,
+    color: textColor,
+    fontFamily: 'system-ui, sans-serif',
+    padding: '2px 4px',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+    overflow: 'hidden',
+    lineHeight: 1.3,
+    pointerEvents: 'auto',
+  };
 
   return (
     <div
-      className="grc-frame"
+      className="grc-comment"
       data-role="canvas-node"
       data-node-id={id}
-      data-block-type="frame"
-      style={{
-        background: bgColor,
-        border: `${borderWidth}px ${borderStyle} ${borderColor}`,
-        borderRadius: 6,
-        width: '100%',
-        height: '100%',
-        boxSizing: 'border-box',
-        position: 'relative',
-      }}
+      data-block-type="comment"
+      onDoubleClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      title={editing ? '' : 'Double-click to edit (Enter for newline), right-click for style'}
+      style={wrapperStyle}
     >
-      <NodeResizer
-        minWidth={80}
-        minHeight={60}
-        isVisible={selected}
-        color={NODE_RESIZER_COLOR}
-      />
+      <NodeResizer minWidth={60} minHeight={24} isVisible={selected} color={NODE_RESIZER_COLOR} />
+      {editing ? (
+        <textarea
+          ref={taRef}
+          className="grc-comment-edit nodrag nopan nowheel"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Escape') { setDraft(text); setEditing(false); }
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          spellCheck={false}
+          style={{ ...textStyle, background: 'rgba(0,0,0,0.4)', border: '1px solid #888', resize: 'none', outline: 'none' }}
+        />
+      ) : text ? (
+        <div style={textStyle}>{text}</div>
+      ) : (
+        <div style={{ ...textStyle, opacity: 0.4 }}>(double-click to edit)</div>
+      )}
     </div>
   );
 }
+
 
 function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeData; selected?: boolean }) {
   const { label, category, inputs: rawInputs, outputs: rawOutputs, defaultParameters, blockType } = data;
@@ -917,29 +1003,16 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
   }, [id]);
 
   const blockTypeStr = blockType || '';
-  // Documentation-only blocks (comment, group_spec): no execution → hide
-  // enable checkbox + run button.
-  const isNonExecutable = blockTypeStr === 'comment' || blockTypeStr === 'group_spec';
-  // Comment nodes carry decorative styling (bg/text color, font size/weight)
-  // that overrides the default block chrome so they can serve as Simulink-
-  // style annotations. We read the params here and apply both to the outer
-  // block container and to the code textarea.
-  const isComment = blockTypeStr === 'comment';
-  const commentBg = isComment ? (currentParams.bg_color || 'transparent') : undefined;
-  const commentTextColor = isComment ? (currentParams.text_color || '#e0e0e0') : undefined;
-  const commentFontSize = isComment ? (currentParams.font_size || '14') : undefined;
-  const commentFontWeight = isComment ? (currentParams.font_weight || 'normal') : undefined;
-  const blockStyle: React.CSSProperties | undefined = isComment
-    ? { background: commentBg, color: commentTextColor }
-    : undefined;
+  // Documentation-only blocks (group_spec): no execution → hide enable
+  // checkbox + run button. (comment now has its own renderer above.)
+  const isNonExecutable = blockTypeStr === 'group_spec';
 
   return (
     <div
-      className={`grc-block ${category || ''}${!isEnabled ? ' disabled' : ''}${executionStatus ? ` exec-${executionStatus}` : ''}${isShim ? ' shim' : ''}${isComment ? ' comment-styled' : ''}`}
+      className={`grc-block ${category || ''}${!isEnabled ? ' disabled' : ''}${executionStatus ? ` exec-${executionStatus}` : ''}${isShim ? ' shim' : ''}`}
       data-role="canvas-node"
       data-node-id={id}
       data-block-type={blockTypeStr}
-      style={blockStyle}
       title={isShim ? `Missing block definition: ${blockType}. Copy ${blockType}.json into <workspace>/blocks/ and reload.` : undefined}
     >
       <NodeResizer minWidth={NODE_MIN_WIDTH} minHeight={NODE_COMPACT_HEIGHT} isVisible={selected} color={NODE_RESIZER_COLOR} />
@@ -1130,7 +1203,7 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
             />
           ) : (
             <textarea
-              className={`grc-code-area nodrag nopan nowheel${isComment ? ' grc-comment-text' : ''}`}
+              className="grc-code-area nodrag nopan nowheel"
               value={currentParams[codeParam.id] !== undefined ? currentParams[codeParam.id] : (codeParam.default || '')}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onParamChange(codeParam.id, e.target.value)}
               onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
@@ -1138,14 +1211,6 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
               spellCheck={false}
               data-role="param-input"
               data-param-id={codeParam.id}
-              style={isComment ? {
-                color: commentTextColor,
-                background: 'transparent',
-                fontSize: `${commentFontSize}px`,
-                fontWeight: commentFontWeight,
-                fontFamily: 'system-ui, sans-serif',
-                border: 'none',
-              } : undefined}
             />
           )
         )}
@@ -1166,7 +1231,7 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
 
 /** Right-click context menu for nodes with delete option */
 export function ContextMenu({ x, y, nodeId, edgeId, selectionCount, onClose, onDelete, onDeleteEdge,
-  nodeType, collapsed, nodeLabel, nodeDescription, onToggleCollapse, onUngroup, onRename, onSetDescription, onCreateSubgraph }: {
+  nodeType, collapsed, nodeLabel, nodeDescription, onToggleCollapse, onUngroup, onRename, onSetDescription, onCreateSubgraph, onEditStyle }: {
   x: number;
   y: number;
   nodeId?: string;
@@ -1184,6 +1249,7 @@ export function ContextMenu({ x, y, nodeId, edgeId, selectionCount, onClose, onD
   onRename?: (nodeId: string, name: string) => void;
   onSetDescription?: (nodeId: string, desc: string) => void;
   onCreateSubgraph?: (nodeIds: string[], name: string) => void;
+  onEditStyle?: (nodeId: string) => void;
 }) {
   useEffect(() => {
     const handler = () => onClose();
@@ -1231,6 +1297,13 @@ export function ContextMenu({ x, y, nodeId, edgeId, selectionCount, onClose, onD
         </button>
       )}
       {nodeId && isSubgraph && <div className="menu-sep" />}
+
+      {/* Decoration: style editor for comment / frame */}
+      {nodeId && (nodeType === 'comment' || nodeType === 'frame') && (
+        <button onClick={() => { onEditStyle?.(nodeId); onClose(); }}>
+          Edit Style…
+        </button>
+      )}
 
       {/* Common items */}
       {nodeId && (

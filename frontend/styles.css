@@ -485,6 +485,29 @@ button, a, [role="button"] { cursor: pointer; }
 .rc-modal-buttons button.danger {
   background: var(--modal-danger-bg); border-color: var(--modal-danger-border); color: var(--text-white);
 }
+
+/* Style editor modal (decorative node settings) */
+.rc-style-editor { min-width: 360px; }
+.rc-style-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.rc-style-label {
+  width: 110px; font-size: 12px; color: var(--text-label); flex-shrink: 0;
+}
+.rc-style-input {
+  flex: 1; padding: 6px 8px;
+  background: var(--bg-secondary); border: 1px solid var(--border-light);
+  border-radius: 4px; color: var(--text-primary); font-size: 13px;
+  outline: none; margin: 0;
+}
+.rc-style-input:focus { border-color: var(--modal-input-focus); }
+.rc-style-color {
+  display: flex; gap: 6px; flex: 1; align-items: center;
+}
+.rc-style-swatch {
+  width: 32px; height: 28px; padding: 0; border: 1px solid var(--border-light);
+  border-radius: 4px; background: transparent; cursor: pointer; flex-shrink: 0;
+}
 .rc-modal-buttons button.danger:hover { background: var(--modal-danger-hover); }
 
 /* ===== Flow Canvas ===== */
@@ -550,14 +573,13 @@ button, a, [role="button"] { cursor: pointer; }
   position: absolute !important;
 }
 
-/* Frame: decorative rectangle that sits behind other nodes.
-   React Flow honors per-node zIndex on the outer wrapper, but we also force
-   pointer-events on the inner div so the frame stays grabbable/resizable
-   even when other nodes overlap it. */
-.react-flow__node[data-block-type="frame"] {
+/* Decoration: comment nodes (with or without border) sit behind regular
+   blocks. React Flow honors per-node zIndex on the outer wrapper, so any
+   node placed on top of a comment-as-frame stays visible and interactive. */
+.react-flow__node[data-block-type="comment"] {
   z-index: -1 !important;
 }
-.grc-frame {
+.grc-comment {
   pointer-events: all;
 }
 
