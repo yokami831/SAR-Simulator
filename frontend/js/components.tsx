@@ -385,8 +385,127 @@ function GuiWidgetBody({ guiWidget, params, onParamChange, paramDefs }: {
     case 'file_picker': return <GuiFilePicker params={params} onParamChange={onParamChange} />;
     case 'sar_visualizer':
       return <SarVisualizer params={params} paramDefs={paramDefs ?? []} onParamChange={onParamChange} />;
+    case 'form':
+      return <GuiFormBody fields={paramDefs ?? []} params={params} onParamChange={onParamChange} />;
     default: return <div>Unknown widget: {guiWidget.type}</div>;
   }
+}
+
+// ===== Composite GUI form (gui_form) =====
+//
+// A gui_form block holds many widget fields in a single block. Each entry in
+// blockDef.parameters has the same shape as a regular widget block's params,
+// plus:
+//   - widget:       "slider"|"dropdown"|"toggle"|"file_picker"|"text_input"
+//   - var_name:     kernel variable to assign
+//   - visible_when: optional condition (see _evalVisibleWhen below)
+//
+// The on-canvas value of each field is stored under params[field.id] (same
+// pattern as ordinary blocks). visible_when is a tiny "field == 'literal'"
+// grammar mirrored in backend/code_utils.py:_eval_visible_when so the
+// frontend hides what the backend skips.
+
+/** Evaluate a simple visible_when expression. Mirrors backend logic. */
+function _evalVisibleWhen(expr: string | undefined, values: Record<string, string>): boolean {
+  if (!expr) return true;
+  const s = expr.trim();
+  for (const op of ['==', '!=']) {
+    const idx = s.indexOf(op);
+    if (idx >= 0) {
+      const left = s.slice(0, idx).trim();
+      let right = s.slice(idx + op.length).trim();
+      if (right.length >= 2 && (right.startsWith("'") || right.startsWith('"')) && right[0] === right[right.length - 1]) {
+        right = right.slice(1, -1);
+      }
+      const actual = String(values[left] ?? '');
+      return op === '==' ? actual === right : actual !== right;
+    }
+  }
+  return true; // unknown grammar -> fail-open
+}
+
+interface FormFieldDef {
+  id: string;
+  label?: string;
+  widget?: string;            // slider/dropdown/toggle/file_picker/text_input
+  var_name?: string;
+  visible_when?: string;
+  default?: string;
+  dtype?: string;
+  hidden?: boolean;
+  // widget-specific keys (forwarded as params to the child widget)
+  min?: string; max?: string; step?: string;
+  options_csv?: string; snap_values?: string;
+  label_on?: string; label_off?: string;
+  accept?: string; placeholder?: string;
+}
+
+/** Render a gui_form: stacked widgets, each tied to one field id. */
+function GuiFormBody({ fields, params, onParamChange }: {
+  fields: SarParamDef[];   // accepts the broader param-def type used elsewhere
+  params: Record<string, string>;
+  onParamChange: (id: string, val: string) => void;
+}) {
+  // Build a values map for visible_when evaluation. Includes both field-id
+  // and var_name keys so authors can reference either form in expressions.
+  const currentValues: Record<string, string> = {};
+  for (const f of fields) {
+    const id = (f as FormFieldDef).id;
+    const def = (f as FormFieldDef).default;
+    currentValues[id] = params[id] !== undefined ? params[id] : (def ?? '');
+  }
+  for (const f of fields) {
+    const v = (f as FormFieldDef).var_name;
+    if (v && currentValues[v] === undefined) {
+      currentValues[v] = currentValues[(f as FormFieldDef).id] ?? '';
+    }
+  }
+
+  return (
+    <div className="gui-form-body nodrag nopan nowheel">
+      {fields.map((rawField) => {
+        const field = rawField as unknown as FormFieldDef;
+        if (field.hidden) return null;
+        if (!_evalVisibleWhen(field.visible_when, currentValues)) return null;
+        const widget = field.widget || 'text_input';
+
+        // Per-field params: child widget reads { value, var_name, ... } as if
+        // it were a standalone widget. We materialize defaults so a freshly
+        // dropped block shows useful initial widget state.
+        const fieldParams: Record<string, string> = {
+          value: currentValues[field.id] ?? '',
+          var_name: field.var_name ?? '',
+          min: field.min ?? '', max: field.max ?? '', step: field.step ?? '',
+          options_csv: field.options_csv ?? '',
+          snap_values: field.snap_values ?? '',
+          label_on: field.label_on ?? '', label_off: field.label_off ?? '',
+          accept: field.accept ?? '', placeholder: field.placeholder ?? '',
+        };
+        // Adapter: child widget writes onParamChange('value', v) → we route
+        // that to the field id so per-field values stay distinct in params.
+        const onChildChange = (key: string, val: string) => {
+          if (key === 'value') onParamChange(field.id, val);
+        };
+
+        let inner: React.ReactNode;
+        switch (widget) {
+          case 'slider':      inner = <GuiSlider     params={fieldParams} onParamChange={onChildChange} />; break;
+          case 'dropdown':    inner = <GuiDropdown   params={fieldParams} onParamChange={onChildChange} />; break;
+          case 'toggle':      inner = <GuiToggle     params={fieldParams} onParamChange={onChildChange} />; break;
+          case 'file_picker': inner = <GuiFilePicker params={fieldParams} onParamChange={onChildChange} />; break;
+          case 'text_input':  inner = <GuiTextInput  params={fieldParams} onParamChange={onChildChange} />; break;
+          default: inner = <div>Unknown widget: {widget}</div>;
+        }
+
+        return (
+          <div key={field.id} className="gui-form-field">
+            {field.label && <div className="gui-form-field-label">{field.label}</div>}
+            {inner}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // ===== Image Display Components =====

@@ -1792,6 +1792,30 @@ select.grc-param-input { cursor: pointer; }
   padding: 8px 10px;
 }
 
+/* Composite gui_form: stack of fields, each with its own label */
+.gui-form-body {
+  padding: 6px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gui-form-field {
+  display: flex;
+  flex-direction: column;
+}
+.gui-form-field-label {
+  font-size: 11px;
+  color: #a0a8b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+  padding: 0 2px;
+}
+.gui-form-field .gui-widget-body {
+  padding: 2px 0;
+}
+
 .gui-widget-var-row {
   display: flex;
   align-items: center;

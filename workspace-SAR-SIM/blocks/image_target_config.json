@@ -1,0 +1,116 @@
+{
+  "id": "image_target_config",
+  "label": "Target Config",
+  "category": "Source",
+  "description": "All target/scene parameters for the SAR simulator in one block. Selecting target_mode swaps point-target options (n_targets) and image-target options (image_path / invert_image / range_scale). Common settings (view_scale, noise, clutter) are always shown. Each field assigns one kernel variable at flow run time.",
+  "gui_widget": {
+    "type": "form",
+    "dtype": "gui_form"
+  },
+  "parameters": [
+    {
+      "id": "target_mode",
+      "label": "Target Mode",
+      "widget": "dropdown",
+      "var_name": "target_mode",
+      "dtype": "select",
+      "options_csv": "point,image",
+      "default": "point"
+    },
+    {
+      "id": "n_targets",
+      "label": "Targets (count)",
+      "widget": "slider",
+      "var_name": "n_targets",
+      "dtype": "number",
+      "min": "1",
+      "max": "10",
+      "step": "1",
+      "default": "1",
+      "visible_when": "target_mode == 'point'"
+    },
+    {
+      "id": "image_path",
+      "label": "Image File",
+      "widget": "file_picker",
+      "var_name": "image_path",
+      "dtype": "filepath",
+      "accept": "png,jpg,jpeg,bmp",
+      "default": "",
+      "visible_when": "target_mode == 'image'"
+    },
+    {
+      "id": "invert_image",
+      "label": "Invert B/W",
+      "widget": "toggle",
+      "var_name": "invert_image",
+      "dtype": "boolean",
+      "label_on": "invert ON",
+      "label_off": "invert OFF",
+      "default": "false",
+      "visible_when": "target_mode == 'image'"
+    },
+    {
+      "id": "range_scale",
+      "label": "Range scale (image)",
+      "widget": "slider",
+      "var_name": "range_scale",
+      "dtype": "number",
+      "min": "1",
+      "max": "10",
+      "step": "0.5",
+      "default": "3",
+      "visible_when": "target_mode == 'image'"
+    },
+    {
+      "id": "view_scale",
+      "label": "Crop Area (m)",
+      "widget": "dropdown",
+      "var_name": "view_scale",
+      "dtype": "select",
+      "options_csv": "5,10,20,40,100,200,500",
+      "default": "40"
+    },
+    {
+      "id": "noise_level_db",
+      "label": "Noise level (dB)",
+      "widget": "slider",
+      "var_name": "noise_level_db",
+      "dtype": "number",
+      "min": "-60",
+      "max": "30",
+      "step": "1",
+      "default": "-60"
+    },
+    {
+      "id": "clutter_n",
+      "label": "Clutter N",
+      "widget": "slider",
+      "var_name": "clutter_n",
+      "dtype": "number",
+      "min": "0",
+      "max": "400",
+      "step": "10",
+      "default": "0"
+    },
+    {
+      "id": "clutter_rcs_db",
+      "label": "Clutter level (dB)",
+      "widget": "slider",
+      "var_name": "clutter_rcs_db",
+      "dtype": "number",
+      "min": "-40",
+      "max": "0",
+      "step": "1",
+      "default": "-20"
+    }
+  ],
+  "inputs": [
+    {"id": "in_0", "label": "", "dtype": "any"}
+  ],
+  "outputs": [
+    {"id": "out_0", "label": "", "dtype": "any"}
+  ],
+  "code_template": "",
+  "default_width": 320
+}

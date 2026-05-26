@@ -22,6 +22,13 @@ def build_node_code(node: dict) -> str:
         # variable name) and "scale" (numeric multiplier, "deg2rad", or "str").
         if widget_dtype == "sar_params":
             return make_sar_params_code(block_def, params)
+        # gui_form: a single block containing multiple widget fields (slider,
+        # dropdown, toggle, file_picker, ...). Each field carries its own
+        # var_name; visibility-gated fields (visible_when) are skipped when
+        # their condition evaluates false. See make_gui_form_code() for the
+        # full contract and the visible_when expression syntax.
+        if widget_dtype == "gui_form":
+            return make_gui_form_code(block_def, params)
         var_name = params.get("var_name", "")
         if not var_name or not var_name.isidentifier():
             return ""
@@ -109,6 +116,84 @@ def make_sar_params_code(block_def: dict, params: dict) -> str:
     if template:
         code = code + "\n\n" + template
     return code
+
+
+def _eval_visible_when(expr: str, values: dict) -> bool:
+    """Evaluate a simple visible_when expression against current field values.
+
+    Supported forms (whitespace-tolerant, no parentheses, no boolean operators):
+      - "var == 'literal'"
+      - "var != 'literal'"
+      - "var == \"literal\""
+      - Always-true if expr is empty/None.
+
+    Anything outside this grammar evaluates to True (fail-open: show the
+    field) and logs nothing — by design the language is intentionally tiny.
+    Use multiple visible_when expressions across separate fields rather than
+    one big boolean clause.
+    """
+    if not expr:
+        return True
+    s = expr.strip()
+    # find operator
+    for op in ("==", "!="):
+        if op in s:
+            left, right = s.split(op, 1)
+            left = left.strip()
+            right = right.strip()
+            # strip surrounding quotes from right-hand side
+            if len(right) >= 2 and right[0] == right[-1] and right[0] in ("'", '"'):
+                right = right[1:-1]
+            actual = str(values.get(left, ""))
+            if op == "==":
+                return actual == right
+            return actual != right
+    return True
+
+
+def make_gui_form_code(block_def: dict, params: dict) -> str:
+    """Generate kernel variable assignments for a gui_form node.
+
+    Each entry in block_def["parameters"] describes one widget field:
+      - widget: "slider"|"dropdown"|"toggle"|"file_picker"|"text_input"
+      - var_name: kernel variable to assign (skipped if not an identifier)
+      - dtype: same vocabulary as gui_widget.dtype ("number"/"select"/
+        "boolean"/"filepath"/"string"); defaults to "string"
+      - visible_when: optional expression; field is *skipped* when false
+        (its var_name is NOT assigned in the kernel — so downstream code
+        seeing NameError is the correct behavior, matching the
+        no-silent-fallbacks rule in CLAUDE.md)
+
+    The current value comes from `params[field_id]` (the node's saved
+    defaultParameters), falling back to the field's "default".
+    """
+    lines: list[str] = []
+    # First, build a map of current values for visible_when evaluation
+    current: dict = {}
+    for field in block_def.get("parameters", []):
+        fid = field.get("id")
+        if not fid:
+            continue
+        current[fid] = params.get(fid, field.get("default", ""))
+    # Also expose var_name keys so visible_when can reference either id or var_name
+    for field in block_def.get("parameters", []):
+        var = field.get("var_name")
+        if var and var not in current:
+            current[var] = current.get(field.get("id", ""), "")
+
+    for field in block_def.get("parameters", []):
+        if field.get("hidden"):
+            continue
+        if not _eval_visible_when(field.get("visible_when", ""), current):
+            continue
+        var = field.get("var_name", "")
+        if not var or not str(var).isidentifier():
+            continue
+        fid = field.get("id", "")
+        value = params.get(fid, field.get("default", ""))
+        dtype = field.get("dtype", "string")
+        lines.append(make_gui_assignment_code(var, value, dtype))
+    return "\n".join(lines)
 
 
 def make_gui_assignment_code(var_name: str, value, dtype: str) -> str:

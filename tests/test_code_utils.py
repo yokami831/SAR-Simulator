@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 from backend import block_registry
-from backend.code_utils import make_gui_assignment_code, build_node_code
+from backend.code_utils import (
+    make_gui_assignment_code,
+    build_node_code,
+    make_gui_form_code,
+    _eval_visible_when,
+)
 
 # Ensure blocks are loaded for build_node_code tests
 _blocks_dir = Path(__file__).parent.parent / "backend" / "plugins" / "python_canvas" / "blocks"
@@ -128,3 +133,98 @@ class TestBuildNodeCode:
             assert "print(x)" in code
         finally:
             block_registry._cache.pop("_test_sub", None)
+
+
+class TestEvalVisibleWhen:
+    def test_empty_expression_is_true(self):
+        assert _eval_visible_when("", {}) is True
+        assert _eval_visible_when(None, {}) is True
+
+    def test_eq_match(self):
+        assert _eval_visible_when("mode == \"point\"", {"mode": "point"}) is True
+
+    def test_eq_single_quotes(self):
+        assert _eval_visible_when("mode == 'image'", {"mode": "image"}) is True
+
+    def test_eq_no_match(self):
+        assert _eval_visible_when("mode == \"point\"", {"mode": "image"}) is False
+
+    def test_ne_match(self):
+        assert _eval_visible_when("mode != \"point\"", {"mode": "image"}) is True
+
+    def test_ne_no_match(self):
+        assert _eval_visible_when("mode != \"point\"", {"mode": "point"}) is False
+
+    def test_missing_var_eq_empty(self):
+        # absent var compares as empty string
+        assert _eval_visible_when("mode == \"\"", {}) is True
+
+    def test_unknown_grammar_fails_open(self):
+        # No operator -> True (show field)
+        assert _eval_visible_when("weird", {"mode": "x"}) is True
+
+
+class TestMakeGuiFormCode:
+    def _make_def(self, fields):
+        return {
+            "id": "test_form",
+            "label": "Test Form",
+            "gui_widget": {"type": "form", "dtype": "gui_form"},
+            "parameters": fields,
+        }
+
+    def test_simple_assignment(self):
+        bd = self._make_def([
+            {"id": "x", "widget": "slider", "var_name": "x", "dtype": "number", "default": "5"},
+        ])
+        code = make_gui_form_code(bd, {"x": "7"})
+        assert code == "x = 7.0"
+
+    def test_uses_default_when_missing(self):
+        bd = self._make_def([
+            {"id": "y", "widget": "slider", "var_name": "y", "dtype": "number", "default": "3"},
+        ])
+        assert make_gui_form_code(bd, {}) == "y = 3.0"
+
+    def test_visible_when_false_skips_field(self):
+        bd = self._make_def([
+            {"id": "mode", "widget": "dropdown", "var_name": "mode", "dtype": "select", "default": "point"},
+            {"id": "img", "widget": "file_picker", "var_name": "image_path", "dtype": "filepath", "default": "",
+             "visible_when": "mode == 'image'"},
+        ])
+        code = make_gui_form_code(bd, {"mode": "point"})
+        assert "mode" in code
+        assert "image_path" not in code  # hidden, no assignment
+
+    def test_visible_when_true_includes_field(self):
+        bd = self._make_def([
+            {"id": "mode", "widget": "dropdown", "var_name": "mode", "dtype": "select", "default": "image"},
+            {"id": "img", "widget": "file_picker", "var_name": "image_path", "dtype": "filepath", "default": "/tmp/x.png",
+             "visible_when": "mode == 'image'"},
+        ])
+        code = make_gui_form_code(bd, {"mode": "image", "img": "/tmp/x.png"})
+        assert "mode" in code
+        assert "image_path" in code
+
+    def test_hidden_skips_field(self):
+        bd = self._make_def([
+            {"id": "secret", "var_name": "secret", "dtype": "string", "default": "x", "hidden": True},
+        ])
+        assert make_gui_form_code(bd, {}) == ""
+
+    def test_invalid_var_name_skipped(self):
+        bd = self._make_def([
+            {"id": "bad", "var_name": "not a valid identifier", "dtype": "string", "default": "x"},
+        ])
+        assert make_gui_form_code(bd, {}) == ""
+
+    def test_visible_when_can_reference_var_name(self):
+        # Some authors will use var_name in expressions instead of field id
+        bd = self._make_def([
+            {"id": "mode", "widget": "dropdown", "var_name": "target_mode", "dtype": "select", "default": "point"},
+            {"id": "img", "widget": "file_picker", "var_name": "image_path", "dtype": "filepath", "default": "",
+             "visible_when": "target_mode == 'image'"},
+        ])
+        assert "image_path" not in make_gui_form_code(bd, {"mode": "point"})
+        assert "image_path" in make_gui_form_code(bd, {"mode": "image", "img": "/tmp/x"})
+
