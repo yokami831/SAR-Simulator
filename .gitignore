@@ -57,6 +57,11 @@ tmp_*.py
 tmp_*.json
 tmp_*.png
 
+# Scratch folder for SKILL workflow (canvas_api.py code_file / @file payloads)
+# All temp files generated when updating nodes go here so they don't pollute the repo root.
+tmp/
+!tmp/.gitkeep
+
 # Renderer crash diagnostics (local-only runtime logs, written by src/main.js)
 logs/
 

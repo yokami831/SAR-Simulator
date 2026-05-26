@@ -19,6 +19,7 @@ Jupyter Kernelでフロー実行可能。venv環境で動作し、GNU Radio/Radi
 - このリポジトリには複数の作業（`workspace-SAR-SIM/`, `workspace-FPGA-HIL/` など）と一時ファイルが混在する。**コミット方針:**
   1. **関連ファイルだけ `git add` で名指し**（`git add .` / `git add -A` は禁止 — 無関係な別タスクの変更や一時ファイルを巻き込む）
   2. **一時ファイル** (`tmp_*`, `tmp.json`, `ids.txt` 等) と **`logs/`**（レンダラークラッシュ診断ログ）は `.gitignore` 済み。コミットしない
+  3. **`tmp/` フォルダ専用**: SKILL ワークフロー (`canvas_api.py update_element` の `code_file` / `add_element` の `@file`) で作る一時ファイルは **必ず `tmp/<name>.{py,json}` に書く**。リポジトリルートに `tmp_*.py` / `tmp_*.json` を散らかさない（旧パターンは非推奨）。`tmp/` は `.gitignore` 済み
   3. コミット前に `git status --short` で意図したファイルのみがステージされているか確認
 
 ## Architecture

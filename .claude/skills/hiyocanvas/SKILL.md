@@ -72,8 +72,17 @@ API <operation>                                    # No parameters
 **`@file` pattern** — use when JSON exceeds 100KB **OR contains non-ASCII text (Japanese, etc.)**. Write JSON to a temp file (UTF-8), then pass with single-quoted `'@file'`:
 
 ```powershell
-API tab_action '@tmp_scene.json'
+API tab_action '@tmp/scene.json'
 ```
+
+> 📁 **CRITICAL — all temp files MUST go in the `tmp/` directory.**
+> When using `code_file` or `@file` patterns, write to `tmp/<name>.{py,json}` rather
+> than repo-root `tmp_<name>.{py,json}`. The `tmp/` folder is git-ignored
+> (with `.gitkeep`) and isolates scratch files so they don't accumulate in the
+> project root over multiple sessions. After a successful `update_element` /
+> `add_element` you may delete the file; otherwise leave it for re-runs but
+> always inside `tmp/`. **Never** scatter `tmp_*.py` / `tmp_*.json` in the repo
+> root — that pattern is deprecated and pollutes the workspace.
 
 > ⚠️ **CRITICAL — Japanese / non-ASCII via PowerShell stdin corrupts data.**
 > Piping a JSON string with Japanese through PowerShell stdin
@@ -161,11 +170,12 @@ API get_execution_status                             # Check execution result
 5. **Verify after run** — Check `get_execution_status` → `get_execution_result` → `get_console_logs`.
 6. **Edges = execution order only** — Variables are shared via Jupyter kernel namespace. Use `print()` to show output on nodes.
 7. **Use node names, not IDs** — When reporting to the user, say "Data Loader (n100)" not "Node n100".
-8. **Use `code_file` when code exceeds 20 lines or contains SVG/HTML** — Write code to a temp file and use `code_file`:
+8. **Use `code_file` when code exceeds 20 lines or contains SVG/HTML** — Write code to `tmp/<name>.py` and use `code_file`:
     ```powershell
-    # Write code to file (use Write tool), then:
-    '{"node_id":"n1","code_file":"tmp_code.py"}' | API update_element
+    # Write code to file (use Write tool, ALWAYS under tmp/), then:
+    '{"node_id":"n1","code_file":"tmp/code.py"}' | API update_element
     ```
+    **Do NOT** create `tmp_*.py` in the repo root — use the `tmp/` folder (see warning in Command Format section above).
 9. **`@file` for JSON over 100KB OR containing non-ASCII (Japanese)** — Write JSON to a UTF-8 temp file and pass with `'@file'` (single quotes required). ASCII-only JSON under 100KB uses stdin pipe. PowerShell stdin corrupts Japanese into `?` — see the ⚠️ note in Command Format.
 10. **Canvas coordinate system** — Origin (0,0) top-left. X→right, Y→down. Typical spacing: 250-300px horizontal, 150-200px vertical.
 11. **auto_layout vs fit_all** — `auto_layout` repositions nodes. `fit_all` only moves the camera.
