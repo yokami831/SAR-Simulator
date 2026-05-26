@@ -209,6 +209,7 @@ interface SurfaceEntry {
   // or teardown. R/C are parsed back from the key.
   indexKey: string | null;
   tickSprites: import('three').Sprite[];
+  grid: import('three').GridHelper | null;
   scene: import('three').Scene | null;
   camera: import('three').PerspectiveCamera | null;
   // Interaction state (spherical camera)
@@ -272,6 +273,7 @@ export class SurfaceRendererManager {
       mesh: null,
       indexKey: null,
       tickSprites: [],
+      grid: null,
       scene: null,
       camera: null,
       sph: { r: 3.4, theta: Math.PI * 0.25, phi: Math.PI * 0.34 },
@@ -363,10 +365,12 @@ export class SurfaceRendererManager {
     const camera = new T.PerspectiveCamera(50, W / H, 0.01, 100);
     entry.target = new T.Vector3(0, entry.data.H * 0.3, 0);
 
-    // Grid
+    // Grid — kept as a reference at unit size; _rebuildMesh applies the data
+    // aspect (sx, sz) so 1 m in range == 1 m in azimuth on screen.
     const grid = new T.GridHelper(2, 16, 0x1c2230, 0x12161f);
     grid.position.y = -0.001;
     scene.add(grid);
+    entry.grid = grid;
 
     entry.scene = scene;
     entry.camera = camera;
@@ -438,27 +442,44 @@ export class SurfaceRendererManager {
       fragmentShader: SURF_FRAG,
     });
 
+    // Data-aspect scale so 1 m in range == 1 m in azimuth on screen. The mesh
+    // is generated in [-1, 1] × [-1, 1] in object space (vertex shader); we
+    // shrink the shorter axis here. Largest extent stays = 1, so the camera
+    // framing is unchanged.
+    const dx = Math.abs(d.xr[1] - d.xr[0]);
+    const dy = Math.abs(d.yr[1] - d.yr[0]);
+    const mScale = Math.max(dx, dy, 1e-9);
+    const sx = dx / mScale;
+    const sz = dy / mScale;
+
     entry.mesh = new T.Mesh(geom, mat);
+    entry.mesh.scale.set(sx, 1, sz);
     // No position attribute => three cannot compute a bounding sphere, so
     // frustum culling would have no bounds and could drop the mesh. The surface
-    // always lives in the ±1 box around the origin, so disable culling.
+    // always lives in the scaled ±(sx, sz) box around the origin, so disable culling.
     entry.mesh.frustumCulled = false;
     entry.scene.add(entry.mesh);
 
-    // Axis tick sprites (same positions as _SURF_TEMPLATE)
+    // Scale the grid to match data aspect (cells become non-square when dx != dy).
+    if (entry.grid) entry.grid.scale.set(sx, 1, sz);
+
+    // Axis tick sprites — positions tracked the (sx, sz) scale of the mesh.
+    // Labels sit at a fixed margin outside the mesh edge regardless of aspect.
     const NT = 5;
+    const MARGIN_T = 0.12;       // distance from mesh edge to tick text
+    const MARGIN_AX_LABEL = 0.30; // distance from mesh edge to axis-name label
     for (let i = 0; i < NT; i++) {
       const f = i / (NT - 1);
       const xv = d.xr[0] + (d.xr[1] - d.xr[0]) * f;
       const yv = d.yr[0] + (d.yr[1] - d.yr[0]) * f;
       entry.tickSprites.push(
-        this._makeTickSprite(T, xv.toFixed(0), f * 2 - 1, -0.06, 1.12, '#9aa6bd', entry.scene!),
-        this._makeTickSprite(T, yv.toFixed(0), -1.12, -0.06, f * 2 - 1, '#9aa6bd', entry.scene!),
+        this._makeTickSprite(T, xv.toFixed(0), (f * 2 - 1) * sx, -0.06, sz + MARGIN_T, '#9aa6bd', entry.scene!),
+        this._makeTickSprite(T, yv.toFixed(0), -(sx + MARGIN_T), -0.06, (f * 2 - 1) * sz, '#9aa6bd', entry.scene!),
       );
     }
     entry.tickSprites.push(
-      this._makeTickSprite(T, d.xlabel, 0, -0.18, 1.30, '#cbd3e4', entry.scene!),
-      this._makeTickSprite(T, d.ylabel, -1.34, -0.18, 0, '#cbd3e4', entry.scene!),
+      this._makeTickSprite(T, d.xlabel, 0, -0.18, sz + MARGIN_AX_LABEL, '#cbd3e4', entry.scene!),
+      this._makeTickSprite(T, d.ylabel, -(sx + MARGIN_AX_LABEL + 0.04), -0.18, 0, '#cbd3e4', entry.scene!),
     );
 
     // Update camera target height on rebuild
@@ -681,6 +702,12 @@ export class SurfaceRendererManager {
       mat.dispose();
     }
     entry.tickSprites = [];
+    if (entry.grid && entry.scene) {
+      entry.scene.remove(entry.grid);
+      entry.grid.geometry.dispose();
+      (entry.grid.material as import('three').Material).dispose();
+      entry.grid = null;
+    }
   }
 
   private _disposeEntry(el: HTMLElement, T: typeof import('three')): void {
