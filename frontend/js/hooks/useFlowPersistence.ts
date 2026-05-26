@@ -80,6 +80,7 @@ export function useFlowPersistence({
           defaultParameters: n.data.defaultParameters || {},
           ...(n.data.enabled === false ? { enabled: false } : {}),
           ...(n.data.codeCollapsed === true ? { codeCollapsed: true } : {}),
+          ...(n.data.barColor ? { barColor: n.data.barColor } : {}),
         },
       })),
       edges: flatEdges.map(e => ({
@@ -114,6 +115,12 @@ export function useFlowPersistence({
       });
       if (n.data.enabled === false) {
         node.data = { ...node.data, enabled: false };
+      }
+      if (n.data.codeCollapsed === true) {
+        node.data = { ...node.data, codeCollapsed: true };
+      }
+      if (n.data.barColor) {
+        node.data = { ...node.data, barColor: n.data.barColor };
       }
       return node;
     });
