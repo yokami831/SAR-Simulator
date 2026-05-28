@@ -28,10 +28,13 @@ interface UseSubgraphOpsOptions {
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   pushHistory: () => void;
   subgraphStoreRef: React.MutableRefObject<Record<string, unknown>>;
+  /** Mark active tab dirty after a structural change. Optional so existing
+   *  callers that don't track dirty state still type-check. */
+  markDirty?: () => void;
 }
 
 export function useSubgraphOps({
-  rfInstance, setNodes, setEdges, pushHistory, subgraphStoreRef,
+  rfInstance, setNodes, setEdges, pushHistory, subgraphStoreRef, markDirty,
 }: UseSubgraphOpsOptions) {
 
   /** Create a subgraph from selected node IDs. Returns the subgraph node ID or null. */
@@ -99,8 +102,9 @@ export function useSubgraphOps({
       ...(proxyEdges as Edge[]),
     ]);
 
+    markDirty?.();
     return sgId;
-  }, [setNodes, setEdges, pushHistory]);
+  }, [setNodes, setEdges, pushHistory, markDirty]);
 
   /** Expand a collapsed subgraph — restore children to React Flow */
   const expandSubgraph = useCallback((sgId: string) => {
@@ -175,8 +179,8 @@ export function useSubgraphOps({
       for (const e of allNew) seen.set(e.id, e);
       return [...seen.values()];
     });
-
-  }, [setNodes, setEdges, pushHistory]);
+    markDirty?.();
+  }, [setNodes, setEdges, pushHistory, markDirty]);
 
   /** Collapse an expanded subgraph — move children back to store */
   const collapseSubgraph = useCallback((sgId: string) => {
@@ -194,6 +198,7 @@ export function useSubgraphOps({
       pushHistory();
       delete subgraphStoreRef.current[sgId];
       setNodes(nds => nds.filter(n => n.id !== sgId));
+      markDirty?.();
       return;
     }
 
@@ -243,8 +248,8 @@ export function useSubgraphOps({
       // Remove any leftover edges referencing collapsed child nodes
       return allNew.filter(e => !aliveChildSet.has(e.source) && !aliveChildSet.has(e.target));
     });
-
-  }, [setNodes, setEdges, pushHistory]);
+    markDirty?.();
+  }, [setNodes, setEdges, pushHistory, markDirty]);
 
   /** Toggle collapse/expand of a subgraph */
   const toggleSubgraph = useCallback((sgId: string) => {
@@ -276,7 +281,8 @@ export function useSubgraphOps({
         } as Node : n
       );
     });
-  }, [expandSubgraph, setNodes, pushHistory]);
+    markDirty?.();
+  }, [expandSubgraph, setNodes, pushHistory, markDirty]);
 
   const groupSelected = useCallback(async () => {
     const selected = rfInstance.current?.getNodes().filter(n => n.selected) || [];
@@ -297,7 +303,8 @@ export function useSubgraphOps({
     setNodes(nds => nds.map(n =>
       n.id === sgId ? { ...n, data: { ...n.data, label: newLabel } } : n
     ));
-  }, [setNodes, pushHistory]);
+    markDirty?.();
+  }, [setNodes, pushHistory, markDirty]);
 
   /** Set subgraph description */
   const setSubgraphDescription = useCallback((sgId: string, desc: string) => {
@@ -305,7 +312,8 @@ export function useSubgraphOps({
     setNodes(nds => nds.map(n =>
       n.id === sgId ? { ...n, data: { ...n.data, description: desc } } : n
     ));
-  }, [setNodes, pushHistory]);
+    markDirty?.();
+  }, [setNodes, pushHistory, markDirty]);
 
   return {
     createSubgraph,

@@ -7,7 +7,7 @@
 
 import { useCallback, useRef } from 'react';
 import type { Node, Edge, ReactFlowInstance } from '@xyflow/react';
-import { consoleLog } from '../backend.js';
+import { consoleLog, apiStop, apiStepReset } from '../backend.js';
 import { resetNodeIdCounter } from '../blockLibraryData.js';
 import { DELAY_RESIZE_EVENT } from '../constants.js';
 import { initGlobalChat } from '../chat.js';
@@ -101,37 +101,29 @@ export function useTabManager({
   /** Switch to a different tab */
   const switchTab = useCallback((newTabId: string) => {
     if (newTabId === activeTabRef.current) return;
-    // Save current tab state to in-memory tabStatesRef
+
+    // If a flow is currently running/stepping, stop it before leaving — the
+    // execution belongs to the outgoing tab and its node-status broadcasts must
+    // not bleed into the next tab. (User-approved behaviour.)
+    if (window.isFlowRunning?.()) {
+      apiStop().catch(() => {});
+      apiStepReset().catch(() => {});
+    }
+
+    // Snapshot the OUTGOING tab's canvas into tabStatesRef. This reads the
+    // still-mounted FlowTab's rfInstance / App-owned history+subgraph refs, so
+    // it must run before setActiveTabId triggers the key-remount.
     saveCurrentTabState();
 
-    // Restore new tab state
+    // Flip the active tab. React sees the FlowTab key change, unmounts the old
+    // FlowTab and mounts a fresh one keyed to newTabId; that new instance reads
+    // its initial nodes/edges/viewport/history from tabStatesRef and seeds the
+    // App-owned shared refs itself (see FlowTab mount-time init). No manual
+    // setNodes/history restore here — doing it synchronously raced the mount
+    // and crashed on a null FlowTabApi (the empty-canvas bug).
     activeTabRef.current = newTabId;
     setActiveTabId(newTabId);
-    const newTab = tabs.find(t => t.id === newTabId);
     const saved = tabStatesRef.current.get(newTabId);
-    if (saved) {
-      skipHistoryRef.current = true;
-      setNodes(saved.nodes);
-      setEdges(saved.edges);
-      historyRef.current = saved.undoStack;
-      futureRef.current = saved.redoStack;
-      subgraphStoreRef.current = saved.subgraphStore;
-      // Reset nodeIdCounter to avoid ID collisions (e.g. in createSubgraph)
-      resetNodeIdCounter(computeMaxNodeId(saved.nodes) + 1);
-      requestAnimationFrame(() => {
-        skipHistoryRef.current = false;
-        if (saved.viewport) rfInstance.current?.setViewport(saved.viewport);
-      });
-    } else {
-      skipHistoryRef.current = true;
-      setNodes([]);
-      setEdges([]);
-      historyRef.current = [];
-      futureRef.current = [];
-      subgraphStoreRef.current = {};
-      resetNodeIdCounter(100);
-      requestAnimationFrame(() => { skipHistoryRef.current = false; });
-    }
 
     // Restore panel visibility for new tab
     const panels = saved?.panels;
@@ -141,7 +133,7 @@ export function useTabManager({
 
     if (panels) {
       // Sidebar (React state)
-      setSidebarVisible(panels.sidebar);
+      setSidebarVisible(panels.sidebar ?? true);
       // Console
       if (panels.console) consolePanel?.classList.remove('console-hidden');
       else consolePanel?.classList.add('console-hidden');

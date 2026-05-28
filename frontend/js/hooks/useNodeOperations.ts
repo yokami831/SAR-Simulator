@@ -22,11 +22,15 @@ interface UseNodeOperationsOptions {
   pushHistory: () => void;
   skipHistoryRef: React.MutableRefObject<boolean>;
   subgraphStoreRef: React.MutableRefObject<Record<string, unknown>>;
+  /** Mark active tab dirty after a direct add/delete/clear (these call setNodes
+   *  directly and do NOT go through onNodesChange, which is where the canvas's
+   *  own dirty tracking lives). Optional for back-compat. */
+  markDirty?: () => void;
 }
 
 export function useNodeOperations({
   rfInstance, setNodes, setEdges, pushHistory, skipHistoryRef,
-  subgraphStoreRef,
+  subgraphStoreRef, markDirty,
 }: UseNodeOperationsOptions) {
 
   const resolveOverlapsTimerRef = useRef<any>(null);
@@ -71,8 +75,9 @@ export function useNodeOperations({
       paramOverrides,
     });
     setNodes(nds => [...nds, newNode]);
+    markDirty?.();
     return nodeId;
-  }, [setNodes, pushHistory]);
+  }, [setNodes, pushHistory, markDirty]);
 
   // ===== Add Edge (unified: UI onConnect, AI tool) =====
   const addEdgeShared = useCallback((
@@ -97,8 +102,9 @@ export function useNodeOperations({
       source, sourceHandle,
       target, targetHandle,
     }]);
+    markDirty?.();
     return edgeId;
-  }, [setEdges, pushHistory]);
+  }, [setEdges, pushHistory, markDirty]);
 
   // ===== Delete Node (unified: UI context menu, AI tool) =====
   /** Fixes AI-side bug: now always cleans up vizDataStore + subgraphStore */
@@ -110,13 +116,15 @@ export function useNodeOperations({
     setNodes(nds => nds.filter(n => n.id !== nodeId));
     setEdges(eds => eds.filter(e => e.source !== nodeId && e.target !== nodeId));
     delete vizDataStore[nodeId];
-  }, [setNodes, setEdges, pushHistory]);
+    markDirty?.();
+  }, [setNodes, setEdges, pushHistory, markDirty]);
 
   // ===== Delete Edge =====
   const deleteEdge = useCallback((edgeId: string) => {
     pushHistory();
     setEdges(eds => eds.filter(e => e.id !== edgeId));
-  }, [setEdges, pushHistory]);
+    markDirty?.();
+  }, [setEdges, pushHistory, markDirty]);
 
   // ===== Delete Selected =====
   const deleteSelected = useCallback(() => {
@@ -132,8 +140,9 @@ export function useNodeOperations({
     setEdges(eds => eds.filter(e =>
       !e.selected && !selectedIds.has(e.source) && !selectedIds.has(e.target)
     ));
+    markDirty?.();
     requestAnimationFrame(() => { skipHistoryRef.current = false; });
-  }, [setNodes, setEdges, pushHistory]);
+  }, [setNodes, setEdges, pushHistory, markDirty]);
 
   // ===== Clear All (unified: UI + AI tool) =====
   /** Always includes resetNodeIdCounter(100) — fixes previous inconsistency */
@@ -143,7 +152,8 @@ export function useNodeOperations({
     setEdges([]);
     subgraphStoreRef.current = {};
     resetNodeIdCounter(100);
-  }, [setNodes, setEdges, pushHistory]);
+    markDirty?.();
+  }, [setNodes, setEdges, pushHistory, markDirty]);
 
   // ===== Edge Connection (UI onConnect callback) =====
   // Uses @xyflow/react's addEdge() for duplicate prevention (unlike addEdgeShared)
@@ -155,7 +165,8 @@ export function useNodeOperations({
     setEdges(eds => addEdge({
       ...params,
     }, eds));
-  }, [setEdges, pushHistory]);
+    markDirty?.();
+  }, [setEdges, pushHistory, markDirty]);
 
   // ===== Drag & Drop from Sidebar =====
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -283,7 +294,8 @@ export function useNodeOperations({
       setTimeout(() => rfInstance.current?.fitView({ padding: FIT_VIEW_PADDING }), 50);
       return result;
     });
-  }, [setNodes, pushHistory]);
+    markDirty?.();
+  }, [setNodes, pushHistory, markDirty]);
 
   // ===== Overlap Resolution on Node Resize =====
   const resolveOverlaps = useCallback(() => {

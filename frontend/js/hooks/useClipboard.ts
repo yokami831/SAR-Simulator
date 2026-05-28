@@ -11,6 +11,9 @@ interface UseClipboardOptions {
   setEdges: (updater: any) => void;
   pushHistory: () => void;
   deleteSelected: () => void;
+  /** Mark active tab dirty after a paste (which mutates nodes/edges directly,
+   *  bypassing onNodesChange's dirty tracking). Optional for back-compat. */
+  markDirty?: () => void;
 }
 
 interface ClipboardData {
@@ -24,6 +27,7 @@ export function useClipboard({
   setEdges,
   pushHistory,
   deleteSelected,
+  markDirty,
 }: UseClipboardOptions) {
   const clipboardRef = useRef<ClipboardData | null>(null);
 
@@ -70,7 +74,8 @@ export function useClipboard({
       })),
       edges: copiedEdges,
     };
-  }, [setNodes, setEdges, pushHistory]);
+    markDirty?.();
+  }, [setNodes, setEdges, pushHistory, markDirty]);
 
   const cutSelected = useCallback(() => {
     copySelected();

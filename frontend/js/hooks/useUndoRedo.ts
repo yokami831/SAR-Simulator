@@ -20,6 +20,10 @@ interface UseUndoRedoOptions {
   setNodes: (updater: any) => void;
   setEdges: (updater: any) => void;
   subgraphStoreRef: MutableRefObject<Record<string, unknown>>;
+  /** Optional externally-owned refs. If provided, used instead of internally-created refs. */
+  historyRef?: MutableRefObject<HistoryEntry[]>;
+  futureRef?: MutableRefObject<HistoryEntry[]>;
+  skipHistoryRef?: MutableRefObject<boolean>;
 }
 
 interface UseUndoRedoReturn {
@@ -31,15 +35,22 @@ interface UseUndoRedoReturn {
   futureRef: MutableRefObject<HistoryEntry[]>;
 }
 
-export function useUndoRedo({
-  rfInstance,
-  setNodes,
-  setEdges,
-  subgraphStoreRef,
-}: UseUndoRedoOptions): UseUndoRedoReturn {
-  const historyRef = useRef<HistoryEntry[]>([]);
-  const futureRef = useRef<HistoryEntry[]>([]);
-  const skipHistoryRef = useRef(false);
+export function useUndoRedo(options: UseUndoRedoOptions): UseUndoRedoReturn {
+  const {
+    rfInstance,
+    setNodes,
+    setEdges,
+    subgraphStoreRef,
+  } = options;
+
+  // Always call useRef (Rules of Hooks). Use the externally-provided ref if given,
+  // otherwise fall back to the internally-created one. Behavior is transparent.
+  const internalHistoryRef = useRef<HistoryEntry[]>([]);
+  const internalFutureRef = useRef<HistoryEntry[]>([]);
+  const internalSkipHistoryRef = useRef(false);
+  const historyRef = options.historyRef ?? internalHistoryRef;
+  const futureRef = options.futureRef ?? internalFutureRef;
+  const skipHistoryRef = options.skipHistoryRef ?? internalSkipHistoryRef;
 
   const pushHistory = useCallback(() => {
     if (skipHistoryRef.current) return;
