@@ -432,6 +432,36 @@ complex AWGN: per-component σ = noise_std_FS / √2
 - **GUI ブロックの `value` 更新は `update_element` の `params` で行う**: `update_element '{"node_id":"n23","params":{"value":"2"}}'`。`code`/`label`/`enabled` はトップレベル、ブロック/GUIパラメータ(value, var_name, min, max…)は **`params:{...}`**（複数形）。`add_element` は `parameters`、`update_element` は `params` という非対称に注意。誤って `value` をトップレベルや `parameters` で渡すと**エラーで弾かれる**（2026-05-24に修正。以前は黙殺して空成功＝サイレントフォールバックだった）。
 - **巨大配列を matplotlib で imshow/表示しない。** 全グリッド(数百万要素)の imshow はレンダラー負荷の原因。3D表示は `surface3d_gl`（GLバイナリ方式、上記）を使う。matplotlib を使うなら表示用に縮小してから。
 
+### FPGA HIL: Amaranth FFT + Verilator pipeline (CRITICAL — 恒久)
+
+`workspace-SAR-SIM/scripts/` に Amaranth radix-2 DIT FFT + Verilator HIL の参照実装あり。詳細は `workspace-SAR-SIM/scripts/README.md`。
+
+**役割分担**:
+- **`SAR-Simulator-FPGA3.rcflow` の Route A/B (n42/n43)**: cupy 量子化 (Q-format-accurate, 速い、本番 HIL ループ向け)
+- **`FPGA-HIL-Stub.rcflow` の n4 FPGA Compute (cupy)**: 上記と同等、ファイル境界経由
+- **`FPGA-HIL-Stub.rcflow` の n6 FPGA Compute (Verilator HIL)** [enabled=false がデフォルト]: Amaranth → Verilog → Verilator → 実 .exe で **bit-exact ゲートレベル**動作。本物 HDL と同じ算術
+- **本番 FPGA**: 別途 pipelined streaming FFT (Xilinx FFT IP / dblclockfft 等) を実装。Amaranth コードはその検証用 reference
+
+**性能 (現フロー Nr=5040 → padded 8192、Na=2016)**:
+- cupy (n4 既存): ~0.1 秒/フレーム
+- Verilator (n6 新規): フルフレーム ~18 秒、bit-exact reference
+- 純粋 Amaranth pysim: 6 時間 (使わない、Verilator が 1200× 高速化)
+
+**ツールチェイン (1回セットアップ)**:
+```
+winget install --id MSYS2.MSYS2
+C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm mingw-w64-x86_64-verilator mingw-w64-x86_64-toolchain make"
+.venv\Scripts\python.exe -m pip install amaranth amaranth-yosys
+```
+Windows ネイティブで Verilator を呼ぶには **MSYS2 bash 経由**でないとパス変換が壊れる。`verilator_fft_drive.py` は subprocess を `bash -lc` でラップしてこれを吸収。
+
+**禁止事項**:
+- ❌ `workspace-SAR-SIM/scripts/amaranth_seq_fft.py` の Q1.15 / Q(WG).15 / WG=16+log2(N) ビット幅を本番 FPGA 設計と無関係に変えない。Route B の `qz()` Q-format と整合させる
+- ❌ シーケンシャル単体バタフライ設計のまま実 FPGA に流さない (PRF=4kHz リアルタイムには pipelined streaming 必須)
+- ❌ `fpga_io/` を git に commit しない (中間データのみ、.gitignore 済み)
+
+**🔥 重要**: cupy 経路は Q-format-accurate ながら**ゲート動作と完全一致しない** (cupy は round-half-to-even、HDL は通常 truncate)。実機ビット幅検証では n6 Verilator 経路を真の参照として使うこと。
+
 ### Error Handling (CRITICAL)
 
 - **No silent errors** - Every error must display a meaningful message

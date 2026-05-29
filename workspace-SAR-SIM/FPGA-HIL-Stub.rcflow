@@ -4,10 +4,10 @@
   "title": "FPGA-HIL-Stub",
   "description": "",
   "created": "2026-05-29T06:08:10.580514+00:00",
-  "modified": "2026-05-29T06:11:43.157676+00:00",
+  "modified": "2026-05-29T07:32:08.745228+00:00",
   "canvas": {
     "name": "flowgraph",
-    "savedAt": "2026-05-29T06:11:43.159Z",
+    "savedAt": "2026-05-29T07:32:08.744Z",
     "nodes": [
       {
         "id": "n1",
@@ -171,6 +171,40 @@
             "code": "# === HIL Stub: Save FPGA IQ ===\n# Tab 1 の Route C-in が読む .npy として保存。\nimport numpy as np\nimport os\n\n_path = str(globals().get('hil_output_path', '')).strip()\nif not _path:\n    raise ValueError(\"hil_output_path is empty — set it in the file picker (var_name='hil_output_path')\")\n\n_dir = os.path.dirname(_path)\nif _dir and not os.path.isdir(_dir):\n    os.makedirs(_dir, exist_ok=True)\n\nnp.save(_path, s_raw_fpga.astype(np.complex64))\n\n_size_mb = os.path.getsize(_path) / 1e6\nprint('Saved HIL FPGA IQ to %s  (%.1f MB, shape=%s, peak|s|=%.3f)' % (\n    _path, _size_mb, s_raw_fpga.shape, float(np.abs(s_raw_fpga).max())))\n",
             "label": "Save FPGA IQ"
           }
+        }
+      },
+      {
+        "id": "n6",
+        "type": "canvasNode",
+        "position": {
+          "x": 700,
+          "y": 771
+        },
+        "width": 400,
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === FPGA Compute (Verilator HIL — bit-exact gate-level FFT) ===\n# Verilator-driven Route B equivalent: pad to power of 2, Amaranth FFT,\n# multiply, IFFT. Slower than the cupy node (n4) but bit-exact with what\n# real HDL synthesis would produce — use this for verification or as the\n# production HIL output when you trust the cupy result.\n#\n# Builds the Verilator exe lazily (first run ~20s); subsequent runs reuse\n# the cached exe in workspace-SAR-SIM/fpga_io/vbuild_<N>/.\nimport numpy as np\nimport sys, os\nimport time as _time\n\n# Make the workspace-local FFT scripts importable from this kernel\n_PROJ = r\"d:\\kamijo\\HiyoCanvas\"\n_SCRIPTS = os.path.join(_PROJ, \"workspace-SAR-SIM\", \"scripts\")\nif _SCRIPTS not in sys.path:\n    sys.path.insert(0, _SCRIPTS)\nfrom verilator_route_b import verilator_fft, verilator_ifft\n\n_t0 = _time.monotonic()\n\nNa, Nr = fir_coefficients.shape\nNr_p2 = 1 << (Nr - 1).bit_length()\nprint(f\"Verilator HIL: Na={Na} Nr={Nr} -> Nr_p2={Nr_p2}\")\n\n# Pad fir and chirp to the next power of 2 (real FPGA FFT IP is also fixed-size)\nfir_padded = np.zeros((Na, Nr_p2), dtype=np.complex64)\nfir_padded[:, :Nr] = fir_coefficients\nchirp_padded = np.zeros(Nr_p2, dtype=np.complex64)\nchirp_padded[:Nr] = ref_chirp\n\n# Stage B equivalent: FFT, multiply, IFFT, all through the Verilator-compiled\n# Amaranth FFT. No explicit BFP quantization yet — F is returned in Q(WG).15\n# floats already block-scaled per-batch by verilator_fft.\n_t_fft = _time.monotonic()\nF = verilator_fft(fir_padded)\nprint(f\"  FFT(fir):   {_time.monotonic() - _t_fft:.2f}s  shape={F.shape}\")\n\n_t_fft = _time.monotonic()\nC = verilator_fft(chirp_padded.reshape(1, -1))[0]\nprint(f\"  FFT(chirp): {_time.monotonic() - _t_fft:.2f}s\")\n\nprod = (F * C[None, :]).astype(np.complex64)\n\n_t_ifft = _time.monotonic()\ns_raw_padded = verilator_ifft(prod)\nprint(f\"  IFFT:       {_time.monotonic() - _t_ifft:.2f}s\")\n\n# Crop back to Nr (drops the zero-padded tail)\ns_raw_fpga = s_raw_padded[:, :Nr].astype(np.complex64)\n\nprint(f\"Verilator HIL: s_raw_fpga={s_raw_fpga.shape} peak|s|={float(np.abs(s_raw_fpga).max()):.3f}  ({_time.monotonic() - _t0:.2f}s total)\")\n",
+            "label": "FPGA Compute (Verilator HIL)"
+          },
+          "enabled": false,
+          "barColor": "#a855f7"
         }
       }
     ],
