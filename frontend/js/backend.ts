@@ -89,9 +89,14 @@ let _nodeExecutionHandler: ((msg: Record<string, unknown>) => void) | null = nul
 let _statusChangeHandler: ((msg: Record<string, unknown>) => void) | null = null;
 let _stepReadyHandler: ((msg: Record<string, unknown>) => void) | null = null;
 let _nodeOutputStreamHandler: ((msg: Record<string, unknown>) => void) | null = null;
+let _saveCompletedHandler: ((msg: Record<string, unknown>) => void) | null = null;
 
 export function setToolCommandHandler(handler: (msg: Record<string, unknown>) => void): void {
   _toolCommandHandler = handler;
+}
+
+export function setSaveCompletedHandler(handler: ((msg: Record<string, unknown>) => void) | null): void {
+  _saveCompletedHandler = handler;
 }
 
 export function setNodeExecutionHandler(handler: (msg: Record<string, unknown>) => void): void {
@@ -255,6 +260,14 @@ function _doConnect(): void {
     // Flow status change (running/stopped)
     if (msg.type === 'status_change') {
       if (_statusChangeHandler) _statusChangeHandler(msg);
+      return;
+    }
+
+    // Server-side save completed — re-sync frontend dirty state with disk.
+    // Emitted by backend after every API-side workspace write (CLI/AI save_tab,
+    // save_tab_as, PUT /api/workspaces/{filename}).
+    if (msg.type === 'save_completed') {
+      if (_saveCompletedHandler) _saveCompletedHandler(msg);
       return;
     }
 

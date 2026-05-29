@@ -104,7 +104,13 @@ def start() -> None:
         if r.status_code == 200 and r.json().get("app") == "hiyocanvas":
             print("Found stale HiyoCanvas on legacy port — requesting shutdown.")
             try:
-                requests.post("http://127.0.0.1:18731/api/tools/shutdown", timeout=5)
+                # Force-shutdown the stale instance: we are about to start a
+                # fresh one so the dirty-guard would just block startup.
+                requests.post(
+                    "http://127.0.0.1:18731/api/tools/shutdown",
+                    json={"force": True},
+                    timeout=5,
+                )
             except Exception:
                 pass
             time.sleep(2)
@@ -135,17 +141,38 @@ def start() -> None:
     sys.exit(1)
 
 
-def stop() -> None:
+def stop(force: bool = False) -> None:
     if not is_running():
         print("HiyoCanvas is not running.")
         return
 
+    body = {"force": True} if force else {}
     try:
-        r = requests.post(SHUTDOWN_URL, timeout=5)
-        print(f"Shutdown request: {r.status_code}")
+        # Allow up to ~5s for the dirty-guard round-trip (frontend 2s + slack).
+        r = requests.post(SHUTDOWN_URL, json=body, timeout=8)
     except Exception as e:
         print(f"Shutdown request failed: {e}")
-        return
+        sys.exit(1)
+
+    # Dirty-guard refusal: server returns 200 with success=false + dirty_tabs.
+    try:
+        data = r.json() if r.content else {}
+    except ValueError:
+        data = {}
+    if isinstance(data, dict) and data.get("success") is False and data.get("dirty_tabs"):
+        dirty = data.get("dirty_tabs", [])
+        msg = data.get(
+            "message",
+            f"Shutdown refused: unsaved changes in {len(dirty)} workspace(s).",
+        )
+        print(msg)
+        for t in dirty:
+            title = t.get("title") or t.get("id") or "?"
+            print(f"  - {title}")
+        print("Save in HiyoCanvas (or use save_tab), or run: ctl.py stop --force")
+        sys.exit(1)
+
+    print(f"Shutdown request: {r.status_code}")
 
     print("Waiting for shutdown...", end="", flush=True)
     for i in range(10):
@@ -156,6 +183,7 @@ def stop() -> None:
         print(".", end="", flush=True)
 
     print(" WARN: still running after 10s")
+    sys.exit(1)
 
 
 def status() -> None:
@@ -167,18 +195,22 @@ def status() -> None:
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: ctl.py <start|stop|status|restart>")
+        print("Usage: ctl.py <start|stop [--force]|status|restart>")
         sys.exit(1)
 
     cmd = sys.argv[1]
+    extra = sys.argv[2:]
     if cmd == "start":
         start()
     elif cmd == "stop":
-        stop()
+        force = "--force" in extra
+        stop(force=force)
     elif cmd == "status":
         status()
     elif cmd == "restart":
-        stop()
+        # Restart implies discarding any pending work — keep parity with the
+        # old behavior by forcing the shutdown side.
+        stop(force=True)
         time.sleep(2)
         start()
     else:

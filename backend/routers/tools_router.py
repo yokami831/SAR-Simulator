@@ -477,8 +477,20 @@ async def reload() -> JSONResponse:
 
 
 @router.post("/shutdown")
-async def shutdown() -> JSONResponse:
-    result = await tools.shutdown_server()
+async def shutdown(req: dict = None) -> JSONResponse:
+    # Body is optional: `{}` or no body → dirty-guard active; `{"force": true}`
+    # bypasses the check. See backend/tools/file_io.py:shutdown_server.
+    req = req or {}
+    force = bool(req.get("force", False))
+    result = await tools.shutdown_server(force=force)
+    return JSONResponse(content=result)
+
+
+@router.post("/get_dirty_tabs")
+async def get_dirty_tabs(req: dict = None) -> JSONResponse:
+    # Returns the list of workspace tabs with unsaved changes.
+    # Used by callers that want to check state before invoking `shutdown`.
+    result = await tools.get_dirty_tabs()
     return JSONResponse(content=result)
 
 

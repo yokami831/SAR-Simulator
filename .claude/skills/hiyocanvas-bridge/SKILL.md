@@ -33,11 +33,42 @@ Automatically unsets `ELECTRON_RUN_AS_NODE` (required in VSCode terminal).
 ## Stop
 
 ```powershell
-$PYTHON $SCRIPTS/ctl.py stop
+$PYTHON $SCRIPTS/ctl.py stop            # refuses if any workspace is dirty
+$PYTHON $SCRIPTS/ctl.py stop --force    # discard unsaved changes
 ```
 
 Sends `POST /api/tools/shutdown` to trigger Electron's graceful shutdown.
 All child processes (FastAPI, voice-agent, terminal-server) are cleaned up properly.
+
+### Dirty-guard
+
+`stop` first asks the renderer for the list of workspaces with unsaved
+changes (`get_dirty_tabs` WS action). If any are dirty, the server
+returns `{"success": false, "dirty_tabs": [{"id","title"}, ...]}` and
+`ctl.py` exits non-zero, printing the offending workspace titles. The
+server does **not** shut down in that case — there are no dialogs on
+this path because it is meant for AI/CLI callers.
+
+Recommended flow:
+
+1. `canvas_api.py get_dirty_tabs` — list workspaces with unsaved
+   changes (`{"success": true, "dirty_tabs": [{"id","title"}, ...]}`).
+   Empty list → safe to stop.
+2. For each dirty workspace, switch to it (`switch_tab`) and
+   `canvas_api.py save_tab` (or save in the UI).
+3. `ctl.py stop`.
+
+`get_dirty_tabs` is exposed as a regular REST/CLI endpoint, so the
+check can be performed without invoking `stop` first. The shutdown
+endpoint uses the same backend function internally.
+
+If the frontend is unreachable (no WS client, or the renderer is
+hung), the dirty check times out after ~2s and shutdown proceeds — a
+warning is logged server-side. The UI close button (× / Cmd+Q) is
+unaffected; it still uses the IPC path with `rcConfirmSave` dialogs.
+
+`ctl.py restart` always force-shuts the current instance (restart
+implies discarding any in-flight work).
 
 **NEVER use `taskkill` directly** — it bypasses Electron's shutdown and orphans processes.
 

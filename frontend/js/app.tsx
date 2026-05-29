@@ -15,7 +15,7 @@ import { useState, useCallback, useRef, useEffect, Fragment, createElement as h 
 import { createRoot } from 'react-dom/client';
 import type { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 
-import { apiRun, apiStop, apiAutoLayout, apiStepStart, apiStepNext, apiStepReset, apiRunRemaining, connectWebSocket, consoleLog, setToolCommandHandler, sendWsMessage, setErrorCountHandler } from './backend.js';
+import { apiRun, apiStop, apiAutoLayout, apiStepStart, apiStepNext, apiStepReset, apiRunRemaining, connectWebSocket, consoleLog, setToolCommandHandler, sendWsMessage, setErrorCountHandler, setSaveCompletedHandler } from './backend.js';
 import { resetNodeIdCounter, fetchBlockData, getSetNodesRef, type BlockLibraryData } from './blockLibraryData.js';
 import { BlockLibrarySidebar } from './components/BlockLibrarySidebar.js';
 import { FlowTab } from './components/FlowTab.js';
@@ -190,6 +190,7 @@ function App() {
   const {
     saveCurrentTabState, switchTab, openWorkspace, onAddTab, onCloseTab, onEditTab, reorderTabs,
     markDirty, clearDirty, persistOpenTabs,
+    setSavedFingerprint,
   } = useTabManager({
     rfInstance, setNodes: flowSetNodes, setEdges: flowSetEdges, skipHistoryRef, historyRef: historyRef as any, futureRef: futureRef as any,
     subgraphStoreRef, tabs, setTabs, activeTabRef, setActiveTabId,
@@ -331,12 +332,13 @@ function App() {
   // operations land on the active FlowTab. buildSaveData/restoreFlowgraph are
   // passed down to FlowTab so the registered FlowTabApi resolves to them.
   const {
-    buildSaveData, restoreFlowgraph, handleSave, handleSaveAs,
+    buildSaveData, computeFlowFingerprint, restoreFlowgraph, handleSave, handleSaveAs,
   } = useFlowPersistence({
     rfInstance, setNodes: flowSetNodes, setEdges: flowSetEdges, pushHistory: flowPushHistory, subgraphStoreRef,
     flowNameRef, tabs, activeTabRef,
     updateTitleFilename, createSubgraph: flowCreateSubgraph, setSubgraphDescription: flowSetSubgraphDescription,
     tabDataRef, clearDirty,
+    setSavedFingerprint,
     onSavedAs: (tabId, newTitle, newFilename) => {
       // Rebind the tab to the newly-created workspace, persist the open-tab list
       // (so a restart reopens the NEW file, not the old one), and refresh the
@@ -368,7 +370,7 @@ function App() {
     createSubgraph: flowCreateSubgraph, toggleSubgraph: flowToggleSubgraph, expandSubgraph: flowExpandSubgraph, ungroupSubgraph: flowUngroupSubgraph, renameSubgraph: flowRenameSubgraph, setSubgraphDescription: flowSetSubgraphDescription,
     buildSaveData: flowBuildSaveData, restoreFlowgraph: flowRestoreFlowgraph, flowNameRef,
     tabsRef, activeTabRef, openWorkspaceRef, switchTabRef, onCloseTabRef,
-    setTabs, tabDataRef,
+    setTabs, tabDataRef, tabStatesRef,
   });
 
   // Register tool command handler with WebSocket module
@@ -384,6 +386,39 @@ function App() {
       setToolCommandHandler(null as unknown as (msg: Record<string, unknown>) => void);
     };
   }, [handleToolCommand]);
+
+  // Register 'save_completed' broadcast handler. Server-side writers (API
+  // save_tab / save_tab_as / PUT /api/workspaces/{filename}) emit this so the
+  // frontend can clear the dirty flag and re-anchor the saved fingerprint —
+  // mirroring what useFlowPersistence.handleSave does for the GUI path.
+  useEffect(() => {
+    const handleSaveCompleted = (msg: Record<string, unknown>) => {
+      const filename = msg.filename as string | undefined;
+      if (!filename) return;
+      // For save_tab_as, the rename_tab broadcast arrived just before this
+      // event, so tabsRef already holds the rebound filename.
+      const tab = tabsRef.current.find(t => t.workspaceFilename === filename);
+      if (!tab) return;
+      clearDirty(tab.id);
+      if (tab.type === 'flow') {
+        // Only the active flow tab's fingerprint can be recomputed here
+        // (computeFlowFingerprint reads the live rfInstance). For non-active
+        // flow tabs, clearDirty alone is correct — their fingerprint was
+        // anchored when they last mounted and hasn't drifted.
+        if (tab.id === activeTabRef.current) {
+          setSavedFingerprint(tab.id, computeFlowFingerprint());
+        }
+      } else if (tab.type === 'excalidraw') {
+        // Excalidraw tracks dirty via a snapshot diff inside the wrapper;
+        // reset the snapshot so the next onChange doesn't immediately re-dirty.
+        (window as { __excalidrawResetSnapshot?: () => void }).__excalidrawResetSnapshot?.();
+      }
+      // mindmap / notes / files don't use snapshot-diff dirty detection —
+      // clearDirty above is sufficient.
+    };
+    setSaveCompletedHandler(handleSaveCompleted);
+    return () => { setSaveCompletedHandler(null); };
+  }, [tabsRef, activeTabRef, clearDirty, setSavedFingerprint, computeFlowFingerprint]);
 
   // Node execution status handlers (setNodeExecutionHandler / OutputStream /
   // StatusChange / StepReady) are registered inside FlowTab, which owns the
@@ -695,7 +730,8 @@ function App() {
         initialUndoStack: st?.undoStack ?? [],
         initialRedoStack: st?.redoStack ?? [],
         rfInstance, subgraphStoreRef, skipHistoryRef, historyRef, futureRef,
-        markDirty, registerApi, unregisterApi,
+        markDirty, clearDirty, setSavedFingerprint, tabStatesRef, computeFlowFingerprint,
+        registerApi, unregisterApi,
         buildSaveData, restoreFlowgraph,
         setRunning, setStepping, setNextStepNodeId, updateToolbarButtons,
         running, runningRef, steppingRef,

@@ -181,6 +181,22 @@ async def _ws_broadcast(msg: dict) -> None:
             logger.debug("WebSocket broadcast failed (client disconnected): %s", e)
 
 
+async def notify_save_completed(filename: str, kind: str = "flow") -> None:
+    """Broadcast 'save_completed' so renderers can clear their dirty flag and
+    re-anchor the saved fingerprint for the workspace they hold under this
+    filename. Called after every server-side workspace write (API save paths)
+    so the frontend's dirty state stays in sync with disk.
+    """
+    try:
+        await _ws_broadcast({
+            "type": "save_completed",
+            "filename": filename,
+            "kind": kind,
+        })
+    except Exception as e:
+        logger.warning("notify_save_completed broadcast failed: %s", e)
+
+
 # ---------------------------------------------------------------------------
 # Frontend Error Reporting + Readiness
 # ---------------------------------------------------------------------------

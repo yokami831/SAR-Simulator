@@ -85,6 +85,7 @@ from backend.tools.file_io import (  # noqa: F401
     load_flowgraph,
     reload_frontend,
     shutdown_server,
+    get_dirty_tabs,
 )
 
 # Batch execution

@@ -8,7 +8,7 @@
 
 import { useCallback } from 'react';
 import type { Node, Edge, ReactFlowInstance } from '@xyflow/react';
-import type { TabInstance, ToolCommand } from '../types.js';
+import type { TabInstance, TabState, ToolCommand } from '../types.js';
 import type { BlockData } from '../blockLibraryData.js';
 import { vizDataStore, sendWsMessage } from '../backend.js';
 import { ANIM_PAN_DURATION, ANIM_FIT_VIEW_DURATION, ANIM_ZOOM_DURATION, DELAY_FIT_VIEW } from '../constants.js';
@@ -55,6 +55,7 @@ interface UseToolCommandHandlerOptions {
   onCloseTabRef: React.MutableRefObject<((tabId: string) => void) | null>;
   setTabs: React.Dispatch<React.SetStateAction<TabInstance[]>>;
   tabDataRef: React.MutableRefObject<Map<string, unknown>>;
+  tabStatesRef: React.MutableRefObject<Map<string, TabState>>;
 }
 
 export function useToolCommandHandler({
@@ -64,7 +65,7 @@ export function useToolCommandHandler({
   createSubgraph, toggleSubgraph, expandSubgraph, ungroupSubgraph, renameSubgraph, setSubgraphDescription,
   buildSaveData, restoreFlowgraph, flowNameRef,
   tabsRef, activeTabRef, openWorkspaceRef, switchTabRef, onCloseTabRef,
-  setTabs, tabDataRef,
+  setTabs, tabDataRef, tabStatesRef,
 }: UseToolCommandHandlerOptions) {
 
   const handleToolCommand = useCallback(async (msg: ToolCommand) => {
@@ -571,6 +572,22 @@ export function useToolCommandHandler({
         case 'set_subgraph_description': {
           setSubgraphDescription(msg.subgraph_id as string, msg.description as string);
           respond({ success: true });
+          break;
+        }
+
+        case 'get_dirty_tabs': {
+          // Returns workspace tabs with unsaved changes. Used by the shutdown
+          // endpoint's dirty-guard (POST /api/tools/shutdown) so AI/CLI tooling
+          // does not silently discard unsaved work. Reads the same dirty flag
+          // the UI close-confirmation (rcConfirmSave) consults — see app.tsx
+          // onWindowCloseRequested.
+          const dirty: Array<{ id: string; title: string }> = [];
+          for (const tab of tabsRef.current) {
+            if (tabStatesRef.current.get(tab.id)?.dirty) {
+              dirty.push({ id: tab.id, title: tab.title });
+            }
+          }
+          respond({ success: true, dirty_tabs: dirty });
           break;
         }
 

@@ -465,7 +465,7 @@ async def save_tab() -> dict[str, Any]:
     - flow: WebSocket get_save_data → workspace file
     - mindmap/excalidraw/notes: WebSocket tab_action get_elements → workspace file
     """
-    from backend.tools.ws import send_command, get_active_tab_type
+    from backend.tools.ws import send_command, get_active_tab_type, notify_save_completed
     from backend import workspace_manager
 
     # Get active tab info
@@ -496,6 +496,7 @@ async def save_tab() -> dict[str, Any]:
             return {"success": False, "message": save_result.get("error", "Failed to get save data")}
         save_data = save_result.get("save_data", {})
         workspace_manager.save_workspace(filename, {"canvas": save_data})
+        await notify_save_completed(filename, "flow")
     else:
         # Plugin tabs (mindmap, excalidraw): get_elements returns typed data
         data_key_map = {"mindmap": "mindmapData", "excalidraw": "excalidrawData", "notes": "notesData"}
@@ -512,6 +513,7 @@ async def save_tab() -> dict[str, Any]:
             return {"success": False, "message": f"No {data_key} in response"}
 
         workspace_manager.save_workspace(filename, {data_key: plugin_data})
+        await notify_save_completed(filename, tab_type)
 
     return {"success": True, "message": f"Saved: {filename}"}
 
@@ -522,7 +524,7 @@ async def save_tab_as(new_title: str, description: str = "") -> dict[str, Any]:
     Creates a new workspace file, copies current canvas data into it,
     and updates the frontend tab to reference the new file.
     """
-    from backend.tools.ws import send_command
+    from backend.tools.ws import send_command, notify_save_completed
     from backend import workspace_manager
 
     if not new_title or not new_title.strip():
@@ -553,12 +555,14 @@ async def save_tab_as(new_title: str, description: str = "") -> dict[str, Any]:
     new_filename = ws["filename"]
 
     # Get current canvas data and save to new workspace
+    save_kind = tab_type
     if tab_type == "flow":
         save_result = await send_command({"action": "get_save_data"})
         if not save_result.get("success"):
             return {"success": False, "message": save_result.get("error", "Failed to get save data")}
         save_data = save_result.get("save_data", {})
         workspace_manager.save_workspace(new_filename, {"canvas": save_data})
+        save_kind = "flow"
     else:
         data_key_map = {"mindmap": "mindmapData", "excalidraw": "excalidrawData", "notes": "notesData"}
         data_key = data_key_map.get(tab_type)
@@ -572,7 +576,9 @@ async def save_tab_as(new_title: str, description: str = "") -> dict[str, Any]:
             return {"success": False, "message": f"No {data_key} in response"}
         workspace_manager.save_workspace(new_filename, {data_key: plugin_data})
 
-    # Update frontend tab to reference the new workspace file
+    # Update frontend tab to reference the new workspace file. The save_completed
+    # broadcast must arrive AFTER this rename so the frontend handler can look up
+    # the tab by the NEW filename.
     old_filename = active_tab.get("workspace_file", "")
     try:
         await send_command({
@@ -583,6 +589,8 @@ async def save_tab_as(new_title: str, description: str = "") -> dict[str, Any]:
         })
     except Exception as e:
         logger.warning("save_tab_as: failed to update frontend tab: %s", e)
+
+    await notify_save_completed(new_filename, save_kind)
 
     return {
         "success": True,

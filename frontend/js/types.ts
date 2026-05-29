@@ -100,6 +100,11 @@ export interface TabState {
   redoStack: Array<{ nodes: import('@xyflow/react').Node[]; edges: import('@xyflow/react').Edge[]; subgraphStore: Record<string, unknown> }>
   subgraphStore: Record<string, unknown>
   dirty: boolean
+  /** Fingerprint of the last saved-to-disk Flow state. Used by snapshot-based
+   *  dirty detection (Phase 1) to compare against the current state on every
+   *  render. Set on initial mount, after handleSave/handleSaveAs success, and
+   *  after restoreFlowgraph. Flow tabs only. */
+  lastSavedFingerprint?: string
   /** Per-tab panel visibility */
   panels?: {
     sidebar?: boolean    // block library
@@ -196,6 +201,22 @@ export interface FlowTabProps {
   historyRef: import('react').MutableRefObject<Array<{ nodes: unknown[]; edges: unknown[]; subgraphStore: Record<string, unknown> }>>
   futureRef: import('react').MutableRefObject<Array<{ nodes: unknown[]; edges: unknown[]; subgraphStore: Record<string, unknown> }>>
   markDirty: () => void
+  /** Phase 1 snapshot dirty detection: clears the dirty flag when the current
+   *  Flow state matches the last saved fingerprint (e.g. user undid back to
+   *  the saved state). Threaded the same way as markDirty. */
+  clearDirty: (tabId?: string) => void
+  /** Phase 1 snapshot dirty detection: re-anchors the last-saved fingerprint
+   *  for a tab. Called by FlowTab on initial mount, and by useFlowPersistence
+   *  after handleSave / handleSaveAs / restoreFlowgraph success. */
+  setSavedFingerprint: (tabId: string, fingerprint: string) => void
+  /** Phase 1 snapshot dirty detection: read access to TabState (specifically
+   *  lastSavedFingerprint) so FlowTab's watch effect can compare without
+   *  duplicating per-tab storage. */
+  tabStatesRef: import('react').MutableRefObject<Map<string, TabState>>
+  /** Phase 1 snapshot dirty detection: stable callback that returns the JSON
+   *  fingerprint of the current Flow state (nodes/edges/subgraphGroups only,
+   *  reusing useFlowPersistence.buildSaveData's whitelist). */
+  computeFlowFingerprint: () => string
   registerApi: (api: FlowTabApi) => void
   /** Called on unmount so App can null the activeFlowApiRef when it still
    *  points at this instance's API (identity-checked to avoid clobbering a

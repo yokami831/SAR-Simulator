@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -100,15 +101,82 @@ async def reload_frontend() -> dict:
     return {"success": True, "clients": count}
 
 
-async def shutdown_server() -> dict:
-    """Shut down the uvicorn server process."""
+async def get_dirty_tabs() -> dict:
+    """List workspace tabs with unsaved changes.
+
+    Returns {success: True, dirty_tabs: [{id, title}, ...]} on success.
+    On frontend-unreachable / timeout, returns success=True with an empty
+    list and a 'frontend_unreachable' note — same semantics the shutdown
+    guard uses (no renderer → no unsaved state to lose).
+    """
+    try:
+        result = await asyncio.wait_for(
+            send_command({"action": "get_dirty_tabs"}),
+            timeout=2.0,
+        )
+        if result and result.get("success"):
+            return {"success": True, "dirty_tabs": result.get("dirty_tabs", [])}
+        return {
+            "success": False,
+            "message": f"Frontend returned failure: {result}",
+            "dirty_tabs": [],
+        }
+    except asyncio.TimeoutError:
+        logger.warning(
+            "get_dirty_tabs: frontend did not respond within 2s — "
+            "treating as no dirty tabs"
+        )
+        return {
+            "success": True,
+            "dirty_tabs": [],
+            "frontend_unreachable": True,
+        }
+    except Exception as e:
+        logger.warning("get_dirty_tabs failed: %s", e)
+        return {
+            "success": False,
+            "message": f"get_dirty_tabs failed: {e}",
+            "dirty_tabs": [],
+        }
+
+
+async def shutdown_server(force: bool = False) -> dict:
+    """Shut down the uvicorn server process.
+
+    Default behavior refuses shutdown when any workspace tab has unsaved
+    changes — the caller must save (`save_tab`) or pass force=True to
+    discard. This prevents silent data loss when AI/CLI tooling invokes
+    the API (the UI path has its own dialog; the API path used to skip
+    it).
+
+    force=True bypasses the dirty check.
+
+    If the frontend is unreachable (no WS client connected, or the
+    request times out), we proceed with shutdown — there is no
+    renderer to hold unsaved state in that case.
+    """
     import os
     import threading
+
+    if not force:
+        check = await get_dirty_tabs()
+        dirty = check.get("dirty_tabs", [])
+        if dirty:
+            titles = ", ".join(t.get("title", t.get("id", "?")) for t in dirty)
+            return {
+                "success": False,
+                "message": (
+                    f"Shutdown refused: unsaved changes in {len(dirty)} "
+                    f"workspace(s): {titles}. Save with save_tab, or pass "
+                    f"force=true to discard."
+                ),
+                "dirty_tabs": dirty,
+            }
 
     def _exit():
         import time, signal
         time.sleep(0.5)
-        logger.info("Shutdown requested via API — exiting.")
+        logger.info("Shutdown requested via API (force=%s) — exiting.", force)
         os.kill(os.getpid(), signal.SIGTERM)
 
     threading.Thread(target=_exit, daemon=True).start()

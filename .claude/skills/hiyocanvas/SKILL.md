@@ -858,6 +858,27 @@ These commands work on any tab type.
 | `get_console_logs` | Get console logs |
 | `clear_logs` | Clear console logs |
 | `get_frontend_errors` | Get runtime errors |
+| `get_dirty_tabs` | List workspace tabs with unsaved changes (`{success, dirty_tabs:[{id,title}]}`) |
+| `shutdown` | Shut down server. Default refuses when any tab is dirty; pass `{"force": true}` to discard. See dirty-guard below |
+
+### Shutdown & dirty-guard
+
+`shutdown` is fail-closed by default to prevent silent data loss:
+
+```powershell
+API get_dirty_tabs                                   # Check first — empty list = safe
+'{}' | API shutdown                                  # Refuses if any tab is dirty
+'{"force":true}' | API shutdown                      # Discards unsaved changes, always shuts down
+```
+
+When refused, the response is:
+```json
+{"success": false, "message": "Shutdown refused: unsaved changes in 2 workspace(s): X, Y. ...", "dirty_tabs": [{"id":"tab-...","title":"X"}, ...]}
+```
+
+Recommended sequence before shutdown: `get_dirty_tabs` → for each dirty tab: `switch_tab` then `save_tab` → `shutdown`. If the frontend is unreachable (no WS client), the dirty check times out after ~2s and shutdown proceeds (logged as a warning server-side).
+
+The UI's close button (× / Cmd+Q) uses its own dialog-based path and is unaffected.
 
 ### Batch Operations
 

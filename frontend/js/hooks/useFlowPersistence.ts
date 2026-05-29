@@ -28,6 +28,10 @@ interface UseFlowPersistenceOptions {
   setSubgraphDescription: (sgId: string, desc: string) => void;
   tabDataRef: React.MutableRefObject<Map<string, any>>;
   clearDirty: (tabId?: string) => void;
+  /** Phase 1 snapshot dirty detection: re-anchor the saved fingerprint after
+   *  a successful save (so subsequent edits compare against the new disk state)
+   *  or after restoreFlowgraph (so a freshly-loaded workspace is clean). */
+  setSavedFingerprint?: (tabId: string, fingerprint: string) => void;
   /** Called after a successful "Save As" that created a new workspace: rebinds
    *  the active tab to the new file (title + filename) and refreshes the list. */
   onSavedAs?: (tabId: string, newTitle: string, newFilename: string) => void;
@@ -39,6 +43,7 @@ export function useFlowPersistence({
   updateTitleFilename, createSubgraph, setSubgraphDescription,
   tabDataRef,
   clearDirty,
+  setSavedFingerprint,
   onSavedAs,
 }: UseFlowPersistenceOptions) {
 
@@ -94,6 +99,23 @@ export function useFlowPersistence({
       })),
     };
   }, []);
+
+  /**
+   * Compute a stable fingerprint of the Flow state's saved-relevant fields.
+   * Used by snapshot-based dirty detection (Phase 1). Equal fingerprint ↔
+   * disk-equal. Reuses buildSaveData's whitelist (it already strips execution
+   * noise: executionStatus / output / error / etc.). The save-name and savedAt
+   * timestamp are excluded explicitly so the fingerprint doesn't change-on-load
+   * or change-on-save just because the timestamp moved.
+   */
+  const computeFlowFingerprint = useCallback((): string => {
+    const data = buildSaveData('__fingerprint__') as Record<string, unknown>;
+    return JSON.stringify({
+      nodes: data.nodes,
+      edges: data.edges,
+      subgraphGroups: data.subgraphGroups,
+    });
+  }, [buildSaveData]);
 
   /** Restore flowgraph from parsed JSON data */
   const restoreFlowgraph = useCallback((data: any, fileName: string) => {
@@ -159,7 +181,17 @@ export function useFlowPersistence({
     setTimeout(() => rfInstance.current?.fitView({ padding: FIT_VIEW_PADDING }), DELAY_FIT_VIEW_LOAD);
     updateTitleFilename(fileName);
     consoleLog('info', `Loaded: ${fileName}`, '', 'file');
-  }, [setNodes, setEdges, updateTitleFilename, pushHistory, createSubgraph, setSubgraphDescription]);
+    // Phase 1: re-anchor the fingerprint to the just-loaded state so the
+    // freshly-loaded flow is treated as clean. Deferred to a microtask so
+    // setNodes/setEdges have committed before we snapshot.
+    if (setSavedFingerprint) {
+      const tabId = activeTabRef.current;
+      setTimeout(() => {
+        try { setSavedFingerprint(tabId, computeFlowFingerprint()); }
+        catch { /* ignore — ref not yet populated */ }
+      }, 0);
+    }
+  }, [setNodes, setEdges, updateTitleFilename, pushHistory, createSubgraph, setSubgraphDescription, setSavedFingerprint, computeFlowFingerprint]);
 
   const handleSaveAs = useCallback(async () => {
     const currentTab = tabs.find(t => t.id === activeTabRef.current);
@@ -206,6 +238,8 @@ export function useFlowPersistence({
         }
         onSavedAs?.(currentTab.id, ws.title, ws.filename);
         clearDirty(currentTab.id);
+        // Phase 1: re-anchor fingerprint to the just-saved state.
+        setSavedFingerprint?.(currentTab.id, computeFlowFingerprint());
         consoleLog('info', `Saved As: ${ws.title}`, '', 'file');
         return;
       }
@@ -261,7 +295,7 @@ export function useFlowPersistence({
       URL.revokeObjectURL(url);
       consoleLog('info', `Saved: ${baseName}${ext}`, '', 'file');
     }
-  }, [tabs, buildSaveData, tabDataRef]);
+  }, [tabs, buildSaveData, tabDataRef, setSavedFingerprint, computeFlowFingerprint]);
 
   const handleSave = useCallback(async () => {
     const currentTab = tabs.find(t => t.id === activeTabRef.current);
@@ -299,6 +333,8 @@ export function useFlowPersistence({
         });
         consoleLog('info', `Saved workspace: ${currentTab.title}`, '', 'file');
         clearDirty();
+        // Phase 1: re-anchor fingerprint to the just-saved state.
+        setSavedFingerprint?.(currentTab.id, computeFlowFingerprint());
         return;
       } catch (e: any) {
         consoleLog('error', `Save error: ${e.message}`, '', 'file');
@@ -315,16 +351,19 @@ export function useFlowPersistence({
         await writable.close();
         consoleLog('info', `Saved: ${fileHandleRef.current.name}`, '', 'file');
         clearDirty();
+        // Phase 1: re-anchor fingerprint to the just-saved state.
+        setSavedFingerprint?.(activeTabRef.current, computeFlowFingerprint());
         return;
       } catch (e) {
         fileHandleRef.current = null;
       }
     }
     await handleSaveAs();
-  }, [tabs, buildSaveData, handleSaveAs]);
+  }, [tabs, buildSaveData, handleSaveAs, setSavedFingerprint, computeFlowFingerprint]);
 
   return {
     buildSaveData,
+    computeFlowFingerprint,
     restoreFlowgraph,
     handleSave,
     handleSaveAs,

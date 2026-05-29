@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from backend import workspace_manager
+from backend.tools.ws import notify_save_completed
 from backend.utils import require_keys as _require_keys
 
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
@@ -52,6 +53,17 @@ async def load_workspace(filename: str) -> JSONResponse:
 async def save_workspace(filename: str, req: dict) -> JSONResponse:
     try:
         result = workspace_manager.save_workspace(filename, req)
+        # Infer kind from data shape so the frontend handler routes to the right
+        # snapshot-reset path. Default to "flow" for the GUI-driven PUT path that
+        # currently dominates this endpoint.
+        kind = "flow"
+        if "mindmapData" in req:
+            kind = "mindmap"
+        elif "excalidrawData" in req:
+            kind = "excalidraw"
+        elif "notesData" in req:
+            kind = "notes"
+        await notify_save_completed(filename, kind)
         return JSONResponse(content=result)
     except FileNotFoundError as e:
         raise HTTPException(404, str(e))

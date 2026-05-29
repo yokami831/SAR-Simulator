@@ -59,10 +59,12 @@ interface TooltipEntry {
 
 export function FlowTab(props: FlowTabProps) {
   const {
+    tabId,
     initialNodes, initialEdges, initialViewport,
     initialSubgraphStore, initialUndoStack, initialRedoStack,
     rfInstance, subgraphStoreRef, skipHistoryRef, historyRef, futureRef,
-    markDirty, registerApi, unregisterApi, buildSaveData, restoreFlowgraph,
+    markDirty, clearDirty, setSavedFingerprint, tabStatesRef, computeFlowFingerprint,
+    registerApi, unregisterApi, buildSaveData, restoreFlowgraph,
     setRunning, setStepping, setNextStepNodeId, updateToolbarButtons,
     running, runningRef, steppingRef,
   } = props;
@@ -95,6 +97,50 @@ export function FlowTab(props: FlowTabProps) {
     const raf = requestAnimationFrame(() => { skipHistoryRef.current = false; });
     return () => cancelAnimationFrame(raf);
   }, []);
+
+  // ===== Phase 1: Snapshot-based dirty detection =====
+  // Compares a fingerprint of the current Flow state (nodes/edges/subgraphGroups,
+  // via useFlowPersistence.buildSaveData's whitelist) against the last saved
+  // fingerprint stored on the per-tab TabState. Every state mutation eventually
+  // re-renders FlowTab → the watch effect fires → fingerprint diff catches it,
+  // so dirty detection is passive and cannot be bypassed by any mutation site.
+  //
+  // This is additive — the existing event-driven markDirty() calls remain in
+  // place until Phase 2 verifies this works.
+  //
+  // Init: anchor the fingerprint to the initial state (so freshly-mounted /
+  // just-loaded tabs are clean). FlowTab is key-remounted per tab (commit
+  // daf4aad), so a tab switch produces a fresh mount and we re-anchor from
+  // the just-restored initialNodes/initialEdges. We only set if there isn't
+  // already one (e.g. set by useFlowPersistence's restoreFlowgraph).
+  //
+  // CRITICAL: computeFlowFingerprint reads from rfInstance.current.getNodes(),
+  // which is null until ReactFlow's onInit fires. So we anchor inside onInit
+  // (see below in the JSX), NOT in a mount-time useEffect — otherwise the
+  // anchor would capture an empty state and the watch effect would immediately
+  // flag the tab as dirty once the real nodes appear.
+  const anchorInitialFingerprint = useCallback(() => {
+    const existing = tabStatesRef.current.get(tabId)?.lastSavedFingerprint;
+    if (existing === undefined) {
+      setSavedFingerprint(tabId, computeFlowFingerprint());
+    }
+  }, [tabId, setSavedFingerprint, computeFlowFingerprint, tabStatesRef]);
+
+  // Watch effect: any render that changes nodes/edges re-computes the
+  // fingerprint and compares with the saved anchor. Diverged → markDirty.
+  // Equal (e.g. user undid back to saved state) → clearDirty.
+  useEffect(() => {
+    const saved = tabStatesRef.current.get(tabId)?.lastSavedFingerprint;
+    if (saved === undefined) return; // init effect hasn't run yet
+    const current = computeFlowFingerprint();
+    if (current !== saved) {
+      markDirty();
+    } else {
+      // State matches saved — clear dirty (auto-clear-on-revert branch).
+      const state = tabStatesRef.current.get(tabId);
+      if (state?.dirty) clearDirty(tabId);
+    }
+  }, [nodes, edges, computeFlowFingerprint, markDirty, clearDirty, setSavedFingerprint, tabStatesRef, tabId]);
 
   // ===== Undo/Redo (extracted hook) — uses App-owned history refs =====
   const { pushHistory, undo, redo } = useUndoRedo({
@@ -551,7 +597,13 @@ export function FlowTab(props: FlowTabProps) {
     h(ReactFlow, {
           ref: flowContainer,
           nodes, edges, onNodesChange, onEdgesChange, onConnect: onConnectGuarded,
-          onInit: inst => { rfInstance.current = inst; window.rfInstance = inst; },
+          onInit: inst => {
+            rfInstance.current = inst;
+            window.rfInstance = inst;
+            // Anchor fingerprint NOW that rfInstance is ready and the initial
+            // nodes/edges are visible to computeFlowFingerprint.
+            anchorInitialFingerprint();
+          },
           onNodeContextMenu, onEdgeContextMenu, onSelectionContextMenu, onPaneContextMenu,
           onDragOver, onDrop,
           onNodeClick,

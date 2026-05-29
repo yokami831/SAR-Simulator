@@ -70,6 +70,9 @@ export function useTabManager({
       redoStack: structuredClone(futureRef.current),
       subgraphStore: structuredClone(subgraphStoreRef.current),
       dirty: tabStatesRef.current.get(id)?.dirty || false,
+      // Preserve fingerprint across tab snapshots so a tab-switch round-trip
+      // doesn't lose the saved anchor (Phase 1 snapshot dirty detection).
+      lastSavedFingerprint: tabStatesRef.current.get(id)?.lastSavedFingerprint,
       panels: {
         sidebar: sidebarVisibleRef.current,
         console: !document.getElementById('console-panel')?.classList.contains('console-hidden'),
@@ -96,6 +99,15 @@ export function useTabManager({
       state.dirty = false;
       setTabs(prev => [...prev]);
     }
+  }, []);
+
+  /** Phase 1 snapshot dirty detection: re-anchor the saved fingerprint for a
+   *  tab. Called by FlowTab on initial mount, and by useFlowPersistence after
+   *  a successful save / restore. Does NOT trigger a re-render — fingerprint is
+   *  metadata read by FlowTab's watch effect, not displayed in the UI. */
+  const setSavedFingerprint = useCallback((tabId: string, fingerprint: string) => {
+    const state = tabStatesRef.current.get(tabId);
+    if (state) state.lastSavedFingerprint = fingerprint;
   }, []);
 
   /** Switch to a different tab */
@@ -372,6 +384,7 @@ export function useTabManager({
     reorderTabs,
     markDirty,
     clearDirty,
+    setSavedFingerprint,
     persistOpenTabs,
   };
 }
