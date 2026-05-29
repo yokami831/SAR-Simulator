@@ -366,6 +366,9 @@ export function useToolCommandHandler({
                 inputs: inputs.map((p: { id: string }) => p.id || p),
                 outputs: outputs.map((p: { id: string }) => p.id || p),
                 ...(d.enabled === false ? { enabled: false } : {}),
+                ...(d.codeCollapsed === true ? { codeCollapsed: true } : {}),
+                ...(d.specCollapsed === true ? { specCollapsed: true } : {}),
+                ...(d.barColor ? { barColor: d.barColor } : {}),
                 // Execution result data (matches what is displayed on the node)
                 ...(d.executionStatus ? {
                   executionStatus: d.executionStatus,

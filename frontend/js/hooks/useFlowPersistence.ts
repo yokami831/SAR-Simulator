@@ -80,6 +80,8 @@ export function useFlowPersistence({
           defaultParameters: n.data.defaultParameters || {},
           ...(n.data.enabled === false ? { enabled: false } : {}),
           ...(n.data.codeCollapsed === true ? { codeCollapsed: true } : {}),
+          ...(n.data.specCollapsed === true ? { specCollapsed: true } : {}),
+          ...(typeof n.data.specHeight === 'number' ? { specHeight: n.data.specHeight } : {}),
           ...(n.data.barColor ? { barColor: n.data.barColor } : {}),
         },
       })),
@@ -118,6 +120,12 @@ export function useFlowPersistence({
       }
       if (n.data.codeCollapsed === true) {
         node.data = { ...node.data, codeCollapsed: true };
+      }
+      if (n.data.specCollapsed === true) {
+        node.data = { ...node.data, specCollapsed: true };
+      }
+      if (typeof n.data.specHeight === 'number') {
+        node.data = { ...node.data, specHeight: n.data.specHeight };
       }
       if (n.data.barColor) {
         node.data = { ...node.data, barColor: n.data.barColor };
