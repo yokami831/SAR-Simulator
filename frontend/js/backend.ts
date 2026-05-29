@@ -37,43 +37,23 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   return resp.json();
 }
 
-export function apiRun() {
-  return apiFetch('/api/tools/start_execution', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
-  });
+/** POST to a tools endpoint. withBody sends an empty JSON object body. */
+function apiPost(path: string, withBody = false): Promise<unknown> {
+  const options: RequestInit = withBody
+    ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+    : { method: 'POST' };
+  return apiFetch(path, options);
 }
 
-export function apiStop() {
-  return apiFetch('/api/tools/stop_execution', { method: 'POST' });
-}
-
-export function apiStatus() {
-  return apiFetch('/api/tools/get_execution_status', { method: 'POST' });
-}
-
-export function apiClear() {
-  return apiFetch('/api/tools/clear', { method: 'POST' });
-}
-
-export function apiStepStart() {
-  return apiFetch('/api/tools/step_start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-}
-
-export function apiStepNext() {
-  return apiFetch('/api/tools/step_next', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-}
-
-export function apiStepReset() {
-  return apiFetch('/api/tools/step_reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-}
-
-export function apiRunRemaining() {
-  return apiFetch('/api/tools/run_remaining', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-}
-
-export function apiAutoLayout() {
-  return apiFetch('/api/tools/auto_layout', { method: 'POST' });
-}
+export const apiRun = () => apiPost('/api/tools/start_execution', true);
+export const apiStop = () => apiPost('/api/tools/stop_execution');
+export const apiStatus = () => apiPost('/api/tools/get_execution_status');
+export const apiClear = () => apiPost('/api/tools/clear');
+export const apiStepStart = () => apiPost('/api/tools/step_start', true);
+export const apiStepNext = () => apiPost('/api/tools/step_next', true);
+export const apiStepReset = () => apiPost('/api/tools/step_reset', true);
+export const apiRunRemaining = () => apiPost('/api/tools/run_remaining', true);
+export const apiAutoLayout = () => apiPost('/api/tools/auto_layout');
 
 // ===== WebSocket with Auto-Reconnect =====
 

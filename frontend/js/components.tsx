@@ -12,7 +12,7 @@ import { Handle, Position, NodeResizer } from '@xyflow/react';
 import type { Node } from '@xyflow/react';
 
 import { getBlockDef, getSetNodesRef } from './blockLibraryData.js';
-import { NODE_MIN_WIDTH, NODE_COMPACT_HEIGHT, MAX_OUTPUT_DISPLAY_LEN } from './utils.js';
+import { NODE_MIN_WIDTH, NODE_COMPACT_HEIGHT, MAX_OUTPUT_DISPLAY_LEN, updateNodeById } from './utils.js';
 import { NODE_RESIZER_COLOR, TOOLTIP_INFO_BG, TOOLTIP_INFO_BORDER, TOOLTIP_WARNING_BG, TOOLTIP_WARNING_BORDER, TOOLTIP_TEACHING_BG, TOOLTIP_TEACHING_BORDER, Z_MODAL_OVERLAY, Z_MODAL_BUTTON } from './constants.js';
 
 // Feature flag cache (loaded once from /api/config)
@@ -804,8 +804,7 @@ function CommentNode({ id, data, selected }: { id: string; data: BlockNodeData; 
     if (draft !== text) {
       const setNodes = getSetNodesRef();
       if (!setNodes) return;
-      setNodes((nds) => nds.map(n => {
-        if (n.id !== id) return n;
+      setNodes((nds) => updateNodeById(nds, id, n => {
         const d = n.data as BlockNodeData;
         return { ...n, data: { ...d, defaultParameters: { ...(d.defaultParameters || {}), text: draft } } };
       }));
@@ -924,8 +923,7 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
   const toggleSpecCollapse = useCallback(() => {
     const setNodes = getSetNodesRef();
     if (!setNodes) return;
-    setNodes((nds) => nds.map(n => {
-      if (n.id !== id) return n;
+    setNodes((nds) => updateNodeById(nds, id, n => {
       const { height: _h, ...restStyle } = (n.style || {}) as Record<string, unknown>;
       const { height: _mh, ...restMeasured } = ((n as Record<string, unknown>).measured || {}) as Record<string, unknown>;
       const { height: _nh, ...restNode } = n as Record<string, unknown>;
@@ -946,9 +944,7 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
     const startH = specHeight;
     const onMove = (ev: MouseEvent) => {
       const next = Math.max(32, startH + (ev.clientY - startY));
-      setNodes((nds) => nds.map(n =>
-        n.id === id ? { ...n, data: { ...n.data, specHeight: next } } : n,
-      ));
+      setNodes((nds) => updateNodeById(nds, id, n => ({ ...n, data: { ...n.data, specHeight: next } })));
     };
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
@@ -963,8 +959,7 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
     if (!setNodes) return;
     const next = !codeCollapsed;
     // Update data.codeCollapsed and remove explicit height so node auto-sizes
-    setNodes((nds) => nds.map(n => {
-      if (n.id !== id) return n;
+    setNodes((nds) => updateNodeById(nds, id, n => {
       const { height: _h, ...restStyle } = (n.style || {}) as Record<string, unknown>;
       const { height: _mh, ...restMeasured } = ((n as Record<string, unknown>).measured || {}) as Record<string, unknown>;
       const { height: _nh, ...restNode } = n as Record<string, unknown>;
@@ -1004,12 +999,9 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
   const onParamChange = useCallback((paramId: string, value: string) => {
     const setNodes = getSetNodesRef();
     if (!setNodes) return;
-    setNodes((nds) => nds.map(n => {
-      if (n.id !== id) return n;
-      return { ...n, data: { ...n.data,
-        defaultParameters: { ...(n.data as BlockNodeData).defaultParameters, [paramId]: value }
-      }};
-    }));
+    setNodes((nds) => updateNodeById(nds, id, n => ({ ...n, data: { ...n.data,
+      defaultParameters: { ...(n.data as BlockNodeData).defaultParameters, [paramId]: value }
+    }})));
   }, [id]);
 
   const isEnabled = data.enabled !== false;
@@ -1017,10 +1009,7 @@ function RegularBlockNode({ id, data, selected }: { id: string; data: BlockNodeD
   const onEnabledChange = useCallback((checked: boolean) => {
     const setNodes = getSetNodesRef();
     if (!setNodes) return;
-    setNodes((nds) => nds.map(n => {
-      if (n.id !== id) return n;
-      return { ...n, data: { ...n.data, enabled: checked } };
-    }));
+    setNodes((nds) => updateNodeById(nds, id, n => ({ ...n, data: { ...n.data, enabled: checked } })));
   }, [id]);
 
   const blockTypeStr = blockType || '';
