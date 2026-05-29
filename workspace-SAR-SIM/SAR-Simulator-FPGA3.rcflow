@@ -4,10 +4,8 @@
   "title": "SAR-Simulator-FPGA3",
   "description": "",
   "created": "2026-05-27T09:06:43.977563+00:00",
-  "modified": "2026-05-29T06:13:10.354449+00:00",
+  "modified": "2026-05-29T12:41:27.858572+00:00",
   "canvas": {
-    "name": "flowgraph",
-    "savedAt": "2026-05-29T06:13:10.349Z",
     "nodes": [
       {
         "id": "n2",
@@ -16,7 +14,6 @@
           "x": 517.2533573264079,
           "y": -11.33625912520529
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -41,7 +38,8 @@
             "spec": "Generate the transmit linear-FM (chirp) pulse and the imaging grid.\n\nParameters (from mindmap):\n- Frequency: min/max  -> chirp sweeps fc-B/2 .. fc+B/2\n- Pulse width: Tp\n- PRF: pulse repetition frequency\n\nPhysics:\n- chirp rate  Kr = B/Tp\n- baseband chirp  s(t) = rect(|t|<=Tp/2) * exp(j*pi*Kr*t^2)\n- wavelength lam = c/fc, ref slant range R0 = H/cos(look)\n\nThis block also designs the range/azimuth sampling grid (Nr,Na,t_r,eta,az_pos) the echo will live on."
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n3",
@@ -50,7 +48,6 @@
           "x": 1021.7200005608117,
           "y": 75.75599801846501
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -75,7 +72,8 @@
             "spec": "REAL HW: mixes the baseband chirp up to the RF carrier fc (CenterFrequency).\n\nSimulation: SKIPPED. The simulator works at baseband with R_eta phase carrying the carrier term (-4*pi*R/lam), so explicit up-conversion is not modeled. Placeholder block kept so the structure matches the real transmit chain."
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n4",
@@ -84,7 +82,6 @@
           "x": 1024.8599956069743,
           "y": 326.755998018465
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -109,7 +106,8 @@
             "spec": "REAL HW: high-power amplifier. Characteristics: saturation, noise floor (NF), frequency flatness.\n\nSimulation: SKIPPED (ideal linear amplification assumed). Placeholder for future refinement (e.g. add AM/AM saturation, NF)."
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n5",
@@ -118,7 +116,6 @@
           "x": 1031.1136753535654,
           "y": 518.755998018465
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -143,7 +140,8 @@
             "spec": "REAL HW: RF band-pass filter. Characteristic: filter response shapes the transmit spectrum.\n\nSimulation: SKIPPED (ideal flat passband assumed). Placeholder for future refinement."
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n6",
@@ -152,7 +150,6 @@
           "x": 1591.4481321461037,
           "y": 66.49078550911027
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -177,7 +174,8 @@
             "spec": "REAL HW: antenna pattern shapes the illumination. Characteristics (mindmap): range direction, azimuth direction, gain.\n\nSimulation: azimuth pattern modeled as normalized-sinc^2 with first null at the beamwidth theta_a:\n  pat(squint) = sinc(squint/theta_a)^2\nThis is a first-null beamwidth approximation (NOT 3 dB). Range-direction pattern and absolute gain are not modeled (relative pattern only)."
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n9",
@@ -186,7 +184,6 @@
           "x": 113.59353230894135,
           "y": 1816.0173193183614
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -210,7 +207,8 @@
             "label": "Analog BPF",
             "spec": "REAL HW (Receive): analog band-pass filter on the received echo before down-conversion. Selects the signal band, rejects out-of-band noise/interference.\n\nSimulation: SKIPPED (ideal — the raw echo is already band-limited). Placeholder so the structure matches the real receive chain."
           }
-        }
+        },
+        "width": 400
       },
       {
         "id": "n10",
@@ -219,7 +217,6 @@
           "x": 116.09595350274219,
           "y": 2068.0173193183614
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -243,7 +240,8 @@
             "label": "Downconvert",
             "spec": "REAL HW (Receive): mixes the received RF signal down to baseband (I/Q demodulation).\n\nSimulation: SKIPPED. The simulator already works at baseband (the echo phase carries -4*pi*R/lam directly), so explicit down-conversion is not modeled. Placeholder."
           }
-        }
+        },
+        "width": 400
       },
       {
         "id": "n11",
@@ -252,7 +250,6 @@
           "x": 116.09595350274219,
           "y": 2320.0173193183614
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -276,7 +273,8 @@
             "label": "Filtering",
             "spec": "REAL HW (Receive): anti-alias / channel filtering after down-conversion.\n\nSimulation: SKIPPED (ideal). Placeholder for future refinement."
           }
-        }
+        },
+        "width": 400
       },
       {
         "id": "n12",
@@ -285,7 +283,6 @@
           "x": 116.09595350274219,
           "y": 2572.0173193183614
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -309,7 +306,8 @@
             "label": "Down sample & filter",
             "spec": "REAL HW (Receive): decimation to the processing sample rate with the matching anti-alias filter.\n\nSimulation: SKIPPED. The grid is already designed at Fs=1.2*B, so no resampling is modeled. Placeholder."
           }
-        }
+        },
+        "width": 400
       },
       {
         "id": "n13",
@@ -318,7 +316,6 @@
           "x": 116.09595350274219,
           "y": 2824.0173193183614
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -342,7 +339,8 @@
             "label": "BAQ compression",
             "spec": "REAL HW (Receive): Block Adaptive Quantization — onboard lossy compression of the raw echo to save downlink bandwidth. Parameter: number of bits.\n\nSimulation: SKIPPED (full-precision complex64 kept). Placeholder; a future refinement could quantize s_raw to N bits/sample to study BAQ artifacts."
           }
-        }
+        },
+        "width": 400
       },
       {
         "id": "n14",
@@ -351,7 +349,6 @@
           "x": 687.5495909929434,
           "y": 2086.059389167513
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -376,7 +373,8 @@
             "spec": "PROCESSING (RDA step 1): compress each range line by matched filtering with the conjugate of the transmit chirp.\n\nPhysics:\n  H_range = conj( FFT( ifftshift(ref_chirp) ) )\n  s_rc = IFFT( FFT(s_raw, axis=range) * H_range )\nConcentrates each target's chirp smear into a sharp range peak."
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n15",
@@ -385,7 +383,6 @@
           "x": 1149.8813333536234,
           "y": 2090.346417141425
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -410,7 +407,8 @@
             "spec": "PROCESSING (RDA step 2): FFT along azimuth (slow-time) to enter the Range-Doppler domain. Range axis is never shifted; azimuth is fftshift-ed so the Doppler axis is centered.\n\n  S_rd  = fftshift( FFT(s_rc, axis=azimuth) )\n  f_eta = fftshift( fftfreq(Na, 1/PRF) )   # Doppler axis"
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n16",
@@ -419,7 +417,6 @@
           "x": 1639.1422549275474,
           "y": 2074.7905512635116
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -444,7 +441,8 @@
             "spec": "PROCESSING (RDA step 3): Range Cell Migration Correction. In the Range-Doppler domain a target's energy lies on a parabola across range cells; RCMC straightens it via a range-frequency phase shift.\n\n  delta_R = lam^2 * R0 * f_eta^2 / (8 V^2)   (narrow-beam)\n  shift   = exp(j 2pi f_r * 2 delta_R / c)\n  S_rd_rcmc = IFFT( FFT(S_rd, axis=range) * shift )"
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n17",
@@ -453,7 +451,6 @@
           "x": 2119.76374767998,
           "y": 2072.6625246679473
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -478,7 +475,8 @@
             "spec": "PROCESSING (RDA step 4): focus in azimuth with the conjugate azimuth matched filter, then inverse azimuth FFT -> focused complex image.\n\nMETHOD C (range-dependent azimuth FM rate). Each range column uses its own slant range R_col = R0 + range_offset, so its own Ka(r):\n  Ka(r) = 2 V^2 / (lam * R_col)            # per range column (Nr,)\n  H_az  = exp(-j pi f_eta^2 / Ka(r))       # 2-D (Na, Nr), conjugate, focuses at az=0\n  img   = IFFT( ifftshift( S_rd_rcmc * H_az ) )\n\nWhy: a single Ka fixed at R0 mis-focuses far-range targets once the swath is wide. Verified (verify_rcmc_swath_sweep.py): the range-independent filter mis-places corner targets by 1-2 azimuth cells from ~+-1 km swath; Ka(r) brings them back to 0. At narrow swath Ka(r) == single-Ka, so this is a safe always-on upgrade.\n\nNote on RCMC (n16): kept parabolic on purpose. The exact-hyperbolic dR was verified to make NO measurable difference even at B=600 MHz / +-2 km (R0 ~ 567 km geometry), so azimuth Ka(r) is the ONLY focusing fix that matters for wide swath; do not 'fix' the RCMC unless geometry changes drastically.\n\nResult: each point target collapses to its impulse response (IRF), correctly placed across the full swath."
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n18",
@@ -487,7 +485,6 @@
           "x": 2139.2530348842324,
           "y": 1060.2367117354574
         },
-        "width": 832,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -513,7 +510,8 @@
           },
           "codeCollapsed": true,
           "barColor": "#f59e0b"
-        }
+        },
+        "width": 832
       },
       {
         "id": "n19",
@@ -522,7 +520,6 @@
           "x": 681.0182097102215,
           "y": 1088.6531130425055
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -548,7 +545,8 @@
           },
           "codeCollapsed": true,
           "barColor": "#f59e0b"
-        }
+        },
+        "width": 400
       },
       {
         "id": "n20",
@@ -557,7 +555,6 @@
           "x": 1126.4063171965938,
           "y": 1091.411949684278
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -583,7 +580,8 @@
           },
           "codeCollapsed": true,
           "barColor": "#f59e0b"
-        }
+        },
+        "width": 400
       },
       {
         "id": "n21",
@@ -592,7 +590,6 @@
           "x": 1645.3812868104822,
           "y": 1066.9135980355052
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -618,7 +615,8 @@
           },
           "codeCollapsed": true,
           "barColor": "#f59e0b"
-        }
+        },
+        "width": 400
       },
       {
         "id": "n25",
@@ -627,7 +625,6 @@
           "x": -488.98322183952496,
           "y": 1927
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -652,7 +649,8 @@
             "spec": "【LNA (Level 2 RF Front-End, explicit link budget)】\n\n3段処理:\n1. リンクバジェット連鎖 (EIRP − L_path + G_r + G_LNA) を s_raw に voltage scaling として一括適用。アンテナ寸法 (La, Lr) と波長 (λ) から G_t = G_r を 4π·η·La·Lr/λ² で算出。調整ノブは G_LNA (slider n53) 一個に集約。\n2. 熱雑音 (kTBF) — ADC基準で固定。G_LNA を変えても雑音床は動かない設計 (signal だけ動く → SNR が実際に変わる)。AGC とは別物。\n3. ADC clip 率を per-sample で表示 (>0% で飽和警告)。\n\n内訳 (コメント・出力に同じ数値を表示):\n  Tx     P_t = +63 dBm (~2 kW)\n         G_t = 10·log10(4π·η·La·Lr / λ²)   η=0.6\n         EIRP = P_t + G_t\n  Channel L_path = 30·log10(4π) + 40·log10(R0) − 20·log10(λ) − 10·log10(σ_ref=1m²)\n         (per-scatterer 1/R² 変動は n32 で既に反映済)\n  Rx     G_r = G_t (monostatic, shared aperture)\n         G_LNA = slider n53 (level-tune knob)\n  Net    K_total = 10^((EIRP − L_path + G_r + G_LNA) / 20)\n\nG_LNA が物理的に大きい (~100–150 dB) 理由:\nn32 の s_raw は |peak| ≈ 1.0 の正規化値。実物理では ~−156 dBm 相当を 1 V ADC FS に持ち上げるために ~165 dB の受信機鎖ゲインが必要。本シミュレータは LNA / mixer / IF amp / baseband / AGC を G_LNA 一つに集約している (コメントで各物理寄与は明示)。\n\n入力 (kernel namespace):\n  s_raw  ← n42/n43/n47 のいずれか (n32 で σ°_max + 1/R² 反映済)\n  R0, lam ← n6, La, Lr, B ← n1\n\nGUI 入力:\n  nf_db     ← n26 (Noise Figure dB)\n  g_lna_db  ← n53 (LNA / total Rx-chain gain, level-tune knob; default 110 dB → reference peak ≈ −30 dBFS)\n\n旧 signal_peak_dbfs スライダ (校正ターゲット dBFS) は同等の g_lna_db に内部で変換する fallback 付き。\n\n出力 (kernel namespace):\n  s_raw → 後段 SAR 処理 (n9〜n18) が消費。peak はシーン依存、ADC FS=1.0 V_peak 単位。\n  console に link budget breakdown + achieved peak dBFS + ADC clip% + noise floor + SNR を表示。\n\nシーン別の振る舞い:\n  - 点標的 1 個 (σ°=0 dB): achieved peak ≈ (chain_no_lna + g_lna_db) dBFS  (default: −30)\n  - σ°_max を +20 dB: peak が +20 dB → 飽和の可能性\n  - σ°_max を −40 dB: peak が雑音床近くまで沈む → SNR 低下を観測可能\n  - 多数散乱体の画像: コヒーレント和で peak が ~sqrt(N) 以上に成長 → ADC 飽和の可能性"
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n26",
@@ -661,7 +659,6 @@
           "x": -800.542956960342,
           "y": 1270.6256813225232
         },
-        "width": 250,
         "data": {
           "label": "Slider",
           "category": "gui",
@@ -689,7 +686,8 @@
             "label": "Noise Figure (dB)"
           },
           "barColor": "#a3e635"
-        }
+        },
+        "width": 250
       },
       {
         "id": "n27",
@@ -698,7 +696,6 @@
           "x": 122.95939438515097,
           "y": 1086.468504618489
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -724,7 +721,8 @@
           },
           "codeCollapsed": true,
           "barColor": "#f59e0b"
-        }
+        },
+        "width": 400
       },
       {
         "id": "n30",
@@ -733,7 +731,6 @@
           "x": 495.79938052923285,
           "y": 265.13453431833346
         },
-        "width": 485,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -757,7 +754,8 @@
             "label": "Fixed Parameters"
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 485
       },
       {
         "id": "n31",
@@ -766,7 +764,6 @@
           "x": 8.092061735021929,
           "y": 539.1941256183005
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -792,7 +789,8 @@
           },
           "codeCollapsed": true,
           "barColor": "#f59e0b"
-        }
+        },
+        "width": 400
       },
       {
         "id": "n32",
@@ -801,7 +799,6 @@
           "x": 2160.7966858033133,
           "y": 280.8485750918655
         },
-        "width": 503,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -826,7 +823,8 @@
             "spec": "【共通ステージ】NUFFTで反射係数を生成するだけのノード。s_raw は計算しない。\n\n出力（kernel namespace 経由で下流の FPGA ルートノードへ）:\n- S_all (Na, Nr) complex64  — 周波数領域反射係数（NUFFT 直出力）\n- chirp_fft (Nr,) complex64 — fft(ref_chirp)、共役なし・ifftshift なし\n- fir_coefficients (Na, Nr) complex64 — 時間領域FIRタップ = ifftshift(ifft(S_all, axis=1))。FPGA Notebook（target_sim_FFT_FPGA_convert2Image2_375M.ipynb）と同じ形式\n\n3つのFPGAルート（Float / Fixed-point / 外部FPGA）はすべてこのノードの出力を共有する。下記ルートノードのいずれかを Enabled にして s_raw を生成する:\n- n32_Float       : Route A — 浮動小数点理想 IFFT（デフォルト Enabled）\n- n32_Fixed       : Route B — fxpmath 固定小数点（3ステージ Q-format）\n- n32_FPGA_Save   : Route C-out — 係数を .mat に書き出し（HDL シミュ用）\n- n32_FPGA_Load   : Route C-in  — FPGA出力の .npy を取り込み s_raw として使用\n\n性能: NUFFT本体（~84s on RTX 5080）は旧 n32 と同じ。末尾の IFFT（~1秒）だけ各ルートノードへ移動した。"
           },
           "codeCollapsed": true
-        }
+        },
+        "width": 503
       },
       {
         "id": "n41",
@@ -835,7 +833,6 @@
           "x": 2611.6537765249495,
           "y": 1905.7198148346138
         },
-        "width": 687,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -860,16 +857,16 @@
           },
           "codeCollapsed": true,
           "barColor": "#f59e0b"
-        }
+        },
+        "width": 687
       },
       {
         "id": "n42",
         "type": "canvasNode",
         "position": {
-          "x": 3038.881677049793,
-          "y": -117.76567202830034
+          "x": 3022.835128534431,
+          "y": 391.00914592156255
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -889,22 +886,21 @@
             }
           ],
           "defaultParameters": {
-            "code": "# === FPGA Route A: Float Ideal (IFFT) ===\n# 浮動小数点理想ルート。S_all と chirp_fft を周波数領域で乗算して IFFT 戻し、\n# raw echo s_raw を生成する。旧 n32 末尾と完全等価（complex64、GPU 1バッチ）。\n#\n# Enable してこのノードを動かすと s_raw が kernel に出て、下流 n25 (LNA) に\n# 流れる。Route B (n32_Fixed) / Route C-in (n32_FPGA_Load) と同時 Enable しない\n# こと（s_raw が衝突する）。Route C-out (n32_FPGA_Save) とは併用可。\nimport numpy as np\nimport cupy as cp\nimport time as _time\n_t0 = _time.monotonic()\n\nS_gpu = cp.asarray(S_all)\nchirp_gpu = cp.asarray(chirp_fft)\ns_raw = cp.asnumpy(cp.fft.ifft(S_gpu * chirp_gpu[None, :], axis=1)).astype(np.complex64)\ndel S_gpu, chirp_gpu\ncp.get_default_memory_pool().free_all_blocks()\n\nprint('Float route: s_raw=%s peak|s|=%.3f  (%.2fs)'\n      % (s_raw.shape, float(np.abs(s_raw).max()), _time.monotonic() - _t0))\n",
+            "code": "# === Route gate: runs ONLY when route_mode == 'float' ===\n# route_mode is set by the 'Route Selector' dropdown (var_name='route_mode').\n# float=Route A(浮動小数点) / fixed=Route B(Python固定小数点) / hdl=Verilator(HDLシミュレーション)\n_mode = str(globals().get('route_mode', 'float'))\nif _mode == 'float':\n    # === FPGA Route A: Float Ideal (IFFT) ===\n    # 浮動小数点理想ルート。S_all と chirp_fft を周波数領域で乗算して IFFT 戻し、\n    # raw echo s_raw を生成する。旧 n32 末尾と完全等価（complex64、GPU 1バッチ）。\n    #\n    # Enable してこのノードを動かすと s_raw が kernel に出て、下流 n25 (LNA) に\n    # 流れる。Route B (n32_Fixed) / Route C-in (n32_FPGA_Load) と同時 Enable しない\n    # こと（s_raw が衝突する）。Route C-out (n32_FPGA_Save) とは併用可。\n    import numpy as np\n    import cupy as cp\n    import time as _time\n    _t0 = _time.monotonic()\n\n    S_gpu = cp.asarray(S_all)\n    chirp_gpu = cp.asarray(chirp_fft)\n    s_raw = cp.asnumpy(cp.fft.ifft(S_gpu * chirp_gpu[None, :], axis=1)).astype(np.complex64)\n    del S_gpu, chirp_gpu\n    cp.get_default_memory_pool().free_all_blocks()\n\n    print('Float route: s_raw=%s peak|s|=%.3f  (%.2fs)'\n          % (s_raw.shape, float(np.abs(s_raw).max()), _time.monotonic() - _t0))\nelse:\n    print('[Route A float] skipped (route_mode=%s)' % _mode)\n",
             "label": "FPGA Route A: Float Ideal (IFFT)",
             "spec": "【Route A: 浮動小数点理想ルート】\n\nこのノードを Enable にすると S_all × chirp_fft → IFFT を浮動小数点 (complex64) で計算し、理想的な s_raw を生成する。デフォルトで有効。\n\n入力（kernel namespace 経由）:\n  S_all      (Na, Nr) complex64  — n32 (NUFFT共通) が生成\n  chirp_fft  (Nr,)    complex64  — n32 が生成\n\n出力（kernel namespace）:\n  s_raw      (Na, Nr) complex64  — n25 (LNA) が消費\n\n排他関係:\n  Route B (n32_Fixed) / Route C-in (n32_FPGA_Load) と同時 Enable 不可\n  （s_raw が衝突する）。Route C-out (n32_FPGA_Save) とは併用可。"
           },
-          "enabled": false,
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n43",
         "type": "canvasNode",
         "position": {
-          "x": 3034.942793772455,
-          "y": 111.48279160102358
+          "x": 3031.1957964366256,
+          "y": 620.5939835951599
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -924,20 +920,21 @@
             }
           ],
           "defaultParameters": {
-            "code": "# === FPGA Route B: Fixed-point (Q-format 3-stage, GPU) ===\n# FPGA で必然となるビット幅制限が SAR 画像品質にどう効くかを Python で評価する\n# ルート。FPGA でよくある FFT × 周波数乗算 × IFFT のパイプラインを cupy GPU で\n# 量子化しながら模擬する。3 ステージ独立 Q-format:\n#   Stage A : 入力時間領域 (FIR taps + chirp)  --> ADC ビット幅 (Q_IN_*)\n#   Stage B : FFT 後の周波数領域 + 乗算後      --> FPGA 内部演算 (Q_FFT_*)\n#   Stage C : IFFT 後の時間領域 (最終 s_raw)   --> DAC ビット幅 (Q_OUT_*)\n# 各ステージで auto-scale (peak->full-scale*0.95) → round-half-to-even +\n# saturate で量子化 → 復元。量子化 SNR を per-stage に GPU 上で計算して表示。\n#\n# 同時 Enable 排他: Route A (n42) / Route C-in (n47) と同時 Enable 不可\n# (s_raw が衝突する)。Route C-out (n44) とは併用可。\nimport numpy as np\nimport cupy as cp\nimport math\nimport time as _time\n_t0 = _time.monotonic()\n\n# --- Q-format parameters (このノード code を編集してチューニング) ----------\n# Stage A: 入力時間領域 = ADC ビット幅。10bit ADC は Q1.9 (1bit符号 + 9bit小数、\n# range ~[-1, 1))。chirp / FIR taps は概ね O(1) なのでこれで足りる\nQ_IN_W,  Q_IN_F  = 8, 7\n# Stage B: FFT 後周波数領域 (FPGA 内部演算)。N=Nr で log2(Nr) のビット成長を\n# 吸収するため広めに取る。Xilinx 7 系 DSP の 18bit に合わせて Q8.10\n# (整数 8bit + 小数 10bit、dynamic range ~256、分解能 ~0.001)\nQ_FFT_W, Q_FFT_F = 14-4, 4\n# Stage C: IFFT 後時間領域 = DAC ビット幅。10bit DAC は Q1.9\nQ_OUT_W, Q_OUT_F = 8, 7\n# -------------------------------------------------------------------------\n\n# fxpmath の signed Q(n_word-n_frac).n_frac 定義と等価の量子化を cupy で実装。\n# round-half-to-even (cp.rint と等価) + saturate (cp.clip)。numpy 版から1行\n# 単位で対応する形なので、結果はビット同一。\ndef _qaxis(v, n_word, n_frac, scale):\n    step = 2.0 ** (-n_frac)\n    iv_max =  (1 << (n_word - 1)) - 1\n    iv_min = -(1 << (n_word - 1))\n    return cp.clip(cp.round(v * scale / step), iv_min, iv_max) * step / scale\n\ndef qz(x, n_word, n_frac, name='', mode='auto'):\n    \"\"\"Quantize cupy complex array to Q(n_word-n_frac).n_frac signed.\n\n    mode='auto'  : Block Floating Point - auto-scale by peak so |x|_max -> FS*0.95.\n                   Output is rescaled back to original magnitude (peak preserved).\n                   Used for Stage B (FFT internal datapath) and Stage C.\n    mode='fixed' : Fixed Q-format at FS=2^(n_word-1-n_frac). NO auto-scale.\n                   Input must already be in [-FS, +FS] range (clipped if not).\n                   Used for Stage A (ADC quantize): the analog gain decided in\n                   n25 determines where the signal lands relative to FS.\n\n    Reports SNR and (for fixed) clip percentage.\"\"\"\n    import math\n    if x.size == 0:\n        return x.astype(cp.complex64)\n\n    if mode == 'fixed':\n        full_scale = float(2 ** (n_word - 1 - n_frac))\n        step = 2.0 ** (-n_frac)\n        iv_max =  (1 << (n_word - 1)) - 1\n        iv_min = -(1 << (n_word - 1))\n        # Direct fixed quantize: clip first to full-scale, then round.\n        r_q = cp.clip(cp.round(x.real / step), iv_min, iv_max) * step\n        i_q = cp.clip(cp.round(x.imag / step), iv_min, iv_max) * step\n        peak = float(cp.maximum(cp.abs(x.real).max(), cp.abs(x.imag).max()))\n        clip_frac = float(((cp.abs(x.real) >= full_scale) | (cp.abs(x.imag) >= full_scale)).mean())\n        err2 = (x.real - r_q) ** 2 + (x.imag - i_q) ** 2\n        sig2 = (cp.abs(x) ** 2).mean()\n        snr_db = 10.0 * float(cp.log10(sig2 / (err2.mean() + 1e-30)))\n        headroom_db = 20.0 * math.log10(full_scale / peak) if peak > 0 else float('inf')\n        print('  qz[%-9s fixed] Q%d.%d  FS=%.3g  peak=%.3g  headroom=%+5.1f dB  clip=%5.2f%%  SNR=%.1f dB'\n              % (name, n_word - n_frac, n_frac, full_scale, peak, headroom_db, 100*clip_frac, snr_db))\n        return (r_q + 1j * i_q).astype(cp.complex64)\n\n    # mode == 'auto' (BFP)\n    peak = float(cp.maximum(cp.abs(x.real).max(), cp.abs(x.imag).max()))\n    if peak == 0:\n        return x.astype(cp.complex64)\n    full_scale = float(2 ** (n_word - 1 - n_frac))\n    s = 0.95 * full_scale / peak\n    r_q = _qaxis(x.real, n_word, n_frac, s)\n    i_q = _qaxis(x.imag, n_word, n_frac, s)\n    err2 = (x.real - r_q) ** 2 + (x.imag - i_q) ** 2\n    sig2 = (cp.abs(x) ** 2).mean()\n    snr_db = 10.0 * float(cp.log10(sig2 / (err2.mean() + 1e-30)))\n    shift_bits = math.log2(s) if s > 0 else 0.0\n    print('  qz[%-9s auto ] Q%d.%d  peak=%.3g  shift=%+6.2f bits  SNR=%.1f dB'\n          % (name, n_word - n_frac, n_frac, peak, shift_bits, snr_db))\n    return (r_q + 1j * i_q).astype(cp.complex64)\n\nprint('Fixed route start (GPU): Q_IN=Q%d.%d  Q_FFT=Q%d.%d  Q_OUT=Q%d.%d' % (\n    Q_IN_W - Q_IN_F, Q_IN_F,\n    Q_FFT_W - Q_FFT_F, Q_FFT_F,\n    Q_OUT_W - Q_OUT_F, Q_OUT_F))\n\n# --- CPU -> GPU 転送 -----------------------------------------------------\n_t_xfer = _time.monotonic()\nfir_gpu   = cp.asarray(fir_coefficients)\nchirp_gpu = cp.asarray(ref_chirp.astype(np.complex64))\ncp.cuda.Stream.null.synchronize()\nprint('  H2D: fir %s + chirp %s  (%.2fs)' % (\n    fir_gpu.shape, chirp_gpu.shape, _time.monotonic() - _t_xfer))\n\n# --- Stage A: 入力時間領域 (fixed Q-format = ADC ビット幅) ----------------\n# Level 2 model: Stage A is an ADC-like fixed quantizer. The analog gain decided\n# in n25 (signal_peak_dbfs) determines where signals land relative to FS=1.0.\n# Out-of-range samples are clipped (real ADC saturation). The chirp template\n# (ref_chirp peak = 1) lands at signal_peak_dbfs. fir_coefficients is a stored\n# coefficient table — its peak depends on the scene (image vs point); in real\n# FPGA the BRAM scaling factor is computed offline, so we similarly bring fir\n# to FS-comparable range by pre-scaling to its own peak (= per-frame block\n# scaling factor, an \"offline\" decision). Apply the inverse scale after Stage A\n# so downstream code sees natural magnitudes (BFP-style block exponent).\nfir_peak = float(cp.maximum(cp.abs(fir_gpu.real).max(), cp.abs(fir_gpu.imag).max()))\nfir_pre_scale = 0.95 / fir_peak if fir_peak > 0 else 1.0\nprint('  fir_in BRAM pre-scale: 1/%.3g   (block-scale shift = %+.2f bits)' % (\n    1.0 / fir_pre_scale, math.log2(fir_pre_scale)))\nfir_q   = qz(fir_gpu * fir_pre_scale, Q_IN_W, Q_IN_F, 'fir_in',   mode='fixed') / fir_pre_scale\nchirp_q = qz(chirp_gpu,               Q_IN_W, Q_IN_F, 'chirp_in', mode='fixed')\ndel fir_gpu, chirp_gpu\n\n# --- Stage B: FFT 後周波数領域 (乗算ステップ含む) -------------------------\nF    = qz(cp.fft.fft(fir_q, axis=1), Q_FFT_W, Q_FFT_F, 'fir_fft')\nC    = qz(cp.fft.fft(chirp_q),       Q_FFT_W, Q_FFT_F, 'chirp_fft')\nprod = qz(F * C[None, :],            Q_FFT_W, Q_FFT_F, 'prod')\ndel fir_q, chirp_q, F, C\n\n# --- Stage C: IFFT 後時間領域 -------------------------------------------\ns_raw_gpu = qz(cp.fft.ifft(prod, axis=1), Q_OUT_W, Q_OUT_F, 'out')\ndel prod\n\n# --- GPU -> CPU 転送 -----------------------------------------------------\n_t_xfer = _time.monotonic()\ns_raw = cp.asnumpy(s_raw_gpu).astype(np.complex64)\ndel s_raw_gpu\ncp.get_default_memory_pool().free_all_blocks()\nprint('  D2H: s_raw %s  (%.2fs)' % (s_raw.shape, _time.monotonic() - _t_xfer))\n\nprint('Fixed route: s_raw=%s peak|s|=%.3f  (%.2fs total)'\n      % (s_raw.shape, float(np.abs(s_raw).max()), _time.monotonic() - _t0))\n",
+            "code": "# === Route gate: runs ONLY when route_mode == 'fixed' ===\n# float=Route A(浮動小数点) / fixed=Route B(Python固定小数点) / hdl=Verilator(HDL)\n_mode = str(globals().get('route_mode', 'float'))\nif _mode == 'fixed':\n    # === FPGA Route B: Fixed-point (Q-format 3-stage, GPU) ===\n    # FPGA で必然となるビット幅制限が SAR 画像品質にどう効くかを Python で評価する\n    # ルート。FPGA でよくある FFT × 周波数乗算 × IFFT のパイプラインを cupy GPU で\n    # 量子化しながら模擬する。3 ステージ独立 Q-format:\n    #   Stage A : 入力時間領域 (FIR taps + chirp)  --> ADC ビット幅 (Q_IN_*)\n    #   Stage B : FFT 後の周波数領域 + 乗算後      --> FPGA 内部演算 (Q_FFT_*)\n    #   Stage C : IFFT 後の時間領域 (最終 s_raw)   --> DAC ビット幅 (Q_OUT_*)\n    # 各ステージで auto-scale (peak->full-scale*0.95) → round-half-to-even +\n    # saturate で量子化 → 復元。量子化 SNR を per-stage に GPU 上で計算して表示。\n    #\n    # 同時 Enable 排他: Route A (n42) / Route C-in (n47) と同時 Enable 不可\n    # (s_raw が衝突する)。Route C-out (n44) とは併用可。\n    import numpy as np\n    import cupy as cp\n    import math\n    import time as _time\n    _t0 = _time.monotonic()\n\n    # --- Q-format parameters (単一ソース = \"FPGA Q-Format Config\" ノード n60) ----\n    # Q_IN / Q_FFT / Q_OUT は未接続の \"FPGA Q-Format Config\" ノードが kernel に\n    # 定義済み。ここで個別変数に展開するだけ。値の変更はそのノードで行うこと。\n    if not all(k in globals() for k in ('Q_IN', 'Q_FFT', 'Q_OUT')):\n        raise NameError(\"Q_IN/Q_FFT/Q_OUT が未定義。'FPGA Q-Format Config' ノードを有効化して先に実行すること\")\n    Q_IN_W,  Q_IN_F  = Q_IN    # Stage A (ADC)\n    Q_FFT_W, Q_FFT_F = Q_FFT   # Stage B (FPGA datapath)\n    Q_OUT_W, Q_OUT_F = Q_OUT   # Stage C (DAC)\n    # -------------------------------------------------------------------------\n\n    # fxpmath の signed Q(n_word-n_frac).n_frac 定義と等価の量子化を cupy で実装。\n    # round-half-to-even (cp.rint と等価) + saturate (cp.clip)。numpy 版から1行\n    # 単位で対応する形なので、結果はビット同一。\n    def _qaxis(v, n_word, n_frac, scale):\n        step = 2.0 ** (-n_frac)\n        iv_max =  (1 << (n_word - 1)) - 1\n        iv_min = -(1 << (n_word - 1))\n        return cp.clip(cp.round(v * scale / step), iv_min, iv_max) * step / scale\n\n    def qz(x, n_word, n_frac, name='', mode='auto'):\n        \"\"\"Quantize cupy complex array to Q(n_word-n_frac).n_frac signed.\n\n        mode='auto'  : Block Floating Point - auto-scale by peak so |x|_max -> FS*0.95.\n                       Output is rescaled back to original magnitude (peak preserved).\n                       Used for Stage B (FFT internal datapath) and Stage C.\n        mode='fixed' : Fixed Q-format at FS=2^(n_word-1-n_frac). NO auto-scale.\n                       Input must already be in [-FS, +FS] range (clipped if not).\n                       Used for Stage A (ADC quantize): the analog gain decided in\n                       n25 determines where the signal lands relative to FS.\n\n        Reports SNR and (for fixed) clip percentage.\"\"\"\n        import math\n        if x.size == 0:\n            return x.astype(cp.complex64)\n\n        if mode == 'fixed':\n            full_scale = float(2 ** (n_word - 1 - n_frac))\n            step = 2.0 ** (-n_frac)\n            iv_max =  (1 << (n_word - 1)) - 1\n            iv_min = -(1 << (n_word - 1))\n            # Direct fixed quantize: clip first to full-scale, then round.\n            r_q = cp.clip(cp.round(x.real / step), iv_min, iv_max) * step\n            i_q = cp.clip(cp.round(x.imag / step), iv_min, iv_max) * step\n            peak = float(cp.maximum(cp.abs(x.real).max(), cp.abs(x.imag).max()))\n            clip_frac = float(((cp.abs(x.real) >= full_scale) | (cp.abs(x.imag) >= full_scale)).mean())\n            err2 = (x.real - r_q) ** 2 + (x.imag - i_q) ** 2\n            sig2 = (cp.abs(x) ** 2).mean()\n            snr_db = 10.0 * float(cp.log10(sig2 / (err2.mean() + 1e-30)))\n            headroom_db = 20.0 * math.log10(full_scale / peak) if peak > 0 else float('inf')\n            print('  qz[%-9s fixed] Q%d.%d  FS=%.3g  peak=%.3g  headroom=%+5.1f dB  clip=%5.2f%%  SNR=%.1f dB'\n                  % (name, n_word - n_frac, n_frac, full_scale, peak, headroom_db, 100*clip_frac, snr_db))\n            return (r_q + 1j * i_q).astype(cp.complex64)\n\n        # mode == 'auto' (BFP)\n        peak = float(cp.maximum(cp.abs(x.real).max(), cp.abs(x.imag).max()))\n        if peak == 0:\n            return x.astype(cp.complex64)\n        full_scale = float(2 ** (n_word - 1 - n_frac))\n        # per-scene POWER-OF-2 bit shift (host computes from known data, passes to FPGA as param)\n        shift_bits = int(math.floor(math.log2(0.95 * full_scale / peak)))\n        s = 2.0 ** shift_bits\n        r_q = _qaxis(x.real, n_word, n_frac, s)\n        i_q = _qaxis(x.imag, n_word, n_frac, s)\n        err2 = (x.real - r_q) ** 2 + (x.imag - i_q) ** 2\n        sig2 = (cp.abs(x) ** 2).mean()\n        snr_db = 10.0 * float(cp.log10(sig2 / (err2.mean() + 1e-30)))\n        print('  qz[%-9s p2sh] Q%d.%d  peak=%.3g  shift=%+d bits  SNR=%.1f dB'\n              % (name, n_word - n_frac, n_frac, peak, shift_bits, snr_db))\n        return (r_q + 1j * i_q).astype(cp.complex64)\n\n    print('Fixed route start (GPU): Q_IN=Q%d.%d  Q_FFT=Q%d.%d  Q_OUT=Q%d.%d' % (\n        Q_IN_W - Q_IN_F, Q_IN_F,\n        Q_FFT_W - Q_FFT_F, Q_FFT_F,\n        Q_OUT_W - Q_OUT_F, Q_OUT_F))\n\n    # --- CPU -> GPU 転送 -----------------------------------------------------\n    _t_xfer = _time.monotonic()\n    fir_gpu   = cp.asarray(fir_coefficients)\n    chirp_gpu = cp.asarray(ref_chirp.astype(np.complex64))\n    cp.cuda.Stream.null.synchronize()\n    print('  H2D: fir %s + chirp %s  (%.2fs)' % (\n        fir_gpu.shape, chirp_gpu.shape, _time.monotonic() - _t_xfer))\n\n    # --- Stage A: 入力時間領域 (fixed Q-format = ADC ビット幅) ----------------\n    # Level 2 model: Stage A is an ADC-like fixed quantizer. The analog gain decided\n    # in n25 (signal_peak_dbfs) determines where signals land relative to FS=1.0.\n    # Out-of-range samples are clipped (real ADC saturation). The chirp template\n    # (ref_chirp peak = 1) lands at signal_peak_dbfs. fir_coefficients is a stored\n    # coefficient table — its peak depends on the scene (image vs point); in real\n    # FPGA the BRAM scaling factor is computed offline, so we similarly bring fir\n    # to FS-comparable range by pre-scaling to its own peak (= per-frame block\n    # scaling factor, an \"offline\" decision). Apply the inverse scale after Stage A\n    # so downstream code sees natural magnitudes (BFP-style block exponent).\n    fir_peak = float(cp.maximum(cp.abs(fir_gpu.real).max(), cp.abs(fir_gpu.imag).max()))\n    fir_pre_scale = 0.95 / fir_peak if fir_peak > 0 else 1.0\n    print('  fir_in BRAM pre-scale: 1/%.3g   (block-scale shift = %+.2f bits)' % (\n        1.0 / fir_pre_scale, math.log2(fir_pre_scale)))\n    fir_q   = qz(fir_gpu * fir_pre_scale, Q_IN_W, Q_IN_F, 'fir_in',   mode='fixed') / fir_pre_scale\n    chirp_q = qz(chirp_gpu,               Q_IN_W, Q_IN_F, 'chirp_in', mode='fixed')\n    del fir_gpu, chirp_gpu\n\n    # --- Stage B: FFT 後周波数領域 (乗算ステップ含む) -------------------------\n    F    = qz(cp.fft.fft(fir_q, axis=1), Q_FFT_W, Q_FFT_F, 'fir_fft')\n    C    = qz(cp.fft.fft(chirp_q),       Q_FFT_W, Q_FFT_F, 'chirp_fft')\n    prod = qz(F * C[None, :],            Q_FFT_W, Q_FFT_F, 'prod')\n    del fir_q, chirp_q, F, C\n\n    # --- Stage C: IFFT 後時間領域 -------------------------------------------\n    s_raw_gpu = qz(cp.fft.ifft(prod, axis=1), Q_OUT_W, Q_OUT_F, 'out')\n    del prod\n\n    # --- GPU -> CPU 転送 -----------------------------------------------------\n    _t_xfer = _time.monotonic()\n    s_raw = cp.asnumpy(s_raw_gpu).astype(np.complex64)\n    del s_raw_gpu\n    cp.get_default_memory_pool().free_all_blocks()\n    print('  D2H: s_raw %s  (%.2fs)' % (s_raw.shape, _time.monotonic() - _t_xfer))\n\n    print('Fixed route: s_raw=%s peak|s|=%.3f  (%.2fs total)'\n          % (s_raw.shape, float(np.abs(s_raw).max()), _time.monotonic() - _t0))\nelse:\n    print('[Route B fixed] skipped (route_mode=%s)' % _mode)\n",
             "label": "FPGA Route B: Fixed-point (Q-format 3-stage)",
-            "spec": "【Route B: 固定小数点評価ルート (fxpmath)】\n\nFPGA で必然となるビット幅制限が SAR 画像品質にどう効くかを Python 側で評価するルート。FPGA でよくある FFT × 周波数乗算 × IFFT のパイプラインを fxpmath で量子化しながら模擬する。\n\n3ステージ独立 Q-format（ノードコード冒頭の定数を編集してチューニング）:\n\nStage A — 入力時間領域 (= ADC ビット幅):\n  Q_IN_W=10, Q_IN_F=9  (Q1.9, range ~ [-1, 1))\n  10bit ADC を想定。対象: fir_coefficients, ref_chirp\n\nStage B — FFT 後周波数領域 + 乗算後 (FPGA 内部演算):\n  Q_FFT_W=18, Q_FFT_F=10  (整数8bit + 小数10bit、Xilinx 7系 DSP 18bit に整合)\n  FFT 長 Nr で log2(Nr) のビット成長を吸収するため整数部に余裕を持たせる\n  対象: fft(fir_coefficients), fft(chirp), F × C[None,:]\n\nStage C — IFFT 後時間領域 (= DAC ビット幅):\n  Q_OUT_W=10, Q_OUT_F=9  (Q1.9)\n  10bit DAC を想定。対象: 最終 s_raw\n\n各ステージは auto-scale: peak を Q full-scale × 0.95 にマップして 5% のオーバーフローヘッドルームを確保 → fxpmath で量子化 → 復元。量子化 SNR を per-stage で表示。\n\n入力（kernel namespace）:\n  S_all, chirp_fft, fir_coefficients, ref_chirp, Na, Nr  ← n32 が生成\n\n出力（kernel namespace）:\n  s_raw  ← n25 (LNA) が消費\n\n排他関係:\n  Route A (n32_Float) / Route C-in (n32_FPGA_Load) と同時 Enable 不可。\n  Route C-out (n32_FPGA_Save) とは併用可（量子化結果を .mat 保存も可能）。\n\n参考: workspace-SAR-SIM/TargetSim_old/target_sim_FFT_FPGA_convert2Image2_375M.ipynb の BadAccuracy モード（int16 直接キャスト）の柔軟版。"
-          }
-        }
+            "spec": "【Route B: 固定小数点評価ルート (fxpmath)】\n\nFPGA で必然となるビット幅制限が SAR 画像品質にどう効くかを Python 側で評価するルート。FPGA でよくある FFT × 周波数乗算 × IFFT のパイプラインを fxpmath で量子化しながら模擬する。\n\n3ステージ独立 Q-format（ノードコード冒頭の定数を編集してチューニング）:\n\nStage A — 入力時間領域 (= ADC ビット幅):\n  Q_IN_W=10, Q_IN_F=9  (Q1.9, range ~ [-1, 1))\n  10bit ADC を想定。対象: fir_coefficients, ref_chirp\n\nStage B — FFT 後周波数領域 + 乗算後 (FPGA 内部演算):\n  Q_FFT_W=18, Q_FFT_F=10  (整数8bit + 小数10bit、Xilinx 7系 DSP 18bit に整合)\n  FFT 長 Nr で log2(Nr) のビット成長を吸収するため整数部に余裕を持たせる\n  対象: fft(fir_coefficients), fft(chirp), F × C[None,:]\n\nStage C — IFFT 後時間領域 (= DAC ビット幅):\n  Q_OUT_W=10, Q_OUT_F=9  (Q1.9)\n  10bit DAC を想定。対象: 最終 s_raw\n\n各ステージは auto-scale: peak を Q full-scale × 0.95 にマップして 5% のオーバーフローヘッドルームを確保 → fxpmath で量子化 → 復元。量子化 SNR を per-stage で表示。\n\n入力（kernel namespace）:\n  S_all, chirp_fft, fir_coefficients, ref_chirp, Na, Nr  ← n32 が生成\n\n出力（kernel namespace）:\n  s_raw  ← n25 (LNA) が消費\n\n排他関係:\n  Route A (n32_Float) / Route C-in (n32_FPGA_Load) と同時 Enable 不可。\n  Route C-out (n32_FPGA_Save) とは併用可（量子化結果を .mat 保存も可能）。\n\n参考: workspace-SAR-SIM/TargetSim_old/target_sim_FFT_FPGA_convert2Image2_375M.ipynb の BadAccuracy モード（int16 直接キャスト）の柔軟版。\n\n【Q-format 単一ソース化 (2026-05-29)】\nQ_IN_W/Q_FFT_W/Q_OUT_W のハードコードを廃止し、未接続ノード\n\"FPGA Q-Format Config\" (n60) が kernel に置く Q_IN/Q_FFT/Q_OUT タプルを読む。\nQ-format を変えるときは n60 だけ編集すると n44 (Route C-out) と HIL-Stub\nの n4 (cupy) / n6 (Verilator) にも同じ値が npz meta 経由で伝搬される。"
+          },
+          "codeCollapsed": true
+        },
+        "width": 400
       },
       {
         "id": "n44",
         "type": "canvasNode",
         "position": {
-          "x": 3562.6045242857367,
-          "y": 350.8981107362351
+          "x": 3556.1228292700357,
+          "y": 282.84031307137354
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -957,22 +954,22 @@
             }
           ],
           "defaultParameters": {
-            "code": "# === FPGA Route C-out: Save Coefficients (.npz) ===\n# Tab 2 (FPGA-HIL-Stub) が読む .npz を書き出す。HIL ループの境界ファイル。\n# 旧 .mat ベース実装は MATLAB 使わない方針で .npz に変更 (2026-05-29)。\nimport numpy as np\nimport os\nimport time as _time\n_t0 = _time.monotonic()\n\n_path = str(globals().get('save_path', '')).strip()\nif not _path:\n    raise ValueError(\"save_path is empty - set it in the FPGA Config block (var_name='save_path')\")\n\n_inc_golden_str = str(globals().get('include_golden', 'true')).strip().lower()\n_inc_golden = _inc_golden_str in ('1', 'true', 'on', 'yes')\n\n_payload = {\n    'chirp_replica':         ref_chirp.astype(np.complex64),\n    'fir_coefficients':      fir_coefficients.astype(np.complex64),\n    'S_all':                 S_all.astype(np.complex64),\n    'meta_Fs':               np.float64(Fs),\n    'meta_Nr':               np.int64(Nr),\n    'meta_Na':               np.int64(Na),\n    'meta_R0':               np.float64(R0),\n    'meta_lam':              np.float64(lam),\n    'meta_t_r_center':       np.float64(t_r_center),\n}\n\nif _inc_golden:\n    if 's_raw' in globals():\n        _payload['golden_iq_data'] = s_raw.astype(np.complex64)\n        print('  including golden s_raw (peak|s|=%.3f) from earlier route'\n              % float(np.abs(s_raw).max()))\n    else:\n        print('  include_golden=true but s_raw not in kernel; enable Route A first')\n\n# ensure parent directory exists\n_dir = os.path.dirname(_path)\nif _dir and not os.path.isdir(_dir):\n    os.makedirs(_dir, exist_ok=True)\n\nnp.savez(_path, **_payload)\n_size_mb = os.path.getsize(_path) / 1e6\nprint('Saved FPGA coefficients to %s  (%.1f MB, %d keys, %.2fs)'\n      % (_path, _size_mb, len(_payload), _time.monotonic() - _t0))\n",
+            "code": "# === FPGA Route C-out: Save Coefficients (.npz) ===\n# Tab 2 (FPGA-HIL-Stub) が読む .npz を書き出す。HIL ループの境界ファイル。\n# 旧 .mat ベース実装は MATLAB 使わない方針で .npz に変更 (2026-05-29)。\nimport numpy as np\nimport os\nimport time as _time\n_t0 = _time.monotonic()\n\n_path = str(globals().get('save_path', '')).strip()\nif not _path:\n    raise ValueError(\"save_path is empty - set it in the FPGA Config block (var_name='save_path')\")\n\n_inc_golden_str = str(globals().get('include_golden', 'true')).strip().lower()\n_inc_golden = _inc_golden_str in ('1', 'true', 'on', 'yes')\n\nif not all(k in globals() for k in ('Q_IN', 'Q_FFT', 'Q_OUT')):\n    raise NameError(\"Q_IN/Q_FFT/Q_OUT が未定義。'FPGA Q-Format Config' ノードを先に実行すること\")\n\n_payload = {\n    'chirp_replica':         ref_chirp.astype(np.complex64),\n    'fir_coefficients':      fir_coefficients.astype(np.complex64),\n    'S_all':                 S_all.astype(np.complex64),\n    'meta_Fs':               np.float64(Fs),\n    'meta_Nr':               np.int64(Nr),\n    'meta_Na':               np.int64(Na),\n    'meta_R0':               np.float64(R0),\n    'meta_lam':              np.float64(lam),\n    'meta_t_r_center':       np.float64(t_r_center),\n    # --- Q-format (HIL へ伝搬する単一ソース。n60 FPGA Q-Format Config 由来) ---\n    'meta_Q_IN_W':  np.int64(Q_IN[0]),  'meta_Q_IN_F':  np.int64(Q_IN[1]),\n    'meta_Q_FFT_W': np.int64(Q_FFT[0]), 'meta_Q_FFT_F': np.int64(Q_FFT[1]),\n    'meta_Q_OUT_W': np.int64(Q_OUT[0]), 'meta_Q_OUT_F': np.int64(Q_OUT[1]),\n}\n\nif _inc_golden:\n    if 's_raw' in globals():\n        _payload['golden_iq_data'] = s_raw.astype(np.complex64)\n        print('  including golden s_raw (peak|s|=%.3f) from earlier route'\n              % float(np.abs(s_raw).max()))\n    else:\n        print('  include_golden=true but s_raw not in kernel; enable Route A first')\n\n# ensure parent directory exists\n_dir = os.path.dirname(_path)\nif _dir and not os.path.isdir(_dir):\n    os.makedirs(_dir, exist_ok=True)\n\nnp.savez(_path, **_payload)\n_size_mb = os.path.getsize(_path) / 1e6\nprint('Saved FPGA coefficients to %s  (%.1f MB, %d keys, %.2fs)'\n      % (_path, _size_mb, len(_payload), _time.monotonic() - _t0))\n",
             "label": "FPGA Route C-out: Save Coefficients (.npz)",
-            "spec": "【Route C-out: FPGA向け係数を .mat に保存】\n\n外部 FPGA / HDL シミュレータ向けのテストベンチ入力を保存する副作用ノード。Notebook target_sim_FFT_FPGA_convert2Image2_375M.ipynb の scipy.io.savemat 部分と互換。\n\n入力（kernel namespace）:\n  ref_chirp        (Nr,)    complex64 ← n2\n  fir_coefficients (Na, Nr) complex64 ← n32 (時間領域FIRタップ、unshifted)\n  S_all            (Na, Nr) complex64 ← n32 (周波数領域反射係数)\n  s_raw            (Na, Nr) complex64 ← Route A/B/C-in（include_golden=True 時に同梱）\n  Fs, Nr, Na, R0, lam, t_r_center (scalars) ← n1/n2\n\nGUI 入力:\n  save_path     (gui_file_picker) — 保存先 .mat パス\n  include_golden (gui_toggle)    — True で Route A 等の s_raw を同梱\n\n出力: なし (副作用のみ)。s_raw は変更しないので、Route A と併用して golden を生成・保存するのが標準ワークフロー。\n\n保存内容（.mat キー）:\n  chirp_replica, chirp_replica_extended, fir_coefficients, S_all\n  golden_iq_data (optional)\n  meta_Fs, meta_Nr, meta_Na, meta_R0, meta_lam, meta_t_r_center\n\n外部 HDL での使い方: MATLAB / Simulink で load() し、testbench 入力として chirp と fir_coefficients を流し込む。golden_iq_data と FPGA 出力 (Route C-in が読む .npy) を比較して量子化誤差・実装誤差を検証。"
+            "spec": "【Route C-out: FPGA向け係数を .mat に保存】\n\n外部 FPGA / HDL シミュレータ向けのテストベンチ入力を保存する副作用ノード。Notebook target_sim_FFT_FPGA_convert2Image2_375M.ipynb の scipy.io.savemat 部分と互換。\n\n入力（kernel namespace）:\n  ref_chirp        (Nr,)    complex64 ← n2\n  fir_coefficients (Na, Nr) complex64 ← n32 (時間領域FIRタップ、unshifted)\n  S_all            (Na, Nr) complex64 ← n32 (周波数領域反射係数)\n  s_raw            (Na, Nr) complex64 ← Route A/B/C-in（include_golden=True 時に同梱）\n  Fs, Nr, Na, R0, lam, t_r_center (scalars) ← n1/n2\n\nGUI 入力:\n  save_path     (gui_file_picker) — 保存先 .mat パス\n  include_golden (gui_toggle)    — True で Route A 等の s_raw を同梱\n\n出力: なし (副作用のみ)。s_raw は変更しないので、Route A と併用して golden を生成・保存するのが標準ワークフロー。\n\n保存内容（.mat キー）:\n  chirp_replica, chirp_replica_extended, fir_coefficients, S_all\n  golden_iq_data (optional)\n  meta_Fs, meta_Nr, meta_Na, meta_R0, meta_lam, meta_t_r_center\n\n外部 HDL での使い方: MATLAB / Simulink で load() し、testbench 入力として chirp と fir_coefficients を流し込む。golden_iq_data と FPGA 出力 (Route C-in が読む .npy) を比較して量子化誤差・実装誤差を検証。\n\n【Q-format 伝搬 (2026-05-29)】\ncoeffs.npz に meta_Q_IN_W/F, meta_Q_FFT_W/F, meta_Q_OUT_W/F を追加保存するようになった。\nこの Q-format は n60 \"FPGA Q-Format Config\" 由来の単一ソースで、HIL-Stub 側の\n\"Q-Format Config\" ノードがこの meta を読んで n4/n6 に渡す。これにより HIL の\ncupy 経路と Verilator 経路が必ず同じ Q-format で動く (ゲートレベル差のみを比較可能)。"
           },
           "enabled": false,
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n47",
         "type": "canvasNode",
         "position": {
-          "x": 3567.3021639866424,
-          "y": 541.8981107362351
+          "x": 3562.4408927248664,
+          "y": 523.8403130713735
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -998,7 +995,8 @@
           },
           "enabled": false,
           "codeCollapsed": true
-        }
+        },
+        "width": 400
       },
       {
         "id": "n52",
@@ -1007,7 +1005,6 @@
           "x": -488,
           "y": 2319
         },
-        "width": 250,
         "data": {
           "label": "Slider",
           "category": "gui",
@@ -1035,7 +1032,8 @@
             "label": "σ°_max (dB)"
           },
           "barColor": "#a3e635"
-        }
+        },
+        "width": 250
       },
       {
         "id": "n53",
@@ -1044,7 +1042,6 @@
           "x": -488,
           "y": 2465
         },
-        "width": 250,
         "data": {
           "label": "Slider",
           "category": "gui",
@@ -1072,7 +1069,8 @@
             "label": "LNA Gain (dB)"
           },
           "barColor": "#a3e635"
-        }
+        },
+        "width": 250
       },
       {
         "id": "n54",
@@ -1081,7 +1079,6 @@
           "x": -551.5577995907531,
           "y": -374.13920188913823
         },
-        "width": 936,
         "data": {
           "label": "SAR Visualizer",
           "category": "processing",
@@ -1120,7 +1117,8 @@
             "timing_height": "167"
           },
           "barColor": "#facc15"
-        }
+        },
+        "width": 936
       },
       {
         "id": "n55",
@@ -1129,7 +1127,6 @@
           "x": -392.25168778895767,
           "y": 496.1933809772706
         },
-        "width": 320,
         "data": {
           "label": "Target Config",
           "category": "source",
@@ -1152,7 +1149,7 @@
             "target_mode": "image",
             "n_targets": "1",
             "invert_image": "false",
-            "range_scale": "2",
+            "range_scale": "1",
             "view_scale": "40",
             "noise_level_db": "-60",
             "clutter_n": "0",
@@ -1161,7 +1158,8 @@
             "image_path": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\images\\strix.png"
           },
           "barColor": "#a3e635"
-        }
+        },
+        "width": 320
       },
       {
         "id": "n58",
@@ -1170,7 +1168,6 @@
           "x": 3249.6161636496636,
           "y": 975.7437420921627
         },
-        "width": 1042,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -1195,7 +1192,8 @@
           },
           "codeCollapsed": true,
           "barColor": "#f59e0b"
-        }
+        },
+        "width": 1042
       },
       {
         "id": "n59",
@@ -1204,7 +1202,6 @@
           "x": 3569.3001973435807,
           "y": -60.8916502213683
         },
-        "width": 320,
         "data": {
           "label": "FPGA Config",
           "category": "hdl",
@@ -1232,7 +1229,111 @@
             "load_path": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\fpga_io\\fpga_out.npy"
           },
           "barColor": "#a3e635"
-        }
+        },
+        "width": 320
+      },
+      {
+        "id": "n60",
+        "type": "canvasNode",
+        "position": {
+          "x": 3034.1952387224633,
+          "y": 134.15896753591883
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === FPGA Q-Format Config (Q-format 単一ソース) ===\n# このフロー (FPGA3) の FPGA ビット幅 (Q-format) を 1 箇所だけで定義する。\n# Route B (n43) と Route C-out (n44) はここから Q_IN / Q_FFT / Q_OUT を読む。\n# さらに Route C-out が coeffs.npz の meta に書き込み、HIL-Stub 側 (n4/n6) へ伝搬される。\n# → Q-format の真実の源はこのノード 1 つだけ。値を変えるときはここだけ編集する。\n#\n# (n_word, n_frac) のタプル。n_word=総ビット幅(符号込), n_frac=小数ビット数。\n# 整数部 = n_word - 1 - n_frac。\nQ_IN  = (8, 7)    # Stage A (ADC 入力時間領域)   = Q1.7   (8bit)\nQ_FFT = (10, 4)   # Stage B (FPGA 内部 FFT/乗算) = Q6.4   (10bit, Xilinx 7系 DSP 18bit 内)\nQ_OUT = (8, 7)    # Stage C (DAC 出力時間領域)   = Q1.7   (8bit)\nprint('FPGA Q-format (single source): Q_IN=Q%d.%d  Q_FFT=Q%d.%d  Q_OUT=Q%d.%d' % (\n    Q_IN[0]-Q_IN[1], Q_IN[1], Q_FFT[0]-Q_FFT[1], Q_FFT[1], Q_OUT[0]-Q_OUT[1], Q_OUT[1]))\n\n# --- ブロックシフト(BFP)方式の方針メモ -------------------------------------\n# Stage B/C のブロックシフトは「設計時凍結」ではなく『per-scene の 2べきビットシフト』。\n# host(このフロー)が既知の係数からシーン毎に shift = floor(log2(0.95*FS/peak)) を計算し、\n# 係数と一緒に FPGA へ runtime パラメータとして渡す前提(HDL datapath は固定・再合成不要、\n# Xilinx FFT IP の scaled モード相当)。→ オーバーフローは起きず、残る劣化は Q-format の\n# ビット幅による量子化ノイズ。シフトは n43/route_b_pipeline が実行時に計算しログ出力する。\n",
+            "label": "FPGA Q-Format Config",
+            "spec": "【FPGA Q-Format Config — Q-format 単一ソース】\n\n役割: FPGA のビット幅 (Q-format) をこのフロー全体で 1 箇所に集約する未接続ライブラリノード。\n\nなぜ存在するか:\n以前は Q-format が n43 (Route B) / HIL-Stub n4 (cupy) / HIL-Stub n6 (Verilator) の\n3 箇所にハードコードされており、n43/n4 を Q1.7/Q6.4 に変更した際に n6 だけが\n古い Q1.9/Q8.10 に取り残され、HIL 比較が「ゲートレベル差」でなく「Q-format 差」に\n支配される不整合が発生した。これを防ぐため Q-format を 1 ノードに集約した。\n\n伝搬経路 (真実の源 = このノード):\n  このノード (Q_IN/Q_FFT/Q_OUT)\n    ├→ n43 Route B       (kernel namespace 経由、同一フロー同一カーネル)\n    └→ n44 Route C-out   → coeffs.npz の meta_Q_* に保存\n                            → HIL-Stub n3 が npz をロード\n                            → HIL-Stub \"Q-Format Config\" が meta から復元\n                            → HIL n4 (cupy) / n6 (Verilator) が読む\n\n出力 (kernel namespace): Q_IN, Q_FFT, Q_OUT  (いずれも (n_word, n_frac) タプル)\n\n未接続ノードはトポロジカルソートで最初に実行されるため、n32/n43/n44 より先に\nQ_IN/Q_FFT/Q_OUT が定義される。エッジで繋ぐ必要はない。\n\n値を変えるとき: このノードの Q_IN/Q_FFT/Q_OUT だけ編集する。他は触らない。\n"
+          },
+          "codeCollapsed": true
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n61",
+        "type": "canvasNode",
+        "position": {
+          "x": 3097.613913346122,
+          "y": 9.364373160072262
+        },
+        "data": {
+          "label": "Dropdown",
+          "category": "gui",
+          "blockType": "gui_dropdown",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "var_name": "route_mode",
+            "options_csv": "float,fixed,hdl",
+            "label": "Route Selector",
+            "value": "fixed",
+            "spec": "【Route Selector — 3ルート切替ドロップダウン】\n\nvar_name='route_mode'。s_raw(反射波)をどの方式で生成するかをここ1箇所で選ぶ。\n3つのルートノード(n42/n43/n62)は全て enabled だが、各々が先頭で route_mode を見て\n『自分が選ばれた時だけ』s_raw を計算する。→ 同時実行・後勝ち事故が原理的に起きない。\n\n  float : Route A (n42) 浮動小数点・理想 (golden)。ifft(S_all x chirp_fft)。\n  fixed : Route B (n43) Python(cupy) 固定小数点。Q-format 量子化を模擬。\n  hdl   : Route HDL (n62) Verilator ゲートレベル。実HDLと同じ算術 (route_b_pipeline)。\n\nQ-format は n60 'FPGA Q-Format Config' の単一ソースを 3 ルート共通で使う。\n切替はこのドロップダウンの値を変えて再実行するだけ。enable/disable は触らない。"
+          }
+        },
+        "width": 250
+      },
+      {
+        "id": "n62",
+        "type": "canvasNode",
+        "position": {
+          "x": 3570.3891613816963,
+          "y": 816.8403130713735
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === FPGA Route HDL: Verilator gate-level simulation ===\n# route_mode == 'hdl' のときだけ実行。Amaranth->Verilog->Verilator でコンパイルした\n# 実HDLと同じゲートレベル FFT で Route B 相当を計算 (route_b_pipeline)。\n# Q_IN/Q_FFT/Q_OUT は n60 \"FPGA Q-Format Config\" の単一ソースを使う。\n# float=Route A / fixed=Route B(Python) / hdl=ここ。Route Selector ドロップダウンで切替。\n_mode = str(globals().get('route_mode', 'float'))\nif _mode == 'hdl':\n    import numpy as np, sys, os\n    import time as _time\n    _SCRIPTS = r\"d:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\scripts\"\n    if _SCRIPTS not in sys.path:\n        sys.path.insert(0, _SCRIPTS)\n    from verilator_route_b import route_b_pipeline\n    if not all(k in globals() for k in ('Q_IN', 'Q_FFT', 'Q_OUT')):\n        raise NameError(\"Q_IN/Q_FFT/Q_OUT undefined; enable 'FPGA Q-Format Config' (n60) first\")\n    _t0 = _time.monotonic()\n    print('Route HDL (Verilator): Q_IN=Q%d.%d  Q_FFT=Q%d.%d  Q_OUT=Q%d.%d' % (\n        Q_IN[0]-Q_IN[1], Q_IN[1], Q_FFT[0]-Q_FFT[1], Q_FFT[1], Q_OUT[0]-Q_OUT[1], Q_OUT[1]))\n    s_raw = route_b_pipeline(\n        fir_coefficients.astype(np.complex64),\n        ref_chirp.astype(np.complex64),\n        Q_IN=Q_IN, Q_FFT=Q_FFT, Q_OUT=Q_OUT, verbose=True)\n    print('Route HDL: s_raw=%s peak|s|=%.3f  (%.1fs total)' % (\n        s_raw.shape, float(np.abs(s_raw).max()), _time.monotonic() - _t0))\nelse:\n    print('[Route HDL] skipped (route_mode=%s)' % _mode)\n",
+            "label": "FPGA Route HDL: Verilator (gate-level)"
+          },
+          "codeCollapsed": true
+        },
+        "width": 400
       }
     ],
     "edges": [
@@ -1459,7 +1560,26 @@
         "sourceHandle": "out_0",
         "target": "n58",
         "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1780055148631_hatk",
+        "source": "n32",
+        "sourceHandle": "out_0",
+        "target": "n62",
+        "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1780055148968_raan",
+        "source": "n62",
+        "sourceHandle": "out_0",
+        "target": "n25",
+        "targetHandle": "in_0"
       }
-    ]
+    ],
+    "viewport": {
+      "x": -426.76635081297536,
+      "y": 177.18276375508754,
+      "zoom": 0.42400122224265957
+    }
   }
 }

@@ -4,10 +4,8 @@
   "title": "FPGA-HIL-Stub",
   "description": "",
   "created": "2026-05-29T06:08:10.580514+00:00",
-  "modified": "2026-05-29T07:35:12.519687+00:00",
+  "modified": "2026-05-29T08:15:17.758804+00:00",
   "canvas": {
-    "name": "flowgraph",
-    "savedAt": "2026-05-29T07:35:12.527Z",
     "nodes": [
       {
         "id": "n1",
@@ -16,7 +14,6 @@
           "x": -300,
           "y": 0
         },
-        "width": 250,
         "data": {
           "label": "File Picker",
           "category": "gui",
@@ -37,11 +34,15 @@
           ],
           "defaultParameters": {
             "var_name": "hil_input_path",
-            "accept": "mat",
-            "label": "Input .mat (from Route C-out)",
-            "value": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\fpga_io\\coeffs.mat"
-          }
-        }
+            "accept": "npz",
+            "label": "Input .npz (from Route C-out)",
+            "value": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\fpga_io\\coeffs.npz",
+            "spec": "【Input .npz file picker (from Route C-out)】\nFPGA3 の Route C-out (n44) が生成した coeffs.npz のパスを選ぶ。\nvar_name='hil_input_path' で kernel に代入され、n3 (Load) と n7 (Q-Format Config) が読む。\nデフォルト: fpga_io/coeffs.npz。"
+          },
+          "executionOrder": 1
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n2",
@@ -50,7 +51,6 @@
           "x": -300,
           "y": 150
         },
-        "width": 250,
         "data": {
           "label": "File Picker",
           "category": "gui",
@@ -73,9 +73,13 @@
             "var_name": "hil_output_path",
             "accept": "npy",
             "label": "Output .npy (for Route C-in)",
-            "value": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\fpga_io\\fpga_out.npy"
-          }
-        }
+            "value": "D:\\kamijo\\HiyoCanvas\\workspace-SAR-SIM\\fpga_io\\fpga_out.npy",
+            "spec": "【Output .npy file picker (for Route C-in)】\nHIL 処理結果 (s_raw_fpga) の保存先 .npy パス。var_name='hil_output_path'。\nn5 (Save) がここに書き、FPGA3 の Route C-in (n47) が読み込んで SLC 画像化する。\nデフォルト: fpga_io/fpga_out.npy。"
+          },
+          "executionOrder": 2
+        },
+        "width": 250,
+        "style": {}
       },
       {
         "id": "n3",
@@ -84,7 +88,6 @@
           "x": 200,
           "y": 50
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -105,18 +108,21 @@
           ],
           "defaultParameters": {
             "code": "# === HIL Stub: Load Coefficients ===\n# Route C-out が書いた .npz を読んで kernel namespace に展開する。\n# 後段 (FPGA Compute) はこれらを n43 Route B と同じ名前で参照できる。\nimport numpy as np\nimport os\n\n_path = str(globals().get('hil_input_path', '')).strip()\nif not _path:\n    raise ValueError(\"hil_input_path is empty — set it in the file picker (var_name='hil_input_path')\")\nif not os.path.isfile(_path):\n    raise FileNotFoundError(\"Coefficients file not found: %s\" % _path)\n\n_npz = np.load(_path, allow_pickle=False)\n\n# Required arrays (Route C-out が必ず書く)\nref_chirp        = _npz['chirp_replica'].astype(np.complex64).reshape(-1)\nfir_coefficients = _npz['fir_coefficients'].astype(np.complex64)\nS_all            = _npz['S_all'].astype(np.complex64)\n\n# Scalars\nFs         = float(_npz['meta_Fs'])\nNr         = int(_npz['meta_Nr'])\nNa         = int(_npz['meta_Na'])\nR0         = float(_npz['meta_R0'])\nlam        = float(_npz['meta_lam'])\nt_r_center = float(_npz['meta_t_r_center'])\n\n# Optional golden (for verification)\ngolden_iq_data = _npz['golden_iq_data'].astype(np.complex64) if 'golden_iq_data' in _npz.files else None\n\nprint('Loaded %s' % _path)\nprint('  shapes: ref_chirp=%s  fir_coefficients=%s  S_all=%s' % (\n    ref_chirp.shape, fir_coefficients.shape, S_all.shape))\nprint('  meta: Fs=%.0f Hz  Nr=%d  Na=%d  R0=%.0f m  lam=%.4f m' % (Fs, Nr, Na, R0, lam))\nprint('  golden_iq_data: %s' % ('present %s' % (golden_iq_data.shape,) if golden_iq_data is not None else 'absent'))\n",
-            "label": "Load Coefficients"
-          }
-        }
+            "label": "Load Coefficients",
+            "spec": "【HIL Stub: Load Coefficients】\nRoute C-out が書いた coeffs.npz を読んで kernel namespace に展開する。\n後段 (n7 Q-Format Config, n4/n6 FPGA Compute) はこれらを n43 Route B と同じ名前で参照できる。\n\n読むもの: chirp_replica→ref_chirp(Nr,), fir_coefficients(Na,Nr), S_all(Na,Nr),\nmeta_Fs/Nr/Na/R0/lam/t_r_center, golden_iq_data(あれば検証用)。\n注: Q-format meta (meta_Q_*) は n7 が別途読む。\n\n配線: このノード → n7 (Q-Format Config) → {n4, n6} → n5。"
+          },
+          "executionOrder": 3
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n4",
         "type": "canvasNode",
         "position": {
-          "x": 700,
-          "y": 50
+          "x": 1138.8027716088675,
+          "y": 47.702603290005925
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -136,19 +142,22 @@
             }
           ],
           "defaultParameters": {
-            "code": "# === HIL Stub: FPGA Compute (bit-exact mirror of Route B in main flow) ===\n# Stage A/B/C の Q-format 量子化 + FFT × mult × IFFT を cupy で実行。\n# n43 Route B と同じロジックでビット同一の結果を出す。\nimport numpy as np\nimport cupy as cp\nimport math\nimport time as _time\n_t0 = _time.monotonic()\n\n# --- Q-format parameters (n43 と同期させること) -----------------------------\nQ_IN_W,  Q_IN_F  = 8, 7      # Stage A (ADC) = Q1.7\nQ_FFT_W, Q_FFT_F = 10, 4     # Stage B (FPGA datapath) = Q6.4\nQ_OUT_W, Q_OUT_F = 8, 7      # Stage C (DAC) = Q1.7\n# ---------------------------------------------------------------------------\n\ndef _qaxis(v, n_word, n_frac, scale):\n    step = 2.0 ** (-n_frac)\n    iv_max =  (1 << (n_word - 1)) - 1\n    iv_min = -(1 << (n_word - 1))\n    return cp.clip(cp.round(v * scale / step), iv_min, iv_max) * step / scale\n\ndef qz(x, n_word, n_frac, name='', mode='auto'):\n    if x.size == 0:\n        return x.astype(cp.complex64)\n    if mode == 'fixed':\n        full_scale = float(2 ** (n_word - 1 - n_frac))\n        step = 2.0 ** (-n_frac)\n        iv_max =  (1 << (n_word - 1)) - 1\n        iv_min = -(1 << (n_word - 1))\n        r_q = cp.clip(cp.round(x.real / step), iv_min, iv_max) * step\n        i_q = cp.clip(cp.round(x.imag / step), iv_min, iv_max) * step\n        peak = float(cp.maximum(cp.abs(x.real).max(), cp.abs(x.imag).max()))\n        clip_frac = float(((cp.abs(x.real) >= full_scale) | (cp.abs(x.imag) >= full_scale)).mean())\n        err2 = (x.real - r_q) ** 2 + (x.imag - i_q) ** 2\n        sig2 = (cp.abs(x) ** 2).mean()\n        snr_db = 10.0 * float(cp.log10(sig2 / (err2.mean() + 1e-30)))\n        headroom_db = 20.0 * math.log10(full_scale / peak) if peak > 0 else float('inf')\n        print('  qz[%-9s fixed] Q%d.%d  FS=%.3g  peak=%.3g  headroom=%+5.1f dB  clip=%5.2f%%  SNR=%.1f dB'\n              % (name, n_word - n_frac, n_frac, full_scale, peak, headroom_db, 100*clip_frac, snr_db))\n        return (r_q + 1j * i_q).astype(cp.complex64)\n    peak = float(cp.maximum(cp.abs(x.real).max(), cp.abs(x.imag).max()))\n    if peak == 0:\n        return x.astype(cp.complex64)\n    full_scale = float(2 ** (n_word - 1 - n_frac))\n    s = 0.95 * full_scale / peak\n    r_q = _qaxis(x.real, n_word, n_frac, s)\n    i_q = _qaxis(x.imag, n_word, n_frac, s)\n    err2 = (x.real - r_q) ** 2 + (x.imag - i_q) ** 2\n    sig2 = (cp.abs(x) ** 2).mean()\n    snr_db = 10.0 * float(cp.log10(sig2 / (err2.mean() + 1e-30)))\n    shift_bits = math.log2(s) if s > 0 else 0.0\n    print('  qz[%-9s auto ] Q%d.%d  peak=%.3g  shift=%+6.2f bits  SNR=%.1f dB'\n          % (name, n_word - n_frac, n_frac, peak, shift_bits, snr_db))\n    return (r_q + 1j * i_q).astype(cp.complex64)\n\nprint('HIL FPGA compute (GPU): Q_IN=Q%d.%d  Q_FFT=Q%d.%d  Q_OUT=Q%d.%d' % (\n    Q_IN_W - Q_IN_F, Q_IN_F, Q_FFT_W - Q_FFT_F, Q_FFT_F, Q_OUT_W - Q_OUT_F, Q_OUT_F))\n\n# H2D\n_t_xfer = _time.monotonic()\nfir_gpu   = cp.asarray(fir_coefficients)\nchirp_gpu = cp.asarray(ref_chirp.astype(np.complex64))\ncp.cuda.Stream.null.synchronize()\nprint('  H2D: fir %s + chirp %s  (%.2fs)' % (fir_gpu.shape, chirp_gpu.shape, _time.monotonic() - _t_xfer))\n\n# Stage A: fixed Q (ADC quantize)\nfir_peak = float(cp.maximum(cp.abs(fir_gpu.real).max(), cp.abs(fir_gpu.imag).max()))\nfir_pre_scale = 0.95 / fir_peak if fir_peak > 0 else 1.0\nprint('  fir_in BRAM pre-scale: 1/%.3g   (block-scale shift = %+.2f bits)' % (\n    1.0 / fir_pre_scale, math.log2(fir_pre_scale)))\nfir_q   = qz(fir_gpu * fir_pre_scale, Q_IN_W, Q_IN_F, 'fir_in',   mode='fixed') / fir_pre_scale\nchirp_q = qz(chirp_gpu,               Q_IN_W, Q_IN_F, 'chirp_in', mode='fixed')\ndel fir_gpu, chirp_gpu\n\n# Stage B: FFT × mult (BFP auto)\nF    = qz(cp.fft.fft(fir_q, axis=1), Q_FFT_W, Q_FFT_F, 'fir_fft')\nC    = qz(cp.fft.fft(chirp_q),       Q_FFT_W, Q_FFT_F, 'chirp_fft')\nprod = qz(F * C[None, :],            Q_FFT_W, Q_FFT_F, 'prod')\ndel fir_q, chirp_q, F, C\n\n# Stage C: IFFT (BFP auto)\ns_raw_gpu = qz(cp.fft.ifft(prod, axis=1), Q_OUT_W, Q_OUT_F, 'out')\ndel prod\n\n# D2H\n_t_xfer = _time.monotonic()\ns_raw_fpga = cp.asnumpy(s_raw_gpu).astype(np.complex64)\ndel s_raw_gpu\ncp.get_default_memory_pool().free_all_blocks()\nprint('  D2H: s_raw_fpga %s  (%.2fs)' % (s_raw_fpga.shape, _time.monotonic() - _t_xfer))\n\nprint('HIL FPGA compute: s_raw_fpga=%s peak|s|=%.3f  (%.2fs total)' % (\n    s_raw_fpga.shape, float(np.abs(s_raw_fpga).max()), _time.monotonic() - _t0))\n\n# Optional: report vs golden (if Route C-out included golden_iq_data)\nif golden_iq_data is not None:\n    _diff = s_raw_fpga - golden_iq_data\n    _err_rms = float(np.sqrt(np.mean(np.abs(_diff) ** 2)))\n    _sig_rms = float(np.sqrt(np.mean(np.abs(golden_iq_data) ** 2)))\n    _snr_db  = 20.0 * np.log10(_sig_rms / (_err_rms + 1e-30))\n    _peak_err = float(np.abs(_diff).max())\n    _peak_sig = float(np.abs(golden_iq_data).max())\n    print('  vs golden: RMS err = %.4g  signal RMS = %.4g  SNR = %.1f dB  peak err / peak = %.3f%%' % (\n        _err_rms, _sig_rms, _snr_db, 100 * _peak_err / max(_peak_sig, 1e-30)))\n",
-            "label": "FPGA Compute (mirror of Route B)"
-          }
-        }
+            "code": "# === HIL Stub: FPGA Compute (bit-exact mirror of Route B in main flow) ===\n# Stage A/B/C の Q-format 量子化 + FFT × mult × IFFT を cupy で実行。\n# n43 Route B と同じロジックでビット同一の結果を出す。\nimport numpy as np\nimport cupy as cp\nimport math\nimport time as _time\n_t0 = _time.monotonic()\n\n# --- Q-format parameters (n43 と同期させること) -----------------------------\n# Q_IN/Q_FFT/Q_OUT は \"Q-Format Config\" ノード (n7) が coeffs.npz meta から復元済み。\nif not all(k in globals() for k in ('Q_IN', 'Q_FFT', 'Q_OUT')):\n    raise NameError(\"Q_IN/Q_FFT/Q_OUT が未定義。'Q-Format Config' ノードを先に実行すること\")\nQ_IN_W,  Q_IN_F  = Q_IN      # Stage A (ADC)\nQ_FFT_W, Q_FFT_F = Q_FFT     # Stage B (FPGA datapath)\nQ_OUT_W, Q_OUT_F = Q_OUT     # Stage C (DAC)\n# ---------------------------------------------------------------------------\n\ndef _qaxis(v, n_word, n_frac, scale):\n    step = 2.0 ** (-n_frac)\n    iv_max =  (1 << (n_word - 1)) - 1\n    iv_min = -(1 << (n_word - 1))\n    return cp.clip(cp.round(v * scale / step), iv_min, iv_max) * step / scale\n\ndef qz(x, n_word, n_frac, name='', mode='auto'):\n    if x.size == 0:\n        return x.astype(cp.complex64)\n    if mode == 'fixed':\n        full_scale = float(2 ** (n_word - 1 - n_frac))\n        step = 2.0 ** (-n_frac)\n        iv_max =  (1 << (n_word - 1)) - 1\n        iv_min = -(1 << (n_word - 1))\n        r_q = cp.clip(cp.round(x.real / step), iv_min, iv_max) * step\n        i_q = cp.clip(cp.round(x.imag / step), iv_min, iv_max) * step\n        peak = float(cp.maximum(cp.abs(x.real).max(), cp.abs(x.imag).max()))\n        clip_frac = float(((cp.abs(x.real) >= full_scale) | (cp.abs(x.imag) >= full_scale)).mean())\n        err2 = (x.real - r_q) ** 2 + (x.imag - i_q) ** 2\n        sig2 = (cp.abs(x) ** 2).mean()\n        snr_db = 10.0 * float(cp.log10(sig2 / (err2.mean() + 1e-30)))\n        headroom_db = 20.0 * math.log10(full_scale / peak) if peak > 0 else float('inf')\n        print('  qz[%-9s fixed] Q%d.%d  FS=%.3g  peak=%.3g  headroom=%+5.1f dB  clip=%5.2f%%  SNR=%.1f dB'\n              % (name, n_word - n_frac, n_frac, full_scale, peak, headroom_db, 100*clip_frac, snr_db))\n        return (r_q + 1j * i_q).astype(cp.complex64)\n    peak = float(cp.maximum(cp.abs(x.real).max(), cp.abs(x.imag).max()))\n    if peak == 0:\n        return x.astype(cp.complex64)\n    full_scale = float(2 ** (n_word - 1 - n_frac))\n    s = 0.95 * full_scale / peak\n    r_q = _qaxis(x.real, n_word, n_frac, s)\n    i_q = _qaxis(x.imag, n_word, n_frac, s)\n    err2 = (x.real - r_q) ** 2 + (x.imag - i_q) ** 2\n    sig2 = (cp.abs(x) ** 2).mean()\n    snr_db = 10.0 * float(cp.log10(sig2 / (err2.mean() + 1e-30)))\n    shift_bits = math.log2(s) if s > 0 else 0.0\n    print('  qz[%-9s auto ] Q%d.%d  peak=%.3g  shift=%+6.2f bits  SNR=%.1f dB'\n          % (name, n_word - n_frac, n_frac, peak, shift_bits, snr_db))\n    return (r_q + 1j * i_q).astype(cp.complex64)\n\nprint('HIL FPGA compute (GPU): Q_IN=Q%d.%d  Q_FFT=Q%d.%d  Q_OUT=Q%d.%d' % (\n    Q_IN_W - Q_IN_F, Q_IN_F, Q_FFT_W - Q_FFT_F, Q_FFT_F, Q_OUT_W - Q_OUT_F, Q_OUT_F))\n\n# H2D\n_t_xfer = _time.monotonic()\nfir_gpu   = cp.asarray(fir_coefficients)\nchirp_gpu = cp.asarray(ref_chirp.astype(np.complex64))\ncp.cuda.Stream.null.synchronize()\nprint('  H2D: fir %s + chirp %s  (%.2fs)' % (fir_gpu.shape, chirp_gpu.shape, _time.monotonic() - _t_xfer))\n\n# Stage A: fixed Q (ADC quantize)\nfir_peak = float(cp.maximum(cp.abs(fir_gpu.real).max(), cp.abs(fir_gpu.imag).max()))\nfir_pre_scale = 0.95 / fir_peak if fir_peak > 0 else 1.0\nprint('  fir_in BRAM pre-scale: 1/%.3g   (block-scale shift = %+.2f bits)' % (\n    1.0 / fir_pre_scale, math.log2(fir_pre_scale)))\nfir_q   = qz(fir_gpu * fir_pre_scale, Q_IN_W, Q_IN_F, 'fir_in',   mode='fixed') / fir_pre_scale\nchirp_q = qz(chirp_gpu,               Q_IN_W, Q_IN_F, 'chirp_in', mode='fixed')\ndel fir_gpu, chirp_gpu\n\n# Stage B: FFT × mult (BFP auto)\nF    = qz(cp.fft.fft(fir_q, axis=1), Q_FFT_W, Q_FFT_F, 'fir_fft')\nC    = qz(cp.fft.fft(chirp_q),       Q_FFT_W, Q_FFT_F, 'chirp_fft')\nprod = qz(F * C[None, :],            Q_FFT_W, Q_FFT_F, 'prod')\ndel fir_q, chirp_q, F, C\n\n# Stage C: IFFT (BFP auto)\ns_raw_gpu = qz(cp.fft.ifft(prod, axis=1), Q_OUT_W, Q_OUT_F, 'out')\ndel prod\n\n# D2H\n_t_xfer = _time.monotonic()\ns_raw_fpga = cp.asnumpy(s_raw_gpu).astype(np.complex64)\ndel s_raw_gpu\ncp.get_default_memory_pool().free_all_blocks()\nprint('  D2H: s_raw_fpga %s  (%.2fs)' % (s_raw_fpga.shape, _time.monotonic() - _t_xfer))\n\nprint('HIL FPGA compute: s_raw_fpga=%s peak|s|=%.3f  (%.2fs total)' % (\n    s_raw_fpga.shape, float(np.abs(s_raw_fpga).max()), _time.monotonic() - _t0))\n\n# Optional: report vs golden (if Route C-out included golden_iq_data)\nif golden_iq_data is not None:\n    _diff = s_raw_fpga - golden_iq_data\n    _err_rms = float(np.sqrt(np.mean(np.abs(_diff) ** 2)))\n    _sig_rms = float(np.sqrt(np.mean(np.abs(golden_iq_data) ** 2)))\n    _snr_db  = 20.0 * np.log10(_sig_rms / (_err_rms + 1e-30))\n    _peak_err = float(np.abs(_diff).max())\n    _peak_sig = float(np.abs(golden_iq_data).max())\n    print('  vs golden: RMS err = %.4g  signal RMS = %.4g  SNR = %.1f dB  peak err / peak = %.3f%%' % (\n        _err_rms, _sig_rms, _snr_db, 100 * _peak_err / max(_peak_sig, 1e-30)))\n",
+            "label": "FPGA Compute (mirror of Route B)",
+            "spec": "【HIL FPGA Compute (cupy mirror of Route B)】\n\n役割: n43 Route B とビット同一の Q-format 量子化を cupy GPU で高速に実行 (~0.1s/frame)。\nHIL ループの「速い参照」。ゲートレベル厳密性は n6 (Verilator) が担う。\n\n処理: Stage A (fixed Q = ADC 量子化) → Stage B (FFT × 乗算、BFP auto) →\nStage C (IFFT、BFP auto)。fir は BRAM pre-scale (1/peak×0.95) で fixed Q に入れる。\n\n入力 (kernel): fir_coefficients (Na,Nr), ref_chirp (Nr,), Q_IN/Q_FFT/Q_OUT, golden_iq_data(任意)\n出力 (kernel): s_raw_fpga (Na,Nr) complex64 → n5 Save\n\nQ-format: ハードコードを廃止し、\"Q-Format Config\" ノード (n7) が coeffs.npz meta から\n復元した Q_IN/Q_FFT/Q_OUT を読む。→ FPGA3 n60 由来の単一ソース。\n\ngolden_iq_data があれば vs golden の RMS 誤差 / SNR を表示する。\nn6 (Verilator) とは排他 (両方 s_raw_fpga を書く)。どちらか一方だけ Enable する。"
+          },
+          "enabled": false
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n5",
         "type": "canvasNode",
         "position": {
-          "x": 1200,
-          "y": 50
+          "x": 1638.8027716088675,
+          "y": 47.702603290005925
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -169,18 +178,21 @@
           ],
           "defaultParameters": {
             "code": "# === HIL Stub: Save FPGA IQ ===\n# Tab 1 の Route C-in が読む .npy として保存。\nimport numpy as np\nimport os\n\n_path = str(globals().get('hil_output_path', '')).strip()\nif not _path:\n    raise ValueError(\"hil_output_path is empty — set it in the file picker (var_name='hil_output_path')\")\n\n_dir = os.path.dirname(_path)\nif _dir and not os.path.isdir(_dir):\n    os.makedirs(_dir, exist_ok=True)\n\nnp.save(_path, s_raw_fpga.astype(np.complex64))\n\n_size_mb = os.path.getsize(_path) / 1e6\nprint('Saved HIL FPGA IQ to %s  (%.1f MB, shape=%s, peak|s|=%.3f)' % (\n    _path, _size_mb, s_raw_fpga.shape, float(np.abs(s_raw_fpga).max())))\n",
-            "label": "Save FPGA IQ"
-          }
-        }
+            "label": "Save FPGA IQ",
+            "spec": "【HIL Stub: Save FPGA IQ】\ns_raw_fpga (Na,Nr) complex64 を hil_output_path の .npy として保存する。\nこの .npy を FPGA3 の Route C-in (n47) が読み込んで SAR 処理チェインに流し、\nbit-exact HIL SLC 画像を生成する。\n\n入力 (kernel): s_raw_fpga (n4 または n6 のいずれかが生成)。\n配線: {n4, n6} → このノード。"
+          },
+          "executionOrder": 6
+        },
+        "width": 400,
+        "style": {}
       },
       {
         "id": "n6",
         "type": "canvasNode",
         "position": {
-          "x": 700,
-          "y": 771
+          "x": 1138.8027716088675,
+          "y": 977.702603290006
         },
-        "width": 400,
         "data": {
           "label": "Python Code",
           "category": "processing",
@@ -200,29 +212,98 @@
             }
           ],
           "defaultParameters": {
-            "code": "# === FPGA Compute (Verilator HIL — bit-exact gate-level FFT) ===\n# Full Route B equivalent: Stage A (ADC quantize) -> FFT × multiply × IFFT\n# (each FFT done by the Verilator-compiled Amaranth FFT) -> Stage C (DAC\n# quantize). Bit-exact with what a real FPGA implementing the same Q-format\n# pipeline would produce.\n#\n# Slower than n4 cupy (~18s vs ~0.1s per frame) but gives the gate-accurate\n# reference signal — use to confirm that the cupy result is HW-realizable.\n#\n# Mutually exclusive with n4 (both write s_raw_fpga to the kernel).\nimport numpy as np\nimport sys, os\nimport time as _time\n\n_PROJ = r\"d:\\kamijo\\HiyoCanvas\"\n_SCRIPTS = os.path.join(_PROJ, \"workspace-SAR-SIM\", \"scripts\")\nif _SCRIPTS not in sys.path:\n    sys.path.insert(0, _SCRIPTS)\nfrom verilator_route_b import route_b_pipeline\n\n# Q-format parameters — keep aligned with n43 Route B in the main flow.\n# Defaults match the documented Route B (Q1.9 ADC / Q8.10 FFT internal / Q1.9 DAC).\nQ_IN  = (10, 9)\nQ_FFT = (18, 10)\nQ_OUT = (10, 9)\n\n_t0 = _time.monotonic()\nprint(f\"Verilator HIL Route B start: Q_IN=Q{Q_IN[0]-Q_IN[1]}.{Q_IN[1]}  Q_FFT=Q{Q_FFT[0]-Q_FFT[1]}.{Q_FFT[1]}  Q_OUT=Q{Q_OUT[0]-Q_OUT[1]}.{Q_OUT[1]}\")\n\ns_raw_fpga = route_b_pipeline(\n    fir_coefficients.astype(np.complex64),\n    ref_chirp.astype(np.complex64),\n    Q_IN=Q_IN, Q_FFT=Q_FFT, Q_OUT=Q_OUT,\n    verbose=True,\n)\n\nprint(f\"Verilator HIL Route B done: s_raw_fpga={s_raw_fpga.shape} peak|s|={float(np.abs(s_raw_fpga).max()):.3f}  ({_time.monotonic() - _t0:.2f}s total)\")\n",
-            "label": "FPGA Compute (Verilator HIL)"
+            "code": "# === FPGA Compute (Verilator HIL — bit-exact gate-level FFT) ===\n# Full Route B equivalent: Stage A (ADC quantize) -> FFT × multiply × IFFT\n# (each FFT done by the Verilator-compiled Amaranth FFT) -> Stage C (DAC\n# quantize). Bit-exact with what a real FPGA implementing the same Q-format\n# pipeline would produce.\n#\n# Slower than n4 cupy (~18s vs ~0.1s per frame) but gives the gate-accurate\n# reference signal — use to confirm that the cupy result is HW-realizable.\n#\n# Mutually exclusive with n4 (both write s_raw_fpga to the kernel).\nimport numpy as np\nimport sys, os\nimport time as _time\n\n_PROJ = r\"d:\\kamijo\\HiyoCanvas\"\n_SCRIPTS = os.path.join(_PROJ, \"workspace-SAR-SIM\", \"scripts\")\nif _SCRIPTS not in sys.path:\n    sys.path.insert(0, _SCRIPTS)\nfrom verilator_route_b import route_b_pipeline\n\n# Q-format parameters — \"Q-Format Config\" ノード (n7) が coeffs.npz meta から復元済み。\n# n4 (cupy) と必ず同一の Q-format で動く (ハードコードしない)。\nif not all(k in globals() for k in ('Q_IN', 'Q_FFT', 'Q_OUT')):\n    raise NameError(\"Q_IN/Q_FFT/Q_OUT が未定義。'Q-Format Config' ノードを先に実行すること\")\n\n_t0 = _time.monotonic()\nprint(f\"Verilator HIL Route B start: Q_IN=Q{Q_IN[0]-Q_IN[1]}.{Q_IN[1]}  Q_FFT=Q{Q_FFT[0]-Q_FFT[1]}.{Q_FFT[1]}  Q_OUT=Q{Q_OUT[0]-Q_OUT[1]}.{Q_OUT[1]}\")\n\ns_raw_fpga = route_b_pipeline(\n    fir_coefficients.astype(np.complex64),\n    ref_chirp.astype(np.complex64),\n    Q_IN=Q_IN, Q_FFT=Q_FFT, Q_OUT=Q_OUT,\n    verbose=True,\n)\n\nprint(f\"Verilator HIL Route B done: s_raw_fpga={s_raw_fpga.shape} peak|s|={float(np.abs(s_raw_fpga).max()):.3f}  ({_time.monotonic() - _t0:.2f}s total)\")\n",
+            "label": "FPGA Compute (Verilator HIL)",
+            "spec": "【HIL FPGA Compute (Verilator HIL — bit-exact gate-level FFT)】\n\n役割: Amaranth → Verilog → Verilator でコンパイルした実 HDL と同じゲートレベル FFT で\nRoute B 相当の処理を実行する。cupy (n4) より遅い (~18s/frame) が、実 FPGA が同じ\nQ-format パイプラインを実装したときの bit-exact な参照信号を与える。\ncupy 結果が HW 実現可能かを確認するために使う。\n\n処理: verilator_route_b.route_b_pipeline() を呼ぶ。Stage A (ADC 量子化) →\nFFT × 乗算 × IFFT (各 FFT は Verilator-compiled Amaranth FFT) → Stage C (DAC 量子化)。\n\n入力 (kernel): fir_coefficients (Na,Nr), ref_chirp (Nr,), Q_IN/Q_FFT/Q_OUT\n出力 (kernel): s_raw_fpga (Na,Nr) complex64 → n5 Save\n\nQ-format: ハードコードを廃止し、\"Q-Format Config\" ノード (n7) が coeffs.npz meta から\n復元した Q_IN/Q_FFT/Q_OUT を読む。→ n4 (cupy) と必ず同一 = 差分はゲートレベル\n(丸めモード truncate vs round-half-to-even 等) のみになる。→ FPGA3 n60 由来の単一ソース。\n\n配線: n3 (Load) → n7 (Q-Format Config) → このノード → n5 (Save)。\nn4 (cupy) とは排他 (両方 s_raw_fpga を書く)。このノードを使うときは n4 を Disable、\nこのノードを Enable する。デフォルトは Disable (通常は速い n4 cupy を使う)。"
           },
-          "enabled": false,
-          "barColor": "#a855f7"
-        }
+          "enabled": true,
+          "barColor": "#a855f7",
+          "executionOrder": 5
+        },
+        "width": 400,
+        "style": {}
+      },
+      {
+        "id": "n7",
+        "type": "canvasNode",
+        "position": {
+          "x": 687.3084315193358,
+          "y": 274.0520658001186
+        },
+        "data": {
+          "label": "Python Code",
+          "category": "processing",
+          "blockType": "python_code",
+          "inputs": [
+            {
+              "id": "in_0",
+              "label": "in_0",
+              "portType": "any"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "out_0",
+              "label": "out_0",
+              "portType": "any"
+            }
+          ],
+          "defaultParameters": {
+            "code": "# === HIL Q-Format Config (単一ソース、coeffs.npz meta から) ===\n# FPGA3 の Route C-out が coeffs.npz に書いた Q-format meta を読み、\n# Q_IN/Q_FFT/Q_OUT として kernel に展開する。後段 n4 (cupy) / n6 (Verilator) は\n# これを読む。→ HIL 側の Q-format も FPGA3 の \"FPGA Q-Format Config\" 由来の単一ソース。\nimport numpy as np\nimport os\n\n_p = str(globals().get('hil_input_path', '')).strip()\nif not _p or not os.path.isfile(_p):\n    raise FileNotFoundError(\"hil_input_path が無効。Input file picker を設定すること: %r\" % _p)\n\n_z = np.load(_p, allow_pickle=False)\nif 'meta_Q_IN_W' not in _z.files:\n    raise KeyError(\"coeffs.npz に Q-format meta が無い。FPGA3 の Route C-out (Q-format 伝搬対応版) で再生成すること\")\n\nQ_IN  = (int(_z['meta_Q_IN_W']),  int(_z['meta_Q_IN_F']))\nQ_FFT = (int(_z['meta_Q_FFT_W']), int(_z['meta_Q_FFT_F']))\nQ_OUT = (int(_z['meta_Q_OUT_W']), int(_z['meta_Q_OUT_F']))\nprint('HIL Q-format (from npz meta): Q_IN=Q%d.%d  Q_FFT=Q%d.%d  Q_OUT=Q%d.%d' % (\n    Q_IN[0]-Q_IN[1], Q_IN[1], Q_FFT[0]-Q_FFT[1], Q_FFT[1], Q_OUT[0]-Q_OUT[1], Q_OUT[1]))\n",
+            "label": "Q-Format Config (from npz)",
+            "spec": "【HIL Q-Format Config — Q-format 単一ソース (HIL 側)】\n\n役割: FPGA3 の Route C-out が coeffs.npz に保存した Q-format meta\n(meta_Q_IN_W/F, meta_Q_FFT_W/F, meta_Q_OUT_W/F) を読み、Q_IN/Q_FFT/Q_OUT タプルとして\nkernel namespace に展開する。\n\nなぜ存在するか:\nn4 (cupy) と n6 (Verilator) は以前それぞれ Q-format をハードコードしており、\nn4=Q1.7/Q6.4 に対し n6=Q1.9/Q8.10 と食い違っていたため、cupy vs Verilator の\nHIL 比較が「ゲートレベル差」でなく「Q-format 差」になってしまう問題があった。\nこのノードが両者に同じ Q-format を与えることで、n4≡n6 (Q-format 一致) を保証する。\n\n伝搬経路:\n  FPGA3 \"FPGA Q-Format Config\" (n60)  → Route C-out が coeffs.npz meta に書き込み\n    → n3 Load が npz をロード → このノードが meta から復元 → n4 / n6 が読む\n\n配線: n3 (Load) → このノード → {n4 (cupy), n6 (Verilator)} → n5 (Save)\n出力 (kernel namespace): Q_IN, Q_FFT, Q_OUT\n\n注: Q-format の値を変えたいときはここではなく FPGA3 の n60 を編集し、\nRoute A+C-out を再実行して coeffs.npz を作り直すこと。"
+          },
+          "executionOrder": 4
+        },
+        "width": 400,
+        "style": {}
       }
     ],
     "edges": [
-      {
-        "id": "e_1780035102894_c7o9",
-        "source": "n3",
-        "sourceHandle": "out_0",
-        "target": "n4",
-        "targetHandle": "in_0"
-      },
       {
         "id": "e_1780035103017_n4gg",
         "source": "n4",
         "sourceHandle": "out_0",
         "target": "n5",
+        "targetHandle": "in_0",
+        "selected": false
+      },
+      {
+        "id": "e_1780041525846_mnkf",
+        "source": "n3",
+        "sourceHandle": "out_0",
+        "target": "n7",
         "targetHandle": "in_0"
+      },
+      {
+        "id": "e_1780041525846_ekpk",
+        "source": "n7",
+        "sourceHandle": "out_0",
+        "target": "n4",
+        "targetHandle": "in_0",
+        "selected": false
+      },
+      {
+        "id": "e_1780041525846_foik",
+        "source": "n7",
+        "sourceHandle": "out_0",
+        "target": "n6",
+        "targetHandle": "in_0",
+        "selected": false
+      },
+      {
+        "id": "e_1780041525846_lgim",
+        "source": "n6",
+        "sourceHandle": "out_0",
+        "target": "n5",
+        "targetHandle": "in_0",
+        "selected": false
       }
-    ]
+    ],
+    "viewport": {
+      "x": 258.49770162898255,
+      "y": 64.61769743128531,
+      "zoom": 0.43527528164806206
+    }
   }
 }

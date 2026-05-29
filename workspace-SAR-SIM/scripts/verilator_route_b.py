@@ -15,6 +15,7 @@ Typical use in a flow node:
 """
 import os
 import sys
+import math
 import numpy as np
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -100,12 +101,22 @@ def quantize_fixed(x: np.ndarray, n_word: int, n_frac: int) -> np.ndarray:
     return (re + 1j * im).astype(np.complex64)
 
 
-def quantize_bfp(x: np.ndarray, n_word: int, n_frac: int) -> np.ndarray:
-    """Block floating-point quantize: peak -> FS*0.95, round, scale back.
+def quantize_bfp(x: np.ndarray, n_word: int, n_frac: int,
+                 return_shift: bool = False):
+    """Block quantize with a POWER-OF-2 bit-shift (realistic, FPGA-implementable).
 
-    Used for Stage B (FFT-internal datapath) where each "block" (FFT output,
-    multiply result, etc.) gets its own shift exponent. Matches Route B's
-    qz(mode='auto').
+    The host (which knows the loaded coefficients) computes, per scene/block, the
+    largest integer bit-shift that keeps the block peak within 0.95*FS, and passes
+    it to the FPGA as a RUNTIME PARAMETER alongside the coefficients. The HDL
+    datapath itself is fixed (synthesised once); only the shift register changes
+    per scene. This matches e.g. Xilinx FFT IP "scaled" mode.
+
+        shift = floor(log2(0.95 * FS / peak))     # left(+) / right(-) bit shift
+        s     = 2**shift                          # power-of-2 only (a real shift)
+
+    Returns the quantized array (and the integer shift if return_shift=True).
+    Because shift is chosen on the known data, overflow does not occur; the
+    residual error is the Q-format bit-width quantization noise.
     """
     full_scale = 2 ** (n_word - 1 - n_frac)
     step = 2.0 ** (-n_frac)
@@ -113,11 +124,13 @@ def quantize_bfp(x: np.ndarray, n_word: int, n_frac: int) -> np.ndarray:
     iv_min = -(1 << (n_word - 1))
     peak = float(np.maximum(np.abs(x.real).max(), np.abs(x.imag).max()))
     if peak == 0:
-        return x.astype(np.complex64)
-    s = 0.95 * full_scale / peak
+        return (x.astype(np.complex64), 0) if return_shift else x.astype(np.complex64)
+    shift = int(math.floor(math.log2(0.95 * full_scale / peak)))   # power-of-2 bit shift
+    s = 2.0 ** shift
     re = np.clip(np.round(x.real * s / step), iv_min, iv_max) * step / s
     im = np.clip(np.round(x.imag * s / step), iv_min, iv_max) * step / s
-    return (re + 1j * im).astype(np.complex64)
+    q = (re + 1j * im).astype(np.complex64)
+    return (q, shift) if return_shift else q
 
 
 def route_b_pipeline(
@@ -127,7 +140,7 @@ def route_b_pipeline(
     Q_FFT=(18, 10),
     Q_OUT=(10, 9),
     verbose: bool = True,
-) -> np.ndarray:
+):
     """Bit-exact gate-level Route B (FFT × multiply × IFFT with per-stage Q quantize).
 
     Mirrors n43 Route B but with the FFT/IFFT step done by the Verilator-
@@ -163,13 +176,17 @@ def route_b_pipeline(
     if verbose:
         print(f"  Stage A: fir_pre_scale=1/{1/fir_pre_scale:.3g}  fir_q.shape={fir_q.shape}  chirp_q.shape={chirp_q.shape}")
 
-    # Stage B: FFT via Verilator, then Q_FFT BFP per block
-    F = quantize_bfp(verilator_fft(fir_q),                   *Q_FFT)
-    C = quantize_bfp(verilator_fft(chirp_q.reshape(1, -1))[0], *Q_FFT)
-    prod = quantize_bfp(F * C[None, :], *Q_FFT)
+    # Stage B: FFT via Verilator, then per-scene power-of-2 shift (host-computed,
+    # passed to the FPGA as a runtime parameter). Shifts collected for reporting.
+    F, sh_ff = quantize_bfp(verilator_fft(fir_q),                   *Q_FFT, return_shift=True)
+    C, sh_cf = quantize_bfp(verilator_fft(chirp_q.reshape(1, -1))[0], *Q_FFT, return_shift=True)
+    prod, sh_pr = quantize_bfp(F * C[None, :], *Q_FFT, return_shift=True)
 
-    # Stage C: IFFT via Verilator, Q_OUT BFP for the final s_raw
-    s_raw_padded = quantize_bfp(verilator_ifft(prod), *Q_OUT)
+    # Stage C: IFFT via Verilator, per-scene power-of-2 shift for the final s_raw
+    s_raw_padded, sh_o = quantize_bfp(verilator_ifft(prod), *Q_OUT, return_shift=True)
+    shifts = {'fir_fft': sh_ff, 'chirp_fft': sh_cf, 'prod': sh_pr, 'out': sh_o}
+    if verbose:
+        print(f"  bit-shifts (host->FPGA params): {shifts}")
 
     # Crop zero-pad tail
     s_raw = s_raw_padded[:, :Nr].astype(np.complex64)
