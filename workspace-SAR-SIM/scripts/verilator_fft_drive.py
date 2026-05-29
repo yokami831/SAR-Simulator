@@ -95,39 +95,84 @@ def to_q15(x):
     return int(round(np.clip(x, -1.0, 1.0 - 1.0 / Q15) * Q15))
 
 
-def run_fft_exe(exe: str, N: int, x_re: np.ndarray, x_im: np.ndarray):
-    """Pipe one frame through the FFT exe; return complex output as Q(WG).15 floats."""
-    LOG_N = (N - 1).bit_length()
-    WG = 16 + LOG_N
+def _pack_int16_pairs(x_re: np.ndarray, x_im: np.ndarray) -> bytes:
+    """Interleave real/imag arrays into int16 little-endian byte pairs."""
+    re = np.asarray(x_re, dtype='<i2')
+    im = np.asarray(x_im, dtype='<i2')
+    out = np.empty(re.size + im.size, dtype='<i2')
+    out[0::2] = re
+    out[1::2] = im
+    return out.tobytes()
 
-    # Pack input as int16 pairs
-    buf = bytearray()
-    for r, i in zip(x_re, x_im):
-        buf += int(r).to_bytes(2, 'little', signed=True)
-        buf += int(i).to_bytes(2, 'little', signed=True)
+
+def _unpack_int32_pairs(blob: bytes) -> np.ndarray:
+    """De-interleave int32 byte stream back into a complex array (Q(WG).15 -> float)."""
+    arr = np.frombuffer(blob, dtype='<i4')
+    re = arr[0::2].astype(np.float64) / Q15
+    im = arr[1::2].astype(np.float64) / Q15
+    return re + 1j * im
+
+
+def run_fft_exe(exe: str, N: int, x_re: np.ndarray, x_im: np.ndarray):
+    """Pipe one frame through the FFT exe; return complex output."""
+    buf = _pack_int16_pairs(np.asarray(x_re).reshape(-1), np.asarray(x_im).reshape(-1))
 
     env = os.environ.copy()
     env["FFT_N"] = str(N)
     t0 = time.monotonic()
-    proc = subprocess.run([exe], input=bytes(buf), capture_output=True, env=env)
+    proc = subprocess.run([exe], input=buf, capture_output=True, env=env)
     elapsed = time.monotonic() - t0
     if proc.returncode != 0:
         sys.stderr.write(proc.stderr.decode(errors='replace'))
         raise SystemExit(f"FFT exe failed (rc={proc.returncode})")
 
-    # Output is N pairs of int32_le
     out = proc.stdout
     if len(out) != N * 8:
         raise SystemExit(f"unexpected output size {len(out)}, expected {N*8}")
-    arr = np.frombuffer(out, dtype='<i4').reshape(N, 2)
-    hw = arr[:, 0] / Q15 + 1j * arr[:, 1] / Q15
+    hw = _unpack_int32_pairs(out)
 
-    # parse tb stderr for cycle count
     cycles_str = ""
     for line in proc.stderr.decode(errors='replace').splitlines():
-        if "cycles_compute=" in line:
+        if "cycles_compute=" in line or "total_cycles=" in line:
             cycles_str = line.strip()
     return hw, elapsed, cycles_str
+
+
+def run_fft_batch(exe: str, N: int, frames_re: np.ndarray, frames_im: np.ndarray):
+    """Process Na frames in a single process invocation.
+
+    frames_re, frames_im: shape (Na, N) int16-castable arrays of Q1.15 inputs.
+    Returns: complex ndarray of shape (Na, N), elapsed seconds, tb stderr line.
+    """
+    Na, n = frames_re.shape
+    if n != N:
+        raise ValueError(f"frame width {n} != N ({N})")
+    if frames_im.shape != frames_re.shape:
+        raise ValueError("re/im shape mismatch")
+
+    buf = _pack_int16_pairs(frames_re.reshape(-1), frames_im.reshape(-1))
+
+    env = os.environ.copy()
+    env["FFT_N"] = str(N)
+    t0 = time.monotonic()
+    proc = subprocess.run([exe], input=buf, capture_output=True, env=env)
+    elapsed = time.monotonic() - t0
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stderr.decode(errors='replace'))
+        raise SystemExit(f"FFT exe failed (rc={proc.returncode})")
+
+    out = proc.stdout
+    expected_bytes = Na * N * 8
+    if len(out) != expected_bytes:
+        raise SystemExit(f"unexpected output size {len(out)}, expected {expected_bytes}")
+    hw_flat = _unpack_int32_pairs(out)
+    hw = hw_flat.reshape(Na, N)
+
+    info = ""
+    for line in proc.stderr.decode(errors='replace').splitlines():
+        if "frames=" in line:
+            info = line.strip()
+    return hw, elapsed, info
 
 
 def benchmark(N: int):
