@@ -51,11 +51,20 @@ voice-agent/.agent.pid
 .hiyocanvas-runtime.json
 
 # Temp files
+# Preferred convention: place all scratch/work-in-progress files under tmp/
+# (see CLAUDE.md "一時ファイルは `tmp/` に置く"). The tmp_*.* patterns below
+# are kept for backwards compatibility with older sessions but new code
+# should use tmp/ exclusively.
+tmp/
 temp_*.txt
 tmp_*.txt
 tmp_*.py
 tmp_*.json
 tmp_*.png
+tmp.json
+ids.txt
+*_spec.md
+!references/**/*_spec.md
 
 # Scratch folder for SKILL workflow (canvas_api.py code_file / @file payloads)
 # All temp files generated when updating nodes go here so they don't pollute the repo root.
