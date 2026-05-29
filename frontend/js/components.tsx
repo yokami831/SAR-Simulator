@@ -13,7 +13,7 @@ import type { Node } from '@xyflow/react';
 
 import { getBlockDef, getSetNodesRef } from './blockLibraryData.js';
 import { NODE_MIN_WIDTH, NODE_COMPACT_HEIGHT, MAX_OUTPUT_DISPLAY_LEN } from './utils.js';
-import { NODE_RESIZER_COLOR, TOOLTIP_INFO_BG, TOOLTIP_INFO_BORDER, TOOLTIP_WARNING_BG, TOOLTIP_WARNING_BORDER, TOOLTIP_TEACHING_BG, TOOLTIP_TEACHING_BORDER } from './constants.js';
+import { NODE_RESIZER_COLOR, TOOLTIP_INFO_BG, TOOLTIP_INFO_BORDER, TOOLTIP_WARNING_BG, TOOLTIP_WARNING_BORDER, TOOLTIP_TEACHING_BG, TOOLTIP_TEACHING_BORDER, Z_MODAL_OVERLAY, Z_MODAL_BUTTON } from './constants.js';
 
 // Feature flag cache (loaded once from /api/config)
 let _fpgaEnabled = false;
@@ -666,7 +666,7 @@ function ImageExpandModal({ images, initialIndex, onClose }: {
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
+        position: 'fixed', inset: 0, zIndex: Z_MODAL_OVERLAY,
         background: 'rgba(0,0,0,0.85)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
@@ -677,7 +677,7 @@ function ImageExpandModal({ images, initialIndex, onClose }: {
           labels={labels}
           active={active}
           onSelect={setActive}
-          style={{ position: 'fixed', top: 12, left: 12, zIndex: 10000 }}
+          style={{ position: 'fixed', top: 12, left: 12, zIndex: Z_MODAL_BUTTON }}
         />
       )}
       <img
@@ -688,7 +688,7 @@ function ImageExpandModal({ images, initialIndex, onClose }: {
       <button
         onClick={(e) => { e.stopPropagation(); onClose(); }}
         style={{
-          position: 'fixed', top: 12, right: 12, zIndex: 10000,
+          position: 'fixed', top: 12, right: 12, zIndex: Z_MODAL_BUTTON,
           background: 'rgba(14,20,34,0.85)', border: '1px solid #2a3142',
           borderRadius: 4, color: '#cfd6e6', font: '11px sans-serif',
           padding: '3px 8px', cursor: 'pointer',

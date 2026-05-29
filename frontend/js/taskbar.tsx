@@ -10,6 +10,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react'
 import type { TabInstance } from './types.js'
 import { getTabType } from './tabRegistry.js'
 import { NewMenu } from './bookmarkBar.js'
+import { Z_CONTEXT_MENU } from './constants.js'
 
 // Type-specific border colors for active tab
 const TYPE_COLORS: Record<string, string> = {
@@ -154,7 +155,7 @@ export function BottomTaskbar({
         <div
           ref={menuRef}
           className="tab-context-menu"
-          style={{ position: 'fixed', left: menuPos.x, top: menuPos.y - 40, zIndex: 1000 }}
+          style={{ position: 'fixed', left: menuPos.x, top: menuPos.y - 40, zIndex: Z_CONTEXT_MENU }}
         >
           <button onClick={e => { e.stopPropagation(); setShowMenu(false); onEdit(menuTabId) }}>
             Edit...

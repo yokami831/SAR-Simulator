@@ -25,6 +25,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { SurfaceRendererManager, SurfaceHandle, SurfaceData } from './SurfaceRendererManager.js';
 import { INFERNO_256 } from '../colormap_inferno.js';
+import { Z_MODAL_OVERLAY } from '../constants.js';
 
 // ---------------------------------------------------------------------------
 // Payload schema (must match backend _emit_surface_gl / surface3d_pair_gl)
@@ -262,7 +263,7 @@ function ExpandModal({ surfaceData, isPair, dataA, dataB, onClose }: ExpandModal
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
+      position: 'fixed', inset: 0, zIndex: Z_MODAL_OVERLAY,
       background: 'rgba(0,0,0,0.85)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}
