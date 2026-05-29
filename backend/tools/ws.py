@@ -11,6 +11,7 @@ import json
 import logging
 import time
 import uuid
+from collections import deque
 from datetime import datetime, timezone
 from typing import Any
 
@@ -33,9 +34,9 @@ class ToolsState:
 
     def __init__(self) -> None:
         self.pending_requests: dict[str, asyncio.Future] = {}
-        self.frontend_errors: list[dict] = []
+        self.frontend_errors: deque[dict] = deque(maxlen=MAX_FRONTEND_ERRORS)
         self.frontend_ready: bool = False
-        self.console_logs: list[dict] = []
+        self.console_logs: deque[dict] = deque(maxlen=MAX_CONSOLE_LOGS)
         self.ws_clients: set = set()
         self.ws_lock: asyncio.Lock = asyncio.Lock()
 
@@ -194,8 +195,6 @@ def report_frontend_error(error: dict) -> None:
         "lineno": error.get("lineno", 0),
         "stack": error.get("stack", ""),
     })
-    while len(_state.frontend_errors) > MAX_FRONTEND_ERRORS:
-        _state.frontend_errors.pop(0)
 
 
 def on_frontend_ready() -> None:
@@ -224,8 +223,6 @@ def store_console_log(entry: dict) -> None:
         "details": entry.get("details", ""),
         "source": entry.get("source", ""),
     })
-    while len(_state.console_logs) > MAX_CONSOLE_LOGS:
-        _state.console_logs.pop(0)
 
 
 def clear_stored_console_logs() -> None:

@@ -303,7 +303,6 @@ class FlowExecutor:
             if not result.success:
                 # Error → transition to idle (keep kernel for single-node re-execution)
                 self._stepping = False
-                self._step_executing = False
                 await self._ws_broadcast({"type": "status_change", "status": "stopped"})
                 return {
                     "node_id": node_id,
@@ -316,7 +315,6 @@ class FlowExecutor:
             if self._step_index >= len(self._step_queue):
                 # Keep kernel alive for single-node re-execution
                 self._stepping = False
-                self._step_executing = False
                 await self._ws_broadcast({"type": "status_change", "status": "stopped"})
             else:
                 await self._broadcast_step_ready()
@@ -327,9 +325,6 @@ class FlowExecutor:
                 "step_index": self._step_index - 1,
                 "total_steps": len(self._step_queue),
             }
-        except Exception:
-            self._step_executing = False
-            raise
         finally:
             self._step_executing = False
 
