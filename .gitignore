@@ -67,6 +67,12 @@ tmp/*
 # Renderer crash diagnostics (local-only runtime logs, written by src/main.js)
 logs/
 
+# HIL stub I/O (Route C-out coeffs.npz / FPGA-HIL-Stub fpga_out.npy)
+# Boundary files between SAR-Simulator-FPGA* and FPGA-HIL-Stub tabs.
+# Local runtime data, not source of truth.
+workspace-SAR-SIM/fpga_io/*
+!workspace-SAR-SIM/fpga_io/.gitkeep
+
 # Simulation outputs
 *.vcd
 *.surf.ron
