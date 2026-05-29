@@ -320,7 +320,7 @@ function _scheduleReconnect(): void {
   }
   wsReconnectAttempts++;
   const delay = Math.min(WS_BACKOFF_BASE * Math.pow(2, wsReconnectAttempts - 1), WS_BACKOFF_MAX);
-  consoleLog('warning', `Reconnecting (${wsReconnectAttempts}/${WS_MAX_RETRIES})...`, '', 'system');
+  consoleLog('info', `Reconnecting (${wsReconnectAttempts}/${WS_MAX_RETRIES})...`, '', 'system');
   wsReconnectTimer = setTimeout(() => {
     wsReconnectTimer = null;
     if (wsShouldReconnect) _doConnect();
