@@ -28,6 +28,35 @@ from verilator_fft_drive import (
 # Cache one Verilator exe per N (build is ~20s the first time).
 _EXE_CACHE: dict = {}
 
+# ---------------------------------------------------------------------------
+# Realistic fixed-point modeling knobs (fidelity discussion 2026-05-30).
+# The goal: the HDL/fixed routes must NOT look better than a real FPGA. Three
+# rules, all matching the target-FPGA assumptions the user described:
+#   (1) Every data-dependent scale is a POWER-OF-2 bit-shift only — a real shift
+#       register the host sets per scene alongside the filter coefficients. We
+#       NEVER multiply by an arbitrary float (which would silently flatter the
+#       quantization by perfectly filling the range).
+#   (2) The shift targets ~HALF full-scale, not the overflow edge. Real datapaths
+#       keep headroom; they don't run at 0.95 FS. With a power-of-2 shift the
+#       fill lands in (SCALE_TARGET/2, SCALE_TARGET] = (0.25, 0.5] of FS.
+#   (3) Quantization rounding is TRUNCATE toward zero (np.trunc — drop the
+#       fractional bits, magnitude decreases). This is the standard fixed-point
+#       "truncation" and, unlike round-half-to-even, it is not optimistic. We do
+#       NOT use floor toward -inf here: on the coarse Q1.7/Q6.4 input formats a
+#       consistent -½ LSB bias accumulates into a large DC spike through the FFT
+#       (verified: it wrecks the image), which real designs avoid. The FFT CORE's
+#       own internal `wb >> 15` (arithmetic shift = floor toward -inf) is a
+#       separate, high-precision reduction and is reproduced bit-exactly by
+#       Verilator — we don't re-model it here.
+SCALE_TARGET = 0.5      # fraction of full-scale the per-scene power-of-2 shift aims for
+
+
+def _pow2_scale(peak: float, target: float = SCALE_TARGET) -> float:
+    """Largest power-of-2 scale s such that peak*s <= target (a real shift)."""
+    if peak <= 0:
+        return 1.0
+    return 2.0 ** int(math.floor(math.log2(target / peak)))
+
 def _get_exe(N: int) -> str:
     if N in _EXE_CACHE:
         return _EXE_CACHE[N]
@@ -57,14 +86,16 @@ def verilator_fft(x: np.ndarray) -> np.ndarray:
     Na = flat.shape[0]
     exe = _get_exe(N)
 
-    # Block-scale the input so every batch fits comfortably in Q1.15 range
-    # ([-1, 1)) without clipping; undo on the way out.
+    # Block-scale the input into the Q1.15 range with a POWER-OF-2 shift (a real
+    # per-scene shift register, set with the coefficients), aiming for ~half
+    # full-scale headroom — NOT an arbitrary float that perfectly fills the range.
+    # Truncate toward zero on quantize (drop LSBs, no DC bias).
     peak = float(np.max(np.maximum(np.abs(flat.real), np.abs(flat.imag))))
-    in_scale = (0.95 / peak) if peak > 0 else 1.0
+    in_scale = _pow2_scale(peak, SCALE_TARGET)
 
     scaled = flat * in_scale
-    re = np.clip(np.round(scaled.real * Q15), -32768, 32767).astype(np.int16)
-    im = np.clip(np.round(scaled.imag * Q15), -32768, 32767).astype(np.int16)
+    re = np.clip(np.trunc(scaled.real * Q15), -32768, 32767).astype(np.int16)
+    im = np.clip(np.trunc(scaled.imag * Q15), -32768, 32767).astype(np.int16)
 
     hw, _elapsed, _info = run_fft_batch(exe, N, re, im)
     hw = hw / in_scale
@@ -96,8 +127,9 @@ def quantize_fixed(x: np.ndarray, n_word: int, n_frac: int) -> np.ndarray:
     step = 2.0 ** (-n_frac)
     iv_max =  (1 << (n_word - 1)) - 1
     iv_min = -(1 << (n_word - 1))
-    re = np.clip(np.round(x.real / step), iv_min, iv_max) * step
-    im = np.clip(np.round(x.imag / step), iv_min, iv_max) * step
+    # truncate toward zero (drop fractional bits, no DC bias).
+    re = np.clip(np.trunc(x.real / step), iv_min, iv_max) * step
+    im = np.clip(np.trunc(x.imag / step), iv_min, iv_max) * step
     return (re + 1j * im).astype(np.complex64)
 
 
@@ -106,13 +138,14 @@ def quantize_bfp(x: np.ndarray, n_word: int, n_frac: int,
     """Block quantize with a POWER-OF-2 bit-shift (realistic, FPGA-implementable).
 
     The host (which knows the loaded coefficients) computes, per scene/block, the
-    largest integer bit-shift that keeps the block peak within 0.95*FS, and passes
-    it to the FPGA as a RUNTIME PARAMETER alongside the coefficients. The HDL
-    datapath itself is fixed (synthesised once); only the shift register changes
-    per scene. This matches e.g. Xilinx FFT IP "scaled" mode.
+    largest integer bit-shift that keeps the block peak within SCALE_TARGET*FS
+    (~half full-scale, leaving headroom), and passes it to the FPGA as a RUNTIME
+    PARAMETER alongside the coefficients. The HDL datapath itself is fixed
+    (synthesised once); only the shift register changes per scene. This matches
+    e.g. Xilinx FFT IP "scaled"/BFP mode.
 
-        shift = floor(log2(0.95 * FS / peak))     # left(+) / right(-) bit shift
-        s     = 2**shift                          # power-of-2 only (a real shift)
+        shift = floor(log2(SCALE_TARGET * FS / peak))   # left(+) / right(-) shift
+        s     = 2**shift                                # power-of-2 only (real shift)
 
     Returns the quantized array (and the integer shift if return_shift=True).
     Because shift is chosen on the known data, overflow does not occur; the
@@ -125,10 +158,12 @@ def quantize_bfp(x: np.ndarray, n_word: int, n_frac: int,
     peak = float(np.maximum(np.abs(x.real).max(), np.abs(x.imag).max()))
     if peak == 0:
         return (x.astype(np.complex64), 0) if return_shift else x.astype(np.complex64)
-    shift = int(math.floor(math.log2(0.95 * full_scale / peak)))   # power-of-2 bit shift
+    # power-of-2 bit shift aiming for ~SCALE_TARGET full-scale (headroom, not the edge)
+    shift = int(math.floor(math.log2(SCALE_TARGET * full_scale / peak)))
     s = 2.0 ** shift
-    re = np.clip(np.round(x.real * s / step), iv_min, iv_max) * step / s
-    im = np.clip(np.round(x.imag * s / step), iv_min, iv_max) * step / s
+    # truncate toward zero (drop fractional bits, no DC bias).
+    re = np.clip(np.trunc(x.real * s / step), iv_min, iv_max) * step / s
+    im = np.clip(np.trunc(x.imag * s / step), iv_min, iv_max) * step / s
     q = (re + 1j * im).astype(np.complex64)
     return (q, shift) if return_shift else q
 
@@ -172,10 +207,11 @@ def route_b_pipeline(
     chirp_padded = np.zeros(Nr_p2, dtype=np.complex64)
     chirp_padded[:Nr] = ref_chirp
 
-    # Stage A: ADC-like fixed quantize. BRAM pre-scale for fir (per-frame
-    # block scale factor); chirp is already O(1) so direct.
+    # Stage A: ADC-like fixed quantize. BRAM pre-scale for fir = a POWER-OF-2
+    # block scale (a real shift the host bakes in with the coefficient set),
+    # aiming for ~half full-scale headroom — not an arbitrary float fill.
     fir_peak = float(np.maximum(np.abs(fir_padded.real).max(), np.abs(fir_padded.imag).max()))
-    fir_pre_scale = 0.95 / fir_peak if fir_peak > 0 else 1.0
+    fir_pre_scale = _pow2_scale(fir_peak, SCALE_TARGET)
     fir_q   = quantize_fixed(fir_padded * fir_pre_scale, *Q_IN) / fir_pre_scale
     chirp_q = quantize_fixed(chirp_padded, *Q_IN)
     if verbose:
