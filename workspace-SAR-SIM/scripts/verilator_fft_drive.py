@@ -21,6 +21,28 @@ os.chdir(_ROOT)
 
 # Tooling locations
 BASH_EXE = r"C:\msys64\usr\bin\bash.exe"
+_MINGW_BIN = r"C:\msys64\mingw64\bin"
+_MSYS_BIN = r"C:\msys64\usr\bin"
+
+
+def _mingw_env():
+    """Return a subprocess env where the MSYS2 MINGW64 toolchain is reachable.
+
+    The MSYS2 login shell (`bash -lc`) only adds /mingw64/bin (verilator, g++,
+    the runtime DLLs) to PATH when MSYSTEM=MINGW64. When this process is launched
+    without MSYSTEM set — e.g. the Electron-spawned Jupyter kernel — the login
+    shell defaults to MSYSTEM=MSYS and /mingw64/bin is NOT on PATH, so `verilator`
+    is not found and the build dies with rc=127 ("command not found"). We force
+    MSYSTEM=MINGW64 and also prepend the Windows-side mingw64/usr bin dirs so the
+    built .exe can load its mingw runtime DLLs (libstdc++/libgcc) at run time.
+    Without this, whether HDL works depends on how Electron happened to be
+    launched. See memory: msys2_verilator_setup (must-invoke-via-bash gotcha).
+    """
+    env = os.environ.copy()
+    env["MSYSTEM"] = "MINGW64"
+    env["PATH"] = _MINGW_BIN + os.pathsep + _MSYS_BIN + os.pathsep + env.get("PATH", "")
+    return env
+
 
 def _to_msys(p):
     p = str(p)
@@ -70,7 +92,7 @@ def verilate_build(N: int, verilog_path: str, build_dir: str):
     bash_cmd = [BASH_EXE, '-lc', cmd]
     print(f"[build] running verilator (via bash)")
     t0 = time.monotonic()
-    res = subprocess.run(bash_cmd, capture_output=True)
+    res = subprocess.run(bash_cmd, capture_output=True, env=_mingw_env())
     elapsed = time.monotonic() - t0
     out = res.stdout.decode('utf-8', errors='replace') if res.stdout else ''
     err = res.stderr.decode('utf-8', errors='replace') if res.stderr else ''
@@ -117,7 +139,7 @@ def run_fft_exe(exe: str, N: int, x_re: np.ndarray, x_im: np.ndarray):
     """Pipe one frame through the FFT exe; return complex output."""
     buf = _pack_int16_pairs(np.asarray(x_re).reshape(-1), np.asarray(x_im).reshape(-1))
 
-    env = os.environ.copy()
+    env = _mingw_env()   # exe needs mingw64 runtime DLLs (libstdc++/libgcc) on PATH
     env["FFT_N"] = str(N)
     t0 = time.monotonic()
     proc = subprocess.run([exe], input=buf, capture_output=True, env=env)
@@ -152,7 +174,7 @@ def run_fft_batch(exe: str, N: int, frames_re: np.ndarray, frames_im: np.ndarray
 
     buf = _pack_int16_pairs(frames_re.reshape(-1), frames_im.reshape(-1))
 
-    env = os.environ.copy()
+    env = _mingw_env()   # exe needs mingw64 runtime DLLs (libstdc++/libgcc) on PATH
     env["FFT_N"] = str(N)
     t0 = time.monotonic()
     proc = subprocess.run([exe], input=buf, capture_output=True, env=env)
