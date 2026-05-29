@@ -6,7 +6,6 @@
  */
 
 import { useEffect, useRef, useState, useCallback, createElement as h, Fragment } from 'react'
-// (createPortal removed — toolbar portal no longer used)
 import MindElixir from 'mind-elixir'
 import 'mind-elixir/style'
 import type { MindElixirInstance, MindElixirData } from 'mind-elixir'
@@ -847,8 +846,6 @@ function MindMapTab({ initialData, onDataChange, visible }: MindMapTabProps) {
       }),
     )
   }
-
-  // (Toolbar portal removed — now handled by MindmapToolbar component)
 
   return h(Fragment, null,
     // Context menu (custom)

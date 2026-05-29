@@ -464,9 +464,6 @@ function App() {
   // (The flowgraph-state hidden DOM element is updated inside FlowTab, which
   //  owns the nodes/edges it serializes.)
 
-  // (Old toolbar button handlers and enable/disable logic removed —
-  //  now handled by per-tab toolbar components via React props)
-
   // ===== Keyboard Shortcuts (extracted hook) =====
   useKeyboardShortcuts({
     undo: () => activeFlowApiRef.current?.undo(),
