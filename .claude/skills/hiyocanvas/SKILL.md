@@ -50,10 +50,11 @@ API --json get_element '{"node_id":"n1"}'   # Returns raw JSON
 ```
 
 **References** (read before using unfamiliar operations):
+- [references/operations.md](references/operations.md) — Per-operation reference for canvas/workspace/execution commands
 - [references/blocks.md](references/blocks.md) — Block definitions, code_template conventions, built-in blocks
 - [references/troubleshooting.md](references/troubleshooting.md) — Common errors and fixes
 - [references/rich-display.md](references/rich-display.md) — CadQuery 3D, VRM/GLTF, plotly, SVG templates
-- [references/hdl-simulation.md](references/hdl-simulation.md) — HDL simulation with Amaranth, fixed-point verification
+- [references/narrator.md](references/narrator.md) — Runtime observation (narrator events / state / errors)
 
 ## Command Format
 

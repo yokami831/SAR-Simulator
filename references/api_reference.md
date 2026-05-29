@@ -199,3 +199,16 @@ All `/api/tools/*` endpoints accept POST with JSON body (unless noted as GET).
 - `status_change`: `{"type": "status_change", "status": "running"|"stopped"|"stepping"}`
 - `step_ready`: `{"type": "step_ready", "next_node_id": "...", "step_index": N, "total_steps": N, "step_order": [...]}`
 - `console_log_push`: `{"type": "console_log_push", "level": "...", "message": "..."}`
+
+## Narrator / App State (`/api/narrator/`)
+
+ランタイム観測システム。コードを追わずにアプリの動作状態（フロー実行順序、ノード結果、エラー）を即座に確認できる。read-only HTTP のため、フロー実行中も安全にポーリングできる。
+
+| Method | Path | Parameters | Response |
+|--------|------|-----------|----------|
+| GET | `/api/narrator/events` | `n` (1-500, default 50) | `{"events": [...], "count": N, "total_buffered": N}` |
+| GET | `/api/narrator/state` | — | 現在のナレーター状態（実行中か、WS接続状況など） |
+| GET | `/api/narrator/errors` | `n` (1-100, default 20) | `{"errors": [...], "count": N}` |
+| POST | `/api/narrator/clear` | — | `{"success": true, "message": "..."}` |
+
+フロー実行中は canvas API 操作を送らず、`/api/narrator/events` で `flow_completed` を確認してから編集すること（重い3D表示中のレンダラークラッシュ回避）。
