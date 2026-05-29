@@ -1,6 +1,26 @@
 # 引き継ぎ — SAR FPGA ルート / レンジFFT長 (2026-05-29 夜)
 
-**ブランチ** main / **最新コミット** `0c3bdba`（その前 `327fa90`, `6d45007`）
+> ## ✅ 解決済み（2026-05-29 続きのセッション, commit `8b122de`）
+> 下記「未解決の本丸」は **解決**。n2 の Nr を **next_pow2** に変更（4035→4096）し、
+> NUFFT・echo合成・レンジ圧縮・HDL を全段 同一巡回長 Nr で一貫させた。HDL の
+> `route_b_pipeline` は内部 next_pow2(Nr)==Nr で純粋巡回 Nr に退化 → float/fixed と
+> 一致（継ぎ目消失）。線形/N_req/N_HDL/[:Nr]切出しは全撤去。**3ルート（float/fixed/hdl）
+> 実機検証で画像・ポイント両方が全体表示・継ぎ目なしを確認済み**。ハードコードなし
+> （Fs/R_half/Tp から自動追従）。
+>
+> 検証中に Verilator が `rc=127`（空出力）で死ぬ環境バグも発見・恒久修正:
+> `bash -lc "verilator"` は `MSYSTEM=MINGW64` のときだけ `/mingw64/bin` を PATH に
+> 載せる。Electron が spawn する kernel は MSYSTEM 未設定なので verilator が見つから
+> なかった。`verilator_fft_drive.py` に `_mingw_env()` を追加し build/exe-run 両
+> subprocess へ MSYSTEM=MINGW64 + mingw64/usr bin を渡して解決。
+>
+> **N 可変の整理**: FFTサンプル数(Nr=pow2)が変わると **Verilator シミュは自動追従**
+> （`vbuild_{N}` を N ごとにビルド・キャッシュ、SeqFFT は N 完全パラメータ化）。**実機
+> FPGA は合成時 N 固定なので再合成が必要**。Nr が同じ pow2 のままなら双方リビルド不要。
+> 詳細メモリ: [[fpga-range-fft-nr-pow2]] / [[msys2-verilator-setup]]。
+> 以下は当時の作業ログ（参考）。
+
+**ブランチ** main / **最新コミット** `8b122de`（旧 `0c3bdba` 時点の引き継ぎ）
 対象フロー: `workspace-SAR-SIM/SAR-Simulator-FPGA3.rcflow`（アクティブ作業フロー）
 
 ## このセッションで完了したこと（コミット済み・有効）
