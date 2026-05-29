@@ -139,6 +139,7 @@ def route_b_pipeline(
     Q_IN=(10, 9),
     Q_FFT=(18, 10),
     Q_OUT=(10, 9),
+    N_FFT: int = None,
     verbose: bool = True,
 ):
     """Bit-exact gate-level Route B (FFT × multiply × IFFT with per-stage Q quantize).
@@ -156,7 +157,11 @@ def route_b_pipeline(
         s_raw : (Na, Nr) complex64, cropped back to original Nr.
     """
     Na, Nr = fir_coefficients.shape
-    Nr_p2 = _next_pow2(Nr)
+    # FFT size: caller-supplied fixed FPGA size N_FFT (synthesis-time constant),
+    # else next_pow2(Nr). Must hold at least the receive window.
+    Nr_p2 = int(N_FFT) if N_FFT else _next_pow2(Nr)
+    if Nr_p2 < Nr:
+        raise ValueError(f"N_FFT={Nr_p2} < Nr={Nr}: FFT smaller than receive window")
     if verbose:
         print(f"  Q_IN=Q{Q_IN[0]-Q_IN[1]}.{Q_IN[1]}  Q_FFT=Q{Q_FFT[0]-Q_FFT[1]}.{Q_FFT[1]}  Q_OUT=Q{Q_OUT[0]-Q_OUT[1]}.{Q_OUT[1]}")
         print(f"  Nr={Nr} -> Nr_p2={Nr_p2}, Na={Na}")
