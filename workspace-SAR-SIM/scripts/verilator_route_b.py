@@ -81,6 +81,104 @@ def verilator_ifft(x: np.ndarray) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
+# Route B equivalent — Stage A/B/C quantization wrapped around Verilator FFT.
+# Mirrors backend/SAR n43 Route B's qz() semantics with Q-format parameters
+# (default matches the documented Route B defaults: Q1.9 / Q8.10 / Q1.9).
+# ---------------------------------------------------------------------------
+
+def quantize_fixed(x: np.ndarray, n_word: int, n_frac: int) -> np.ndarray:
+    """Fixed Q-format quantize (no auto-scale). Clip + round to full-scale.
+
+    Used for Stage A (ADC) and Stage C (DAC) where the FS reference is part
+    of the analog design and shouldn't be rescaled per-frame.
+    """
+    step = 2.0 ** (-n_frac)
+    iv_max =  (1 << (n_word - 1)) - 1
+    iv_min = -(1 << (n_word - 1))
+    re = np.clip(np.round(x.real / step), iv_min, iv_max) * step
+    im = np.clip(np.round(x.imag / step), iv_min, iv_max) * step
+    return (re + 1j * im).astype(np.complex64)
+
+
+def quantize_bfp(x: np.ndarray, n_word: int, n_frac: int) -> np.ndarray:
+    """Block floating-point quantize: peak -> FS*0.95, round, scale back.
+
+    Used for Stage B (FFT-internal datapath) where each "block" (FFT output,
+    multiply result, etc.) gets its own shift exponent. Matches Route B's
+    qz(mode='auto').
+    """
+    full_scale = 2 ** (n_word - 1 - n_frac)
+    step = 2.0 ** (-n_frac)
+    iv_max =  (1 << (n_word - 1)) - 1
+    iv_min = -(1 << (n_word - 1))
+    peak = float(np.maximum(np.abs(x.real).max(), np.abs(x.imag).max()))
+    if peak == 0:
+        return x.astype(np.complex64)
+    s = 0.95 * full_scale / peak
+    re = np.clip(np.round(x.real * s / step), iv_min, iv_max) * step / s
+    im = np.clip(np.round(x.imag * s / step), iv_min, iv_max) * step / s
+    return (re + 1j * im).astype(np.complex64)
+
+
+def route_b_pipeline(
+    fir_coefficients: np.ndarray,
+    ref_chirp: np.ndarray,
+    Q_IN=(10, 9),
+    Q_FFT=(18, 10),
+    Q_OUT=(10, 9),
+    verbose: bool = True,
+) -> np.ndarray:
+    """Bit-exact gate-level Route B (FFT × multiply × IFFT with per-stage Q quantize).
+
+    Mirrors n43 Route B but with the FFT/IFFT step done by the Verilator-
+    compiled Amaranth FFT instead of cupy.fft. Stage A/B/C quantization is
+    applied in Python (cupy on real FPGA, here numpy for portability).
+
+    Inputs:
+        fir_coefficients : (Na, Nr) complex   — time-domain FIR taps from n32
+        ref_chirp        : (Nr,)   complex   — baseband reference chirp
+        Q_IN, Q_FFT, Q_OUT: (n_word, n_frac) per stage
+
+    Returns:
+        s_raw : (Na, Nr) complex64, cropped back to original Nr.
+    """
+    Na, Nr = fir_coefficients.shape
+    Nr_p2 = _next_pow2(Nr)
+    if verbose:
+        print(f"  Q_IN=Q{Q_IN[0]-Q_IN[1]}.{Q_IN[1]}  Q_FFT=Q{Q_FFT[0]-Q_FFT[1]}.{Q_FFT[1]}  Q_OUT=Q{Q_OUT[0]-Q_OUT[1]}.{Q_OUT[1]}")
+        print(f"  Nr={Nr} -> Nr_p2={Nr_p2}, Na={Na}")
+
+    # Pad fir + chirp to next power of 2 (real FFT IP is fixed-size)
+    fir_padded = np.zeros((Na, Nr_p2), dtype=np.complex64)
+    fir_padded[:, :Nr] = fir_coefficients
+    chirp_padded = np.zeros(Nr_p2, dtype=np.complex64)
+    chirp_padded[:Nr] = ref_chirp
+
+    # Stage A: ADC-like fixed quantize. BRAM pre-scale for fir (per-frame
+    # block scale factor); chirp is already O(1) so direct.
+    fir_peak = float(np.maximum(np.abs(fir_padded.real).max(), np.abs(fir_padded.imag).max()))
+    fir_pre_scale = 0.95 / fir_peak if fir_peak > 0 else 1.0
+    fir_q   = quantize_fixed(fir_padded * fir_pre_scale, *Q_IN) / fir_pre_scale
+    chirp_q = quantize_fixed(chirp_padded, *Q_IN)
+    if verbose:
+        print(f"  Stage A: fir_pre_scale=1/{1/fir_pre_scale:.3g}  fir_q.shape={fir_q.shape}  chirp_q.shape={chirp_q.shape}")
+
+    # Stage B: FFT via Verilator, then Q_FFT BFP per block
+    F = quantize_bfp(verilator_fft(fir_q),                   *Q_FFT)
+    C = quantize_bfp(verilator_fft(chirp_q.reshape(1, -1))[0], *Q_FFT)
+    prod = quantize_bfp(F * C[None, :], *Q_FFT)
+
+    # Stage C: IFFT via Verilator, Q_OUT BFP for the final s_raw
+    s_raw_padded = quantize_bfp(verilator_ifft(prod), *Q_OUT)
+
+    # Crop zero-pad tail
+    s_raw = s_raw_padded[:, :Nr].astype(np.complex64)
+    if verbose:
+        print(f"  s_raw={s_raw.shape}  peak|s|={float(np.abs(s_raw).max()):.3f}")
+    return s_raw
+
+
+# ---------------------------------------------------------------------------
 # Self-test
 # ---------------------------------------------------------------------------
 def _self_test(N=1024, Na=4, seed=0):

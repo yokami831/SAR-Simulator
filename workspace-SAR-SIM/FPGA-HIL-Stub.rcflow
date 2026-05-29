@@ -4,10 +4,10 @@
   "title": "FPGA-HIL-Stub",
   "description": "",
   "created": "2026-05-29T06:08:10.580514+00:00",
-  "modified": "2026-05-29T07:32:08.745228+00:00",
+  "modified": "2026-05-29T07:35:12.519687+00:00",
   "canvas": {
     "name": "flowgraph",
-    "savedAt": "2026-05-29T07:32:08.744Z",
+    "savedAt": "2026-05-29T07:35:12.527Z",
     "nodes": [
       {
         "id": "n1",
@@ -200,7 +200,7 @@
             }
           ],
           "defaultParameters": {
-            "code": "# === FPGA Compute (Verilator HIL — bit-exact gate-level FFT) ===\n# Verilator-driven Route B equivalent: pad to power of 2, Amaranth FFT,\n# multiply, IFFT. Slower than the cupy node (n4) but bit-exact with what\n# real HDL synthesis would produce — use this for verification or as the\n# production HIL output when you trust the cupy result.\n#\n# Builds the Verilator exe lazily (first run ~20s); subsequent runs reuse\n# the cached exe in workspace-SAR-SIM/fpga_io/vbuild_<N>/.\nimport numpy as np\nimport sys, os\nimport time as _time\n\n# Make the workspace-local FFT scripts importable from this kernel\n_PROJ = r\"d:\\kamijo\\HiyoCanvas\"\n_SCRIPTS = os.path.join(_PROJ, \"workspace-SAR-SIM\", \"scripts\")\nif _SCRIPTS not in sys.path:\n    sys.path.insert(0, _SCRIPTS)\nfrom verilator_route_b import verilator_fft, verilator_ifft\n\n_t0 = _time.monotonic()\n\nNa, Nr = fir_coefficients.shape\nNr_p2 = 1 << (Nr - 1).bit_length()\nprint(f\"Verilator HIL: Na={Na} Nr={Nr} -> Nr_p2={Nr_p2}\")\n\n# Pad fir and chirp to the next power of 2 (real FPGA FFT IP is also fixed-size)\nfir_padded = np.zeros((Na, Nr_p2), dtype=np.complex64)\nfir_padded[:, :Nr] = fir_coefficients\nchirp_padded = np.zeros(Nr_p2, dtype=np.complex64)\nchirp_padded[:Nr] = ref_chirp\n\n# Stage B equivalent: FFT, multiply, IFFT, all through the Verilator-compiled\n# Amaranth FFT. No explicit BFP quantization yet — F is returned in Q(WG).15\n# floats already block-scaled per-batch by verilator_fft.\n_t_fft = _time.monotonic()\nF = verilator_fft(fir_padded)\nprint(f\"  FFT(fir):   {_time.monotonic() - _t_fft:.2f}s  shape={F.shape}\")\n\n_t_fft = _time.monotonic()\nC = verilator_fft(chirp_padded.reshape(1, -1))[0]\nprint(f\"  FFT(chirp): {_time.monotonic() - _t_fft:.2f}s\")\n\nprod = (F * C[None, :]).astype(np.complex64)\n\n_t_ifft = _time.monotonic()\ns_raw_padded = verilator_ifft(prod)\nprint(f\"  IFFT:       {_time.monotonic() - _t_ifft:.2f}s\")\n\n# Crop back to Nr (drops the zero-padded tail)\ns_raw_fpga = s_raw_padded[:, :Nr].astype(np.complex64)\n\nprint(f\"Verilator HIL: s_raw_fpga={s_raw_fpga.shape} peak|s|={float(np.abs(s_raw_fpga).max()):.3f}  ({_time.monotonic() - _t0:.2f}s total)\")\n",
+            "code": "# === FPGA Compute (Verilator HIL — bit-exact gate-level FFT) ===\n# Full Route B equivalent: Stage A (ADC quantize) -> FFT × multiply × IFFT\n# (each FFT done by the Verilator-compiled Amaranth FFT) -> Stage C (DAC\n# quantize). Bit-exact with what a real FPGA implementing the same Q-format\n# pipeline would produce.\n#\n# Slower than n4 cupy (~18s vs ~0.1s per frame) but gives the gate-accurate\n# reference signal — use to confirm that the cupy result is HW-realizable.\n#\n# Mutually exclusive with n4 (both write s_raw_fpga to the kernel).\nimport numpy as np\nimport sys, os\nimport time as _time\n\n_PROJ = r\"d:\\kamijo\\HiyoCanvas\"\n_SCRIPTS = os.path.join(_PROJ, \"workspace-SAR-SIM\", \"scripts\")\nif _SCRIPTS not in sys.path:\n    sys.path.insert(0, _SCRIPTS)\nfrom verilator_route_b import route_b_pipeline\n\n# Q-format parameters — keep aligned with n43 Route B in the main flow.\n# Defaults match the documented Route B (Q1.9 ADC / Q8.10 FFT internal / Q1.9 DAC).\nQ_IN  = (10, 9)\nQ_FFT = (18, 10)\nQ_OUT = (10, 9)\n\n_t0 = _time.monotonic()\nprint(f\"Verilator HIL Route B start: Q_IN=Q{Q_IN[0]-Q_IN[1]}.{Q_IN[1]}  Q_FFT=Q{Q_FFT[0]-Q_FFT[1]}.{Q_FFT[1]}  Q_OUT=Q{Q_OUT[0]-Q_OUT[1]}.{Q_OUT[1]}\")\n\ns_raw_fpga = route_b_pipeline(\n    fir_coefficients.astype(np.complex64),\n    ref_chirp.astype(np.complex64),\n    Q_IN=Q_IN, Q_FFT=Q_FFT, Q_OUT=Q_OUT,\n    verbose=True,\n)\n\nprint(f\"Verilator HIL Route B done: s_raw_fpga={s_raw_fpga.shape} peak|s|={float(np.abs(s_raw_fpga).max()):.3f}  ({_time.monotonic() - _t0:.2f}s total)\")\n",
             "label": "FPGA Compute (Verilator HIL)"
           },
           "enabled": false,
