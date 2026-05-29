@@ -102,7 +102,6 @@ export function useSubgraphOps({
       ...(proxyEdges as Edge[]),
     ]);
 
-    markDirty?.();
     return sgId;
   }, [setNodes, setEdges, pushHistory, markDirty]);
 
@@ -179,7 +178,6 @@ export function useSubgraphOps({
       for (const e of allNew) seen.set(e.id, e);
       return [...seen.values()];
     });
-    markDirty?.();
   }, [setNodes, setEdges, pushHistory, markDirty]);
 
   /** Collapse an expanded subgraph — move children back to store */
@@ -198,7 +196,6 @@ export function useSubgraphOps({
       pushHistory();
       delete subgraphStoreRef.current[sgId];
       setNodes(nds => nds.filter(n => n.id !== sgId));
-      markDirty?.();
       return;
     }
 
@@ -248,7 +245,6 @@ export function useSubgraphOps({
       // Remove any leftover edges referencing collapsed child nodes
       return allNew.filter(e => !aliveChildSet.has(e.source) && !aliveChildSet.has(e.target));
     });
-    markDirty?.();
   }, [setNodes, setEdges, pushHistory, markDirty]);
 
   /** Toggle collapse/expand of a subgraph */
@@ -281,7 +277,6 @@ export function useSubgraphOps({
         } as Node : n
       );
     });
-    markDirty?.();
   }, [expandSubgraph, setNodes, pushHistory, markDirty]);
 
   const groupSelected = useCallback(async () => {
@@ -303,7 +298,6 @@ export function useSubgraphOps({
     setNodes(nds => nds.map(n =>
       n.id === sgId ? { ...n, data: { ...n.data, label: newLabel } } : n
     ));
-    markDirty?.();
   }, [setNodes, pushHistory, markDirty]);
 
   /** Set subgraph description */
@@ -312,7 +306,6 @@ export function useSubgraphOps({
     setNodes(nds => nds.map(n =>
       n.id === sgId ? { ...n, data: { ...n.data, description: desc } } : n
     ));
-    markDirty?.();
   }, [setNodes, pushHistory, markDirty]);
 
   return {

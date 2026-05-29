@@ -74,7 +74,6 @@ export function useClipboard({
       })),
       edges: copiedEdges,
     };
-    markDirty?.();
   }, [setNodes, setEdges, pushHistory, markDirty]);
 
   const cutSelected = useCallback(() => {

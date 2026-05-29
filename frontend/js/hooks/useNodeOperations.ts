@@ -75,7 +75,6 @@ export function useNodeOperations({
       paramOverrides,
     });
     setNodes(nds => [...nds, newNode]);
-    markDirty?.();
     return nodeId;
   }, [setNodes, pushHistory, markDirty]);
 
@@ -102,7 +101,6 @@ export function useNodeOperations({
       source, sourceHandle,
       target, targetHandle,
     }]);
-    markDirty?.();
     return edgeId;
   }, [setEdges, pushHistory, markDirty]);
 
@@ -116,14 +114,12 @@ export function useNodeOperations({
     setNodes(nds => nds.filter(n => n.id !== nodeId));
     setEdges(eds => eds.filter(e => e.source !== nodeId && e.target !== nodeId));
     delete vizDataStore[nodeId];
-    markDirty?.();
   }, [setNodes, setEdges, pushHistory, markDirty]);
 
   // ===== Delete Edge =====
   const deleteEdge = useCallback((edgeId: string) => {
     pushHistory();
     setEdges(eds => eds.filter(e => e.id !== edgeId));
-    markDirty?.();
   }, [setEdges, pushHistory, markDirty]);
 
   // ===== Delete Selected =====
@@ -140,7 +136,6 @@ export function useNodeOperations({
     setEdges(eds => eds.filter(e =>
       !e.selected && !selectedIds.has(e.source) && !selectedIds.has(e.target)
     ));
-    markDirty?.();
     requestAnimationFrame(() => { skipHistoryRef.current = false; });
   }, [setNodes, setEdges, pushHistory, markDirty]);
 
@@ -152,7 +147,6 @@ export function useNodeOperations({
     setEdges([]);
     subgraphStoreRef.current = {};
     resetNodeIdCounter(100);
-    markDirty?.();
   }, [setNodes, setEdges, pushHistory, markDirty]);
 
   // ===== Edge Connection (UI onConnect callback) =====
@@ -165,7 +159,6 @@ export function useNodeOperations({
     setEdges(eds => addEdge({
       ...params,
     }, eds));
-    markDirty?.();
   }, [setEdges, pushHistory, markDirty]);
 
   // ===== Drag & Drop from Sidebar =====
@@ -294,7 +287,6 @@ export function useNodeOperations({
       setTimeout(() => rfInstance.current?.fitView({ padding: FIT_VIEW_PADDING }), 50);
       return result;
     });
-    markDirty?.();
   }, [setNodes, pushHistory, markDirty]);
 
   // ===== Overlap Resolution on Node Resize =====

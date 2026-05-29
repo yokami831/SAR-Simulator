@@ -105,8 +105,9 @@ export function FlowTab(props: FlowTabProps) {
   // re-renders FlowTab → the watch effect fires → fingerprint diff catches it,
   // so dirty detection is passive and cannot be bypassed by any mutation site.
   //
-  // This is additive — the existing event-driven markDirty() calls remain in
-  // place until Phase 2 verifies this works.
+  // Phase 2 (commit follow-up to b86bf61) removed the formerly-redundant
+  // event-driven markDirty() calls scattered through the Flow path; this
+  // watch effect is now the sole dirty-tracking entry point for Flow tabs.
   //
   // Init: anchor the fingerprint to the initial state (so freshly-mounted /
   // just-loaded tabs are clean). FlowTab is key-remounted per tab (commit
@@ -288,11 +289,6 @@ export function FlowTab(props: FlowTabProps) {
 
     onNodesChangeBase(changes);
 
-    // Mark dirty for structural/position changes
-    if (hasAdd || hasRemove || hasDragEnd) {
-      markDirty();
-    }
-
     // Check if any node's dimensions changed (e.g. viz canvas expanded)
     const hasDimensionChange = changes.some(
       (c: NodeChange) => c.type === 'dimensions' && (c as any).dimensions
@@ -316,7 +312,6 @@ export function FlowTab(props: FlowTabProps) {
     }
     if (hasRemove) pushHistory();
     onEdgesChangeBase(changes);
-    if (hasAdd || hasRemove) markDirty();
   }, [onEdgesChangeBase, pushHistory, markDirty]);
 
   // ===== Tooltip Management =====
