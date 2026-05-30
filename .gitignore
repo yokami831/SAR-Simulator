@@ -144,3 +144,8 @@ tmp_desktop_gap_review.md
 # Large reference assets (downloadable separately, not source)
 *.zip
 workspace-SAR-SIM/**/photo_large.png
+
+workspace-SAR-SIM/scripts/xfft_cmodel/
+
+# Vivado generated project (multi-GB runs/cache/sim); recipe lives in vivado_recipe/
+workspace-SAR-SIM/vivado/
